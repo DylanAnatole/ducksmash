@@ -467,6 +467,23 @@ public static class Art
     }
 
     // Pastel bathroom tiles with grout lines.
+    // translucent deep-teal band hugging the tub walls (water looks deeper at the edges)
+    public static Texture2D EdgeShadeTex(float aspect, int size = 128)
+    {
+        int W = size, H = Mathf.RoundToInt(size / Mathf.Max(0.1f, aspect));
+        var tex = new Texture2D(W, H, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+        var px = new Color[W * H]; var c = new Color(0.08f, 0.32f, 0.55f);
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+            {
+                float d = Mathf.Min(Mathf.Min(x, W - 1 - x), Mathf.Min(y, H - 1 - y)) / (float)W;   // distance to edge, in tub widths
+                float a = Mathf.Pow(1f - Mathf.Clamp01(d / 0.2f), 1.8f) * 0.6f;
+                px[y * W + x] = new Color(c.r, c.g, c.b, a);
+            }
+        tex.SetPixels(px); tex.Apply();
+        return tex;
+    }
+
     public static Texture2D TileTex(Color tile, Color grout, int tiles = 4, int size = 256)
     {
         var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear };

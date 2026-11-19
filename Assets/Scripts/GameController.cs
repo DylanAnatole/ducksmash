@@ -43,6 +43,7 @@ public class GameController : MonoBehaviour
         public string type; public Vector2 p; public float w, h, r; public bool rect; public int hp, max; public bool alive = true;
         public float hit, falling; public Block under, plankRef; public List<Block> screws; public string dir; public Color color;
         public float mvCx, mvAmp, mvSp; public int pid; public Transform view; public Vector3 baseScale = Vector3.one;
+        public Renderer[] rends; public bool flashing;
         public bool Goal => type == "cookie" || type == "chest" || type == "pixel" || type == "ice" || type == "boss";
         public bool Hard => type == "stone" || type == "plank";
     }
@@ -251,6 +252,60 @@ public class GameController : MonoBehaviour
         }
         // soap bar on the right rim
         Art.Prim(PrimitiveType.Capsule, world, new Vector3(w / 2 + rim / 2, 0.62f, h * 0.18f), new Vector3(0.3f, 0.22f, 0.22f), Art.Mat(new Color(1f, 0.72f, 0.82f), 0.9f, 0, 0, 0.003f), new Vector3(90, 0, 90));
+        // deeper-looking water toward the walls
+        var depth = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(depth.GetComponent<Collider>());
+        depth.transform.SetParent(world, false); depth.transform.position = new Vector3(0, -0.03f, 0); depth.transform.eulerAngles = new Vector3(90, 0, 0);
+        depth.transform.localScale = new Vector3(w, h, 1);
+        var dm = Art.Fade(Color.white); dm.mainTexture = Art.EdgeShadeTex(w / h); depth.GetComponent<Renderer>().sharedMaterial = dm;
+        depth.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        BuildDecor(w, h, rim);
+    }
+
+    // bathroom props around the tub (baked into one mesh -> 1 draw call)
+    void BuildDecor(float w, float h, float rim)
+    {
+        var root = Art.Root("Decor", world);
+        float top = h / 2 + rim + 1.0f, bottom = -h / 2 - rim - 1.3f;
+        // fluffy bath mat with stripes below the tub
+        var mat = Art.Mat(new Color(0.62f, 0.84f, 0.95f), 0.1f);
+        Art.Prim(PrimitiveType.Cube, root, new Vector3(0, -0.3f, bottom), new Vector3(6.4f, 0.12f, 2.0f), mat);
+        foreach (float x in new[] { -3.2f, 3.2f }) Art.Prim(PrimitiveType.Cylinder, root, new Vector3(x, -0.3f, bottom), new Vector3(2.0f, 0.06f, 2.0f), mat);
+        var stripe = Art.Mat(new Color(1f, 1f, 1f), 0.1f);
+        for (int i = -2; i <= 2; i++) Art.Prim(PrimitiveType.Cube, root, new Vector3(i * 1.2f, -0.235f, bottom), new Vector3(0.28f, 0.02f, 1.7f), stripe);
+        // shelf behind the faucet: bottles, cup, plant, towels
+        var shelf = Art.Mat(new Color(0.98f, 0.95f, 0.92f), 0.6f);
+        Art.Prim(PrimitiveType.Cube, root, new Vector3(0, -0.1f, top + 0.3f), new Vector3(w + 2.5f, 0.5f, 1.6f), shelf);
+        void Bottle(float x, Color body, Color cap, float hgt)
+        {
+            Art.Prim(PrimitiveType.Cylinder, root, new Vector3(x, 0.15f + hgt / 2, top), new Vector3(0.55f, hgt / 2, 0.55f), Art.Mat(body, 0.8f));
+            Art.Prim(PrimitiveType.Sphere, root, new Vector3(x, 0.15f + hgt, top), new Vector3(0.55f, 0.3f, 0.55f), Art.Mat(body, 0.8f));
+            Art.Prim(PrimitiveType.Cylinder, root, new Vector3(x, 0.32f + hgt, top), new Vector3(0.26f, 0.14f, 0.26f), Art.Mat(cap, 0.7f));
+            Art.Prim(PrimitiveType.Cube, root, new Vector3(x, 0.15f + hgt * 0.5f, top - 0.27f), new Vector3(0.34f, hgt * 0.45f, 0.02f), Art.Mat(Color.white, 0.3f));   // label
+        }
+        Bottle(-3.4f, new Color(0.55f, 0.82f, 1f), new Color(0.25f, 0.45f, 0.85f), 1.2f);
+        Bottle(-2.7f, new Color(1f, 0.7f, 0.82f), new Color(0.9f, 0.35f, 0.55f), 0.9f);
+        Bottle(2.6f, new Color(0.7f, 0.92f, 0.6f), new Color(0.35f, 0.65f, 0.3f), 1.05f);
+        // toothbrush cup
+        Art.Prim(PrimitiveType.Cylinder, root, new Vector3(-1.6f, 0.45f, top), new Vector3(0.45f, 0.3f, 0.45f), Art.Mat(new Color(1f, 0.85f, 0.4f), 0.7f));
+        Art.Prim(PrimitiveType.Cylinder, root, new Vector3(-1.68f, 0.95f, top), new Vector3(0.07f, 0.35f, 0.07f), Art.Mat(new Color(0.4f, 0.75f, 1f), 0.6f), new Vector3(0, 0, 12));
+        Art.Prim(PrimitiveType.Cylinder, root, new Vector3(-1.5f, 0.95f, top), new Vector3(0.07f, 0.35f, 0.07f), Art.Mat(new Color(1f, 0.5f, 0.6f), 0.6f), new Vector3(0, 0, -10));
+        // potted plant on the right
+        Art.Prim(PrimitiveType.Cylinder, root, new Vector3(3.6f, 0.5f, top), new Vector3(0.8f, 0.35f, 0.8f), Art.Mat(new Color(0.93f, 0.55f, 0.4f), 0.4f));
+        var leaf = Art.Mat(new Color(0.45f, 0.8f, 0.45f), 0.5f); var leaf2 = Art.Mat(new Color(0.35f, 0.68f, 0.4f), 0.5f);
+        for (int i = 0; i < 7; i++)
+        {
+            float a = i / 7f * Mathf.PI * 2;
+            Art.Prim(PrimitiveType.Sphere, root, new Vector3(3.6f + Mathf.Cos(a) * 0.35f, 1.2f + (i % 2) * 0.2f, top + Mathf.Sin(a) * 0.3f), new Vector3(0.35f, 0.75f, 0.2f), i % 2 == 0 ? leaf : leaf2, new Vector3(Mathf.Sin(a) * 30, -a * Mathf.Rad2Deg, Mathf.Cos(a) * 30));
+        }
+        // rolled towels
+        var towelA = Art.Mat(new Color(1f, 0.78f, 0.86f), 0.1f); var towelB = Art.Mat(new Color(0.75f, 0.88f, 1f), 0.1f);
+        Art.Prim(PrimitiveType.Capsule, root, new Vector3(1.2f, 0.45f, top), new Vector3(0.6f, 0.55f, 0.6f), towelA, new Vector3(0, 0, 90));
+        Art.Prim(PrimitiveType.Capsule, root, new Vector3(1.6f, 0.45f, top - 0.1f), new Vector3(0.6f, 0.55f, 0.6f), towelB, new Vector3(0, 0, 90));
+        Art.Prim(PrimitiveType.Capsule, root, new Vector3(1.4f, 0.95f, top - 0.05f), new Vector3(0.55f, 0.5f, 0.55f), towelA, new Vector3(0, 0, 90));
+        // slippers on the mat
+        var slip = Art.Mat(new Color(1f, 0.85f, 0.45f), 0.3f);
+        foreach (float x in new[] { 3.6f, 4.3f }) Art.Prim(PrimitiveType.Capsule, root, new Vector3(x, -0.15f, bottom + 0.2f), new Vector3(0.5f, 0.55f, 0.25f), slip, new Vector3(90, 0, 0));
+        Art.Bake(root, "decor", 0.5f, 0.002f);
     }
 
     void MakeView(Block b)
@@ -278,6 +333,7 @@ public class GameController : MonoBehaviour
         Art.Bake(b.view, key, gloss, outline, "Spark", "IceShell", "Arrow", "Glow");
         b.view.position = W(b.p);
         b.baseScale = b.view.localScale;
+        b.rends = b.view.GetComponentsInChildren<Renderer>().Where(r => r.gameObject.activeSelf && r.sharedMaterial != null && r.sharedMaterial.HasProperty("_Emission")).ToArray();
     }
 
     Duck NewDuck(Vector2 p, string kind)
@@ -1200,6 +1256,7 @@ public class GameController : MonoBehaviour
             var spark = d.body.Find("Spark"); if (spark) spark.gameObject.SetActive((d.charged || d.special) && Mathf.Sin(t * 14) > -0.3f);
             if (spd > 120 && UnityEngine.Random.value < 0.5f) FxKit.Wake(W(d.p - d.v.normalized * d.r));
             if (d.trail) d.trail.emitting = spd > 260 && d.spawnT <= 0;
+            if (spd < 20 && d.spawnT <= 0 && UnityEngine.Random.value < dt * 0.5f) FxKit.Ripple(W(d.p), 0.75f);   // lazy idle ripples
             if (d.rocketT > 0) { FxKit.Flame(W(d.p - d.v.normalized * d.r * 1.2f, 0.3f)); if (UnityEngine.Random.value < 0.3f) FxKit.Smoke(W(d.p - d.v.normalized * d.r * 1.6f), 0.3f, 1); }
             if (d.special && !moving && UnityEngine.Random.value < dt * 4) FxKit.Sparkle(W(d.p, 0.5f), d.kind == "rainbow" ? Color.HSVToRGB(UnityEngine.Random.value, 0.5f, 1f) : new Color(1f, 0.85f, 0.4f), 1);
         }
@@ -1209,7 +1266,17 @@ public class GameController : MonoBehaviour
             b.hit = Mathf.Max(0, b.hit - dt);
             float k = 1 + b.hit * (b.type == "boss" ? 0.4f : 1.2f);
             b.view.localScale = b.baseScale * k;
-            if (b.mvAmp > 0) b.view.position = W(b.p);
+            // floating goodies bob gently on the bath water
+            bool floats = b.type == "cookie" || b.type == "ice" || b.type == "pixel" || b.type == "chest" || b.type == "tnt" || b.type == "laser" || b.type == "boss";
+            if (b.mvAmp > 0 || floats) b.view.position = W(b.p, floats ? Mathf.Sin(t * 2.2f + b.p.x * 0.031f + b.p.y * 0.017f) * 0.035f : 0);
+            // white flash on hit (property block keeps the shared baked material untouched)
+            if (b.hit > 0 || b.flashing)
+            {
+                b.flashing = b.hit > 0;
+                var e = Color.white * (b.hit > 0 ? Mathf.Min(1f, b.hit * 6f) * 0.55f : 0f);
+                mpb.Clear(); mpb.SetColor("_Emission", e);
+                foreach (var r in b.rends) if (r) r.SetPropertyBlock(b.flashing ? mpb : null);
+            }
             if (b.type == "plank" && b.falling > 0) { float f = Mathf.Min(1, b.falling / 0.35f); b.view.position = W(b.p, -f * 0.6f); }
             if (b.type == "laser") b.view.Find("Arrow").localScale = Vector3.one * (1 + Mathf.Sin(t * 8) * 0.08f);
             if (b.type == "screw") b.view.localEulerAngles = new Vector3(0, t * 30 + b.p.x, 0);
