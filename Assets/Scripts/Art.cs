@@ -303,6 +303,22 @@ public static class Art
         return root;
     }
 
+    // bonus cookie: shiny gold with a star stamp (+1 move when smashed)
+    public static Transform GoldCookie(Transform parent, float d)
+    {
+        var root = Root("GoldCookie", parent);
+        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.1f, 0), new Vector3(d, 0.1f, d), Mat(Hex("e8a520"), 0.9f, 1));
+        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.2f, 0), new Vector3(d * 0.94f, 0.13f, d * 0.94f), Mat(Gold, 0.95f, 1, 0.25f));
+        var star = Mat(Hex("fff3b0"), 1f, 0, 0.6f);
+        for (int i = 0; i < 5; i++)
+        {
+            float a = i / 5f * 360f;
+            Prim(PrimitiveType.Cube, root, new Vector3(0, 0.29f, 0), new Vector3(0.09f, 0.04f, 0.42f) * d, star, new Vector3(0, a, 0));
+        }
+        Prim(PrimitiveType.Sphere, root, new Vector3(0.22f * d, 0.45f, 0.2f * d), Vector3.one * 0.12f * d, Mat(Color.white, 1f, 0, 2.5f, 0f)).name = "Spark";
+        return root;
+    }
+
     public static Transform Ice(Transform parent, float d)
     {
         var root = Cookie(parent, d);
