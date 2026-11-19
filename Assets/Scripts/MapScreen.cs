@@ -1,0 +1,136 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+
+// Level map: 25 nodes on a winding path (1-5 onboarding, 6-25 gameplay, bosses at 10/15/20/25).
+public class MapScreen : MonoBehaviour
+{
+    RectTransform root, content; ScrollRect scroll;
+    Text coinsTxt, starsTxt, boostTxt;
+    readonly List<(Image img, Text num, Text stars, Text tag, int n)> nodes = new List<(Image, Text, Text, Text, int)>();
+    const float NodeGap = 230, Bottom = 260;
+    readonly Dictionary<int, Image[]> nodeStars = new Dictionary<int, Image[]>();
+
+    static readonly Color Bg = new Color(0.97f, 0.85f, 0.9f), Purple = new Color(0.6f, 0.53f, 0.93f), PurpleDark = new Color(0.49f, 0.42f, 0.84f),
+        Ink = new Color(0.23f, 0.18f, 0.42f), Yellow = new Color(1f, 0.8f, 0.2f), Teal = new Color(0.25f, 0.78f, 0.75f),
+        Red = new Color(1f, 0.38f, 0.3f), Green = new Color(0.37f, 0.83f, 0.37f), Locked = new Color(0.79f, 0.76f, 0.84f);
+
+    public void Build(Transform canvas)
+    {
+        root = UIKit.Stretch(UIKit.Rect("MapScreen", canvas));
+        var bg = root.gameObject.AddComponent<RawImage>();
+        bg.texture = Art.TileTex(new Color(1f, 0.93f, 0.9f), new Color(0.94f, 0.84f, 0.84f)); bg.uvRect = new Rect(0, 0, 3, 5.3f);
+
+        // scroll view
+        var view = UIKit.Stretch(UIKit.Rect("Scroll", root), 0, 0, 0, 300);
+        scroll = view.gameObject.AddComponent<ScrollRect>();
+        view.gameObject.AddComponent<RectMask2D>();
+        var hit = view.gameObject.AddComponent<Image>(); hit.color = new Color(0, 0, 0, 0);
+        content = UIKit.Rect("Content", view);
+        content.anchorMin = new Vector2(0, 0); content.anchorMax = new Vector2(1, 0); content.pivot = new Vector2(0.5f, 0);
+        float height = Bottom + (LevelLibrary.Count - 1) * NodeGap + 400;
+        content.sizeDelta = new Vector2(0, height); content.anchoredPosition = Vector2.zero;
+        scroll.content = content; scroll.horizontal = false; scroll.vertical = true; scroll.movementType = ScrollRect.MovementType.Clamped;
+        scroll.viewport = view; scroll.scrollSensitivity = 40;
+
+        // path segments
+        for (int n = 1; n < LevelLibrary.Count; n++)
+        {
+            Vector2 a = NodePos(n), b = NodePos(n + 1);
+            var seg = UIKit.Panel(content, new Color(1, 1, 1, 0.75f), "Path", false).rectTransform;
+            seg.anchorMin = seg.anchorMax = new Vector2(0.5f, 0); seg.pivot = new Vector2(0.5f, 0.5f);
+            seg.anchoredPosition = (a + b) / 2; seg.sizeDelta = new Vector2(Vector2.Distance(a, b), 26);
+            seg.localEulerAngles = new Vector3(0, 0, Mathf.Atan2(b.y - a.y, b.x - a.x) * Mathf.Rad2Deg);
+        }
+        // section banners
+        Banner("HƯỚNG DẪN  ·  MÀN 1–5", 150, NodePos(1).y - 20, Teal);
+        Banner("THỬ THÁCH  ·  MÀN 6–25", -200, NodePos(6).y - 90, PurpleDark);
+
+        for (int n = 1; n <= LevelLibrary.Count; n++)
+        {
+            int lvl = n; bool boss = LevelLibrary.IsBoss(n);
+            float size = boss ? 190 : 150;
+            var img = UIKit.Dot(content, Color.white, "Node" + n);
+            var rt = img.rectTransform; rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0); rt.sizeDelta = new Vector2(size, size); rt.anchoredPosition = NodePos(n);
+            var sh = img.gameObject.AddComponent<Shadow>(); sh.effectColor = new Color(0, 0, 0, 0.25f); sh.effectDistance = new Vector2(0, -10);
+            var btn = img.gameObject.AddComponent<Button>(); btn.onClick.AddListener(() => { if (lvl <= SaveData.MaxLevel) { Sfx.Play("click"); App.StartLevel(lvl); } });
+            var inner = UIKit.Dot(img.transform, Color.white, "Inner"); UIKit.Stretch(inner.rectTransform, 12, 12, 12, 12); inner.raycastTarget = false;
+            var num = UIKit.Outlined(UIKit.Label(img.transform, n.ToString(), boss ? 64 : 58, Color.white), Ink, 3);
+            var tag = UIKit.Label(img.transform, boss ? "BOSS" : LevelLibrary.NewSpecialAt(n) != null ? "VỊT MỚI" : "", 28, Color.white); tag.rectTransform.offsetMin = new Vector2(0, -size * 0.75f); tag.rectTransform.offsetMax = new Vector2(0, -size * 0.55f);
+            var st = UIKit.Outlined(UIKit.Label(img.transform, "", 44, Yellow), Ink, 2); st.rectTransform.offsetMin = new Vector2(0, size * 0.62f); st.rectTransform.offsetMax = new Vector2(0, size * 0.62f);
+            nodes.Add((inner, num, st, tag, n));
+            nodeStars[n] = UIKit.StarRow(st.transform, 3, 40, 2);
+        }
+
+        // header
+        var head = UIKit.Panel(root, PurpleDark, "Header").rectTransform; UIKit.Place(head, 0.5f, 1, 0, -150, 1040, 250);
+        var headIn = UIKit.Panel(head, Purple, "Inner").rectTransform; UIKit.Stretch(headIn, 0, 10, 0, 0);
+        var title = UIKit.Outlined(UIKit.Label(headIn, "Duck Smash", 76, Color.white, TextAnchor.MiddleLeft), Ink, 4); UIKit.Place(title.rectTransform, 0, 0.5f, 290, 35, 520, 110);
+        var sub = UIKit.Label(headIn, "Bắn vịt · Phá tung bồn tắm", 32, Color.white, TextAnchor.MiddleLeft, false); UIKit.Place(sub.rectTransform, 0, 0.5f, 290, -45, 520, 60);
+        coinsTxt = UIKit.Label(headIn, "", 46, Yellow, TextAnchor.MiddleRight); UIKit.Place(coinsTxt.rectTransform, 1, 0.5f, -310, 50, 300, 70);
+        starsTxt = UIKit.Label(headIn, "", 32, Color.white, TextAnchor.MiddleRight); UIKit.Place(starsTxt.rectTransform, 1, 0.5f, -310, -5, 300, 50);
+        boostTxt = UIKit.Label(headIn, "", 26, Color.white, TextAnchor.MiddleRight, false); UIKit.Place(boostTxt.rectTransform, 1, 0.5f, -360, -55, 400, 50);
+        var gear = UIKit.Btn(headIn, "CÀI\nĐẶT", Yellow, Ink, 30, () => App.OpenSettings(false), "Settings");
+        UIKit.Place((RectTransform)gear.transform, 1, 0.5f, -80, 5, 130, 130);
+
+        // sandbox level for testing new mechanics (kept apart from the 25-level path)
+        var test = UIKit.Btn(root, "MÀN\nTHỬ", Red, Color.white, 40, () => { Sfx.Play("click"); App.StartLevel(LevelLibrary.TestLevel); }, "TestLevel");
+        UIKit.Place((RectTransform)test.transform, 1, 0, -120, 130, 200, 200);
+    }
+
+    void Banner(string text, float x, float y, Color c)
+    {
+        var b = UIKit.Panel(content, c, "Banner").rectTransform;
+        b.anchorMin = b.anchorMax = new Vector2(0.5f, 0); b.sizeDelta = new Vector2(520, 70); b.anchoredPosition = new Vector2(x, y);
+        UIKit.Label(b, text, 30, Color.white);
+    }
+
+    // zig-zag: 4 columns going up
+    static Vector2 NodePos(int n)
+    {
+        int i = n - 1; float[] xs = { -300, -100, 100, 300 };
+        int row = i / 4, col = i % 4; if (row % 2 == 1) col = 3 - col;
+        float y = Bottom + i * NodeGap * 0.62f + row * 90;
+        return new Vector2(xs[col], y);
+    }
+
+    public void Show()
+    {
+        root.gameObject.SetActive(true);
+        Refresh();
+        Canvas.ForceUpdateCanvases();
+        // scroll so the current level is visible
+        float y = NodePos(Mathf.Min(SaveData.MaxLevel, LevelLibrary.Count)).y;
+        float viewH = ((RectTransform)scroll.viewport).rect.height, total = content.sizeDelta.y;
+        scroll.verticalNormalizedPosition = Mathf.Clamp01((y - viewH * 0.4f) / Mathf.Max(1, total - viewH));
+    }
+
+    public void Hide() => root.gameObject.SetActive(false);
+
+    public void Refresh()
+    {
+        int max = SaveData.MaxLevel, totalStars = 0;
+        foreach (var nd in nodes)
+        {
+            int n = nd.n, s = SaveData.GetStars(n); totalStars += s;
+            bool open = n <= max, boss = LevelLibrary.IsBoss(n);
+            nd.img.color = !open ? (boss ? new Color(0.86f, 0.62f, 0.64f) : n <= LevelLibrary.Onboarding ? new Color(0.62f, 0.82f, 0.81f) : Locked) :boss ? Red : n <= LevelLibrary.Onboarding ? Teal : s > 0 ? Green : Yellow;
+            nd.num.text = open ? n.ToString() : "?";
+            nd.num.color = open ? Color.white : new Color(0.55f, 0.52f, 0.64f);
+            nd.stars.text = "";
+            for (int i = 0; i < 3; i++) { nodeStars[n][i].gameObject.SetActive(s > 0); nodeStars[n][i].color = i < s ? Yellow : new Color(1, 1, 1, 0.55f); }
+            nd.img.transform.parent.localScale = Vector3.one * (n == max ? 1.12f : 1f);
+        }
+        coinsTxt.text = SaveData.Coins + " xu";
+        starsTxt.text = "Sao " + totalStars + "/" + LevelLibrary.Count * 3;
+        boostTxt.text = "Búa " + SaveData.GetBoost("hammer") + " · Bom " + SaveData.GetBoost("bomb") + " · +3 lượt " + SaveData.GetBoost("moves");
+    }
+
+    void Update()
+    {
+        if (!root.gameObject.activeSelf) return;
+        // bob the current node
+        foreach (var nd in nodes)
+            if (nd.n == SaveData.MaxLevel) nd.img.transform.parent.localScale = Vector3.one * (1.12f + Mathf.Sin(Time.time * 4) * 0.04f);
+    }
+}
