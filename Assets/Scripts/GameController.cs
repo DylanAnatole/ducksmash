@@ -28,7 +28,7 @@ public class GameController : MonoBehaviour
         public float squash, zapCd, face = -Mathf.PI / 2; public Transform view, ring, body;
         public int Dmg => kind == "heavy" ? 3 : 1;
         // special (combo-reward) ducks are one-use: after their power fires they turn back into a normal duck
-        public bool special, spent, rainbowReady; public float rocketT, spawnT, stretch, pullVis; public TrailRenderer trail;
+        public bool special, spent, rainbowReady; public float rocketT, spawnT, stretch, pullVis, bankCd; public TrailRenderer trail;
     }
     // combo tiers: smashing this many in ONE shot hatches a special duck
     static readonly (int need, string kind, string name, Color col)[] TIERS =
@@ -72,7 +72,7 @@ public class GameController : MonoBehaviour
     bool moving, frenzyShot, bossKilled, rewarded;
     string state = "play", target, hint;
     float freeze, shake, comboPulse, t, lastW, lastH;
-    Duck drag; Vector2 dragPt, dragSm; int powerStep;
+    Duck drag; Vector2 dragPt, dragSm; int powerStep, shotBanks; bool lastWarned;
     Transform aimTarget, aimGrab; readonly List<Transform> pushDots = new List<Transform>(); LineRenderer band2;
     MaterialPropertyBlock mpb; static Material trailMat;
     Vector3 camBase; Material waterMat;
@@ -408,7 +408,12 @@ public class GameController : MonoBehaviour
                 if (b.falling > 0) b.falling += dt;
                 if (b.mvAmp > 0 && b.alive) b.p.x = b.mvCx + Mathf.Sin(t * b.mvSp) * b.mvAmp;
             }
-            foreach (var d in ducks) d.zapCd = Mathf.Max(0, d.zapCd - dt);
+            foreach (var d in ducks) { d.zapCd = Mathf.Max(0, d.zapCd - dt); d.bankCd = Mathf.Max(0, d.bankCd - dt); }
+            if (moves > 1) lastWarned = false;
+            if (state == "play" && !moving && moves == 1 && timers.Count == 0 && !lastWarned && GoalsLeft() > 0)
+            {   // make the final shot feel tense
+                lastWarned = true; BigText("LƯỢT CUỐI!", new Color(1f, 0.4f, 0.35f)); Sfx.Play("squeak", 0.7f, 0.7f); movesPulse = 0.5f;
+            }
             if (state == "play" || state == "rush" || moving) for (int i = 0; i < 6; i++) Step(dt / 6f);
             if (moving && timers.Count == 0 && ducks.All(d => d.v.magnitude < 14)) { foreach (var d in ducks) d.v = Vector2.zero; EndShot(); }
             if (state == "play" && !moving && timers.Count == 0)
@@ -500,7 +505,18 @@ public class GameController : MonoBehaviour
             float sp = d.v.magnitude;
             if (d.rocketT > 0) { d.rocketT -= dt; if (sp > 1) d.v *= ROCKET_SPEED / sp; }   // rocket: full thrust, no friction
             else if (sp > 0) { float ns = Mathf.Max(0, sp * Mathf.Exp(-DRAG * dt) - (sp < 150 ? 108 : FRICTION) * dt); d.v *= ns / sp; }
-            if (TubWalls(ref d.p, ref d.v, d.r) && sp > 200) { d.squash = 0.15f; Splash(d.p, 5); Sfx.Play("splash", Mathf.Clamp01(sp / 1200f) * 0.6f, UnityEngine.Random.Range(0.9f, 1.15f)); }
+            if (TubWalls(ref d.p, ref d.v, d.r) && sp > 200)
+            {
+                d.squash = 0.15f; Splash(d.p, 5); Sfx.Play("splash", Mathf.Clamp01(sp / 1200f) * 0.6f, UnityEngine.Random.Range(0.9f, 1.15f));
+                // bank shot: the shot duck gets a kick off the wall and the rest of the shot scores more
+                if (moving && d.hot && !d.clone && sp > 380 && d.bankCd <= 0 && shotBanks < 3)
+                {
+                    d.bankCd = 0.12f; shotBanks++;
+                    d.v *= Mathf.Min(1.1f, MAX_SPEED * 1.1f / Mathf.Max(1, sp));
+                    PopText("NẢY BĂNG x" + (shotBanks + 1), d.p, new Color(0.55f, 0.9f, 1f), 44 + shotBanks * 6);
+                    Sfx.Play("squeak", 0.5f, 1.2f + shotBanks * 0.15f); FxKit.Sparkle(W(d.p, 0.3f), new Color(0.6f, 0.9f, 1f), 6);
+                }
+            }
             foreach (var m in bumpers)
                 if (CircleRect(d.p, d.r, m, out var bh))
                 {
@@ -573,7 +589,7 @@ public class GameController : MonoBehaviour
     void DestroyBlock(Block b)
     {
         b.alive = false; shotSmash++;
-        int pts = 10 * (1 + streak); score += pts; comboPulse = 0.18f;
+        int pts = 10 * (1 + streak) * (1 + shotBanks); score += pts; comboPulse = 0.18f;   // bank shots multiply score
         if (shotSmash <= 3) PopText("+" + pts, b.p, Color.white, 40);
         Shake(b.type == "pixel" ? 0.06f : 0.12f);
         float pitch = 1f + Mathf.Min(shotSmash, 25) * 0.025f;
@@ -756,7 +772,7 @@ public class GameController : MonoBehaviour
     // ---------- shooting ----------
     void Launch(Duck d, Vector2 v)
     {
-        d.v = v; d.hot = true; moves--; moving = true; shotSmash = 0; hint = ""; pushes = 0; frenzyShot = false;
+        d.v = v; d.hot = true; moves--; moving = true; shotSmash = 0; hint = ""; pushes = 0; frenzyShot = false; shotBanks = 0;
         foreach (var k in ducks) k.charged = true;
         d.stretch = 0.22f; d.pullVis = 0;
         Sfx.Play("shoot"); Sfx.Play("squeak", 0.5f, 1.3f); FxKit.Splash(W(d.p), 6); FxKit.Ripple(W(d.p), 1.1f);
@@ -1235,7 +1251,10 @@ public class GameController : MonoBehaviour
             // while aiming the duck leans back toward the finger and trembles at full power
             var lean = dragged ? -dragDir * pw * 10f : Vector2.zero;
             var jit = dragged && pw > 0.95f ? UnityEngine.Random.insideUnitCircle * 1.2f : Vector2.zero;
-            d.view.position = W(d.p + lean + jit) + Vector3.up * (Mathf.Sin(t * 3 + d.p.x) * 0.02f + drop);
+            // victory: every duck hops and spins
+            float hop = 0;
+            if (state == "win") { hop = Mathf.Abs(Mathf.Sin(t * 7f + d.p.x * 0.05f)) * 0.55f; d.face += dt * 4f; }
+            d.view.position = W(d.p + lean + jit) + Vector3.up * (Mathf.Sin(t * 3 + d.p.x) * 0.02f + drop + hop);
             // sim y is down, world z is up: direction (cos, -sin)
             d.view.rotation = Quaternion.Euler(0, Mathf.Atan2(Mathf.Cos(d.face), -Mathf.Sin(d.face)) * Mathf.Rad2Deg, 0);
             float s = d.squash * 1.6f, st = d.stretch * 1.8f;
@@ -1260,6 +1279,7 @@ public class GameController : MonoBehaviour
             if (d.rocketT > 0) { FxKit.Flame(W(d.p - d.v.normalized * d.r * 1.2f, 0.3f)); if (UnityEngine.Random.value < 0.3f) FxKit.Smoke(W(d.p - d.v.normalized * d.r * 1.6f), 0.3f, 1); }
             if (d.special && !moving && UnityEngine.Random.value < dt * 4) FxKit.Sparkle(W(d.p, 0.5f), d.kind == "rainbow" ? Color.HSVToRGB(UnityEngine.Random.value, 0.5f, 1f) : new Color(1f, 0.85f, 0.4f), 1);
         }
+        bool fewLeft = state == "play" && !moving && GoalsLeft() <= 3;
         foreach (var b in blocks)
         {
             if (!b.alive || b.view == null) continue;
@@ -1270,10 +1290,13 @@ public class GameController : MonoBehaviour
             bool floats = b.type == "cookie" || b.type == "ice" || b.type == "pixel" || b.type == "chest" || b.type == "tnt" || b.type == "laser" || b.type == "boss";
             if (b.mvAmp > 0 || floats) b.view.position = W(b.p, floats ? Mathf.Sin(t * 2.2f + b.p.x * 0.031f + b.p.y * 0.017f) * 0.035f : 0);
             // white flash on hit (property block keeps the shared baked material untouched)
-            if (b.hit > 0 || b.flashing)
+            // last few targets glow softly so the player can find them
+            bool glow = fewLeft && b.Goal && !Covered(b);
+            if (b.hit > 0 || b.flashing || glow)
             {
-                b.flashing = b.hit > 0;
-                var e = Color.white * (b.hit > 0 ? Mathf.Min(1f, b.hit * 6f) * 0.55f : 0f);
+                b.flashing = b.hit > 0 || glow;
+                var e = b.hit > 0 ? Color.white * Mathf.Min(1f, b.hit * 6f) * 0.55f
+                      : glow ? new Color(1f, 0.85f, 0.35f) * (0.18f + 0.18f * Mathf.Sin(t * 6f)) : Color.clear;
                 mpb.Clear(); mpb.SetColor("_Emission", e);
                 foreach (var r in b.rends) if (r) r.SetPropertyBlock(b.flashing ? mpb : null);
             }
@@ -1407,6 +1430,9 @@ public class GameController : MonoBehaviour
     void BuildHud(Transform canvas)
     {
         hud = UIKit.Stretch(UIKit.Rect("GameHUD", canvas));
+        // soft purple vignette: frames the tub and pulls the eye to the middle
+        var vig = UIKit.Stretch(UIKit.Rect("Vignette", hud)).gameObject.AddComponent<RawImage>();
+        vig.texture = VignetteTex(); vig.raycastTarget = false; vig.color = new Color(0.35f, 0.2f, 0.45f, 0.55f);
         // top bar
         var top = UIKit.Panel(hud, PurpleDark, "TopBar").rectTransform; UIKit.Place(top, 0.5f, 1, 0, -150, 1040, 250);
         var topIn = UIKit.Panel(top, Purple, "Inner").rectTransform; UIKit.Stretch(topIn, 0, 10, 0, 0);
@@ -1436,7 +1462,7 @@ public class GameController : MonoBehaviour
         bossFill.anchorMin = Vector2.zero; bossFill.anchorMax = Vector2.one; bossFill.offsetMin = new Vector2(4, 4); bossFill.offsetMax = new Vector2(-4, -4);
         bossTxt = UIKit.Label(bossBar, "BOSS", 26, Color.white);
         // combo + big text
-        comboTxt = UIKit.Outlined(UIKit.Label(hud, "", 90, Yellow), Ink, 6); UIKit.Place(comboTxt.rectTransform, 0.5f, 0, 0, 540, 1000, 220); comboTxt.lineSpacing = 0.85f;
+        comboTxt = UIKit.Outlined(UIKit.Label(hud, "", 90, Yellow), Ink, 6); UIKit.Place(comboTxt.rectTransform, 0.5f, 0, 0, 540, 1000, 220); comboTxt.lineSpacing = 0.85f; comboTxt.verticalOverflow = VerticalWrapMode.Overflow;
         bigTxt = UIKit.Outlined(UIKit.Label(hud, "", 110, Color.white), new Color(1f, 0.5f, 0.75f), 8); UIKit.Place(bigTxt.rectTransform, 0.5f, 0.5f, 0, 120, 1000, 200);
         bigTxt.color = new Color(1, 1, 1, 0);
         // hint
@@ -1483,6 +1509,20 @@ public class GameController : MonoBehaviour
         popupRoot.gameObject.SetActive(false);
     }
 
+    static Texture2D VignetteTex()
+    {
+        const int S = 64; var tex = new Texture2D(S, S, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        var px = new Color[S * S];
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                float dx = (x + 0.5f) / S * 2 - 1, dy = (y + 0.5f) / S * 2 - 1;
+                float d = Mathf.Sqrt(dx * dx * 0.9f + dy * dy * 0.75f);
+                px[y * S + x] = new Color(1, 1, 1, Mathf.SmoothStep(0, 1, Mathf.Clamp01((d - 0.75f) / 0.6f)));
+            }
+        tex.SetPixels(px); tex.Apply(); return tex;
+    }
+
     void RefreshHud()
     {
         if (!Active) return;
@@ -1520,8 +1560,10 @@ public class GameController : MonoBehaviour
             string sub = nt.kind != null ? "\n<size=44>còn " + (nt.need - shotSmash) + " → " + nt.name + "</size>"
                        : nt.maxed ? "\n<size=44>" + nt.name + "!</size>" : "";
             comboTxt.text = "x" + shotSmash + " SMASH" + sub;
-            comboTxt.color = shotSmash >= 16 ? new Color(1f, 0.35f, 0.2f) : shotSmash >= 10 ? new Color(1f, 0.6f, 0.3f) : Yellow;
-            comboTxt.rectTransform.localScale = Vector3.one * (1 + comboPulse * 2.5f);
+            comboTxt.color = shotSmash >= 25 ? Color.HSVToRGB(t * 1.5f % 1f, 0.55f, 1f) : shotSmash >= 16 ? new Color(1f, 0.35f, 0.2f) : shotSmash >= 10 ? new Color(1f, 0.6f, 0.3f) : Yellow;
+            comboTxt.rectTransform.localScale = Vector3.one * (1 + comboPulse * 2.5f + Mathf.Min(shotSmash, 30) * 0.006f);
+            comboTxt.rectTransform.localEulerAngles = new Vector3(0, 0, Mathf.Sin(t * 30f) * comboPulse * 40f);   // wobble on every smash
+            if (shotBanks > 0) comboTxt.text += "\n<size=40>BĂNG x" + (shotBanks + 1) + " ĐIỂM</size>";
         }
         foreach (var k in PRICE.Keys)
         {
