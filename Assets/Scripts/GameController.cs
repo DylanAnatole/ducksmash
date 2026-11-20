@@ -46,7 +46,7 @@ public class GameController : MonoBehaviour
         public Renderer[] rends; public bool flashing, scaled; public float appear = 1, delay; public Vector2 hitDir;
         public bool shelf;
         public bool Prop => type == "glass" || type == "vase" || type == "soap" || type == "plates";
-        public bool Goal => type == "cookie" || type == "chest" || type == "pixel" || type == "ice" || type == "boss" || Prop;
+        public bool Goal => !Hard;   // single objective: smash EVERYTHING breakable in the tub (only stone + shelf boards stay)
         public bool Hard => type == "stone" || type == "plank";
     }
     class Bumper { public float x, y, w, h, pulse; public Transform view; }
@@ -87,7 +87,7 @@ public class GameController : MonoBehaviour
     string state = "play", target, hint;
     float freeze, shake, comboPulse, t, lastW, lastH;
     Duck drag; Vector2 dragPt, dragSm; int powerStep, shotBanks; bool lastWarned;
-    bool aimVisible = true; RectTransform dynLayer; int shownMoves = -1, shownScore = -1, shownStreak = -1;
+    bool aimVisible = true; RectTransform dynLayer, objFill; int goalTotal, shownLeft = -1; float goalPulse; int shownMoves = -1, shownScore = -1, shownStreak = -1;
     float swoop, flashA, hudTick; Image flashImg; int comboShown = -1; Block bossBlock;
     int piggyGain, dominoFalls, shotClears, piggyAdded; string levelArt; bool newArt, perfect;
     bool HasNext => level < LevelLibrary.Count || (level >= LevelLibrary.SmashLevel && level < LevelLibrary.SmashLevel + LevelLibrary.SmashCount - 1);
@@ -271,7 +271,7 @@ public class GameController : MonoBehaviour
         // build-in animation: blocks drop onto the water row by row
         foreach (var b in blocks) { b.appear = 0; b.delay = 0.15f + (b.p.y - TY) / TH * 0.7f + UnityEngine.Random.value * 0.08f; }
         foreach (var b in blocks) MakeView(b);
-        swoop = 1f; flashA = 0; piggyGain = 0; shownMoves = shownScore = shownStreak = -1; levelArt = L.art; hudTick = 0; comboShown = -1;
+        swoop = 1f; flashA = 0; piggyGain = 0; goalTotal = GoalsLeft(); shownLeft = -1; shownMoves = shownScore = shownStreak = -1; levelArt = L.art; hudTick = 0; comboShown = -1;
         bossBlock = blocks.FirstOrDefault(b => b.type == "boss");
         RefreshComboLabels(); comboShownFill = comboShownGhost = -1; if (guideRoot && guideRoot.gameObject.activeSelf) { guideRoot.gameObject.SetActive(false); Time.timeScale = 1f; }
         BuildLines();
@@ -1125,7 +1125,7 @@ public class GameController : MonoBehaviour
         score += left * 150;
         if (!rewarded && LevelLibrary.IsSandbox(level)) { rewarded = true; reward = 0; }   // test levels: no progress saved
         newArt = false; piggyAdded = 0;
-        perfect = true; foreach (var b in blocks) if (b.alive && !b.Hard) { perfect = false; break; }
+        perfect = false;
         if (!LevelLibrary.IsSandbox(level) && state == "win")
         {
             int before = SaveData.Piggy; SaveData.Piggy = before + piggyGain; piggyAdded = SaveData.Piggy - before; piggyGain = 0;
@@ -1178,16 +1178,9 @@ public class GameController : MonoBehaviour
     // ---------- intro card / tutorial hand / coin flights / win anim (real-time) ----------
     void ShowIntro(LevelDef L)
     {
-        var g = new List<string>();
-        int cookies = blocks.Count(b => b.type == "cookie" || b.type == "ice"), chests = blocks.Count(b => b.type == "chest"), pixels = blocks.Count(b => b.type == "pixel");
-        if (L.boss) g.Add("Hạ Boss Vua Bánh");
-        if (cookies > 0) g.Add("Phá " + cookies + " bánh");
-        if (chests > 0) g.Add("Mở " + chests + " rương");
-        if (pixels > 0) g.Add("Phá tranh " + pixels + " ô");
+        var g = new List<string> { "<b>PHÁ SẠCH BỒN</b>", "<size=40>đập vỡ hết " + GoalsLeft() + " món</size>" };
         introTitle.text = LevelLibrary.Title(level);
         introTitle.color = hardLevel ? new Color(1f, 0.35f, 0.3f) : new Color(0.6f, 0.53f, 0.93f);
-        int props = blocks.Count(b => b.Prop);
-        if (props > 0) g.Add("Đập vỡ " + props + " món đồ");
         // reminder of the combo ducks the player has already unlocked
         var known = LevelLibrary.Specials.Where(s => LevelLibrary.Unlocked(s.kind, level) && LevelLibrary.NewSpecialAt(level) != s).ToList();
         string combos = known.Count == 0 ? "" : "\n<size=30>" + string.Join("\n", known.Select(s => s.how + " → " + Cap(s.name))) + "</size>";
@@ -1771,16 +1764,21 @@ public class GameController : MonoBehaviour
         // top bar
         var top = UIKit.Panel(hud, PurpleDark, "TopBar").rectTransform; UIKit.Place(top, 0.5f, 1, 0, -150, 1040, 250);
         var topIn = UIKit.Panel(top, Purple, "Inner").rectTransform; UIKit.Stretch(topIn, 0, 10, 0, 0);
-        var mb = UIKit.Panel(topIn, Color.white, "Moves").rectTransform; UIKit.Place(mb, 0, 0.5f, 120, 10, 170, 170);
-        movesTxt = UIKit.Label(mb, "10", 84, Ink); movesTxt.rectTransform.offsetMin = new Vector2(0, 20);
-        var ml = UIKit.Label(mb, "LƯỢT", 26, PurpleDark); ml.rectTransform.offsetMax = new Vector2(0, -120);
-        var sp = UIKit.Rect("StarPreview", topIn); UIKit.Place(sp, 0, 0.5f, 120, -97, 170, 40);
+        var mframe = UIKit.Panel(topIn, Yellow, "MovesFrame").rectTransform; UIKit.Place(mframe, 0, 0.5f, 125, 18, 206, 196);
+        var mb = UIKit.Panel(topIn, Color.white, "Moves").rectTransform; UIKit.Place(mb, 0, 0.5f, 125, 18, 186, 176);
+        movesTxt = UIKit.Label(mb, "10", 100, Ink); movesTxt.rectTransform.offsetMin = new Vector2(0, 26);
+        var ml = UIKit.Label(mb, "LƯỢT BẮN", 26, PurpleDark); ml.rectTransform.offsetMax = new Vector2(0, -122);
+        var sp = UIKit.Rect("StarPreview", topIn); UIKit.Place(sp, 0, 0.5f, 125, -100, 170, 36);
         starPreview = UIKit.StarRow(sp, 3, 36, 6);
         aimCount = UIKit.Outlined(UIKit.Label(hud, "", 64, Color.white), Ink, 4);
         aimCount.rectTransform.anchorMin = aimCount.rectTransform.anchorMax = new Vector2(0.5f, 0.5f); aimCount.rectTransform.sizeDelta = new Vector2(300, 100);
         aimCount.gameObject.SetActive(false);
-        goalsTxt = UIKit.Label(topIn, "", 40, Color.white, TextAnchor.MiddleLeft); UIKit.Place(goalsTxt.rectTransform, 0, 0.5f, 470, 10, 450, 200);
-        goalsTxt.horizontalOverflow = HorizontalWrapMode.Wrap; goalsTxt.lineSpacing = 1.1f;
+        goalsTxt = UIKit.Outlined(UIKit.Label(topIn, "", 40, Color.white, TextAnchor.MiddleLeft), Ink, 3); UIKit.Place(goalsTxt.rectTransform, 0, 0.5f, 480, 22, 420, 150);
+        goalsTxt.horizontalOverflow = HorizontalWrapMode.Overflow; goalsTxt.verticalOverflow = VerticalWrapMode.Overflow; goalsTxt.lineSpacing = 0.95f;
+        goalsTxt.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        var ob = UIKit.Panel(topIn, new Color(0.23f, 0.18f, 0.42f, 0.55f), "ObjBar").rectTransform; UIKit.Place(ob, 0, 0.5f, 480, -78, 420, 26);
+        objFill = UIKit.Panel(ob, new Color(0.45f, 0.95f, 0.5f), "Fill").rectTransform;
+        objFill.anchorMin = Vector2.zero; objFill.anchorMax = new Vector2(0, 1); objFill.offsetMin = objFill.offsetMax = Vector2.zero; objFill.pivot = new Vector2(0, 0.5f);
         levelTxt = UIKit.Label(topIn, "", 34, Color.white, TextAnchor.MiddleRight); UIKit.Place(levelTxt.rectTransform, 1, 0.5f, -265, 50, 260, 60);
         scoreTxt = UIKit.Label(topIn, "", 40, Yellow, TextAnchor.MiddleRight); UIKit.Place(scoreTxt.rectTransform, 1, 0.5f, -265, -20, 260, 60);
         var gear = UIKit.Btn(topIn, "II", Yellow, Ink, 44, () => App.OpenSettings(true), "Settings");
@@ -1960,6 +1958,8 @@ public class GameController : MonoBehaviour
     {
         if (!Active) return;
         UpdateComboBar();
+        goalPulse = Mathf.Max(0, goalPulse - Time.unscaledDeltaTime);
+        goalsTxt.rectTransform.localScale = Vector3.one * (1 + goalPulse * 0.25f);
         flashA = Mathf.Max(0, flashA - Time.unscaledDeltaTime * 2.5f);
         flashImg.color = new Color(1f, 0.97f, 0.9f, flashA);
         if (shownMoves != moves) { shownMoves = moves; movesTxt.text = moves.ToString(); }
@@ -1973,16 +1973,15 @@ public class GameController : MonoBehaviour
         bool slow = hudTick <= 0; if (slow) hudTick = 0.12f;
         var boss = bossBlock;
         if (slow) {
-        int cookies = blocks.Count(b => b.alive && (b.type == "cookie" || b.type == "ice"));
-        int chests = blocks.Count(b => b.alive && b.type == "chest"), pixels = blocks.Count(b => b.alive && b.type == "pixel");
-        var g = new List<string>();
-        if (boss != null) g.Add(boss.alive ? "Boss " + Mathf.Max(0, boss.hp) : "Boss xong");
-        if (blocks.Any(b => b.type == "cookie" || b.type == "ice")) g.Add("Bánh " + (cookies == 0 ? "xong" : cookies.ToString()));
-        if (blocks.Any(b => b.type == "chest")) g.Add("Rương " + (chests == 0 ? "xong" : chests.ToString()));
-        if (blocks.Any(b => b.type == "pixel")) g.Add("Pixel " + (pixels == 0 ? "xong" : pixels.ToString()));
-        goalsTxt.text = "MỤC TIÊU\n" + string.Join("   ", g);
+        int left = GoalsLeft();
+        if (left != shownLeft)
+        {
+            shownLeft = left;
+            goalsTxt.text = "<size=28>MỤC TIÊU: PHÁ SẠCH BỒN</size>\n<size=66><b>" + (left == 0 ? "XONG!" : "còn " + left) + "</b></size>";
+            objFill.anchorMax = new Vector2(goalTotal > 0 ? 1f - left / (float)goalTotal : 1f, 1);
+            goalPulse = 0.25f;
+        }
         levelTxt.text = LevelLibrary.Title(level);
-        if (blocks.Any(b => b.Prop)) { int pl = blocks.Count(b => b.alive && b.Prop); g.Add("Đồ " + (pl == 0 ? "xong" : pl.ToString())); goalsTxt.text = "MỤC TIÊU\n" + string.Join("   ", g); }
         foreach (var k in PRICE.Keys)
         {
             int n = SaveData.GetBoost(k);

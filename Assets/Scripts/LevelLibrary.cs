@@ -236,7 +236,7 @@ public static class LevelLibrary
                 d.blocks.AddRange(Shelf(270, 610, 360, "glass", "vase", "glass", "vase", "glass", "vase"));
                 break;
             case 11:
-                d = L(6, "Vịt Điện: giật điện 3 khối gần nhất!", (150, 810, null), (270, 810, "zap"), (390, 810, null), (270, 720, "zap"));
+                d = L(8, "Vịt Điện: giật điện 3 khối gần nhất!", (150, 810, null), (270, 810, "zap"), (390, 810, null), (270, 720, "zap"));
                 for (int r = 0; r < 7; r++) d.blocks.AddRange(Row(r % 3 == 2 ? "plates" : (r == 1 || r == 4 ? "vase" : "glass"), 70, 200 + r * 42, 11, 40));
                 d.blocks.Add(B("bathbomb", 270, 620)); d.blocks.Add(B("chest", 150, 620)); d.blocks.Add(B("chest", 390, 620));
                 d.bumpers.Add(BumperL(660)); d.bumpers.Add(BumperR(660));
@@ -259,6 +259,7 @@ public static class LevelLibrary
                 d = IsHard(n) ? HardLevel(n) : Procedural(n);
                 break;
         }
+        if (n <= 13) d.bumpers.Clear();   // early game: no side bumpers until the player can judge power + angle
         d.boss = false; d.hard = IsHard(n);
         // unlock levels gift one special by transforming a plain duck: make sure there is one
         if (NewSpecialAt(n) != null && !d.ducks.Exists(x => x.kind == "normal") && d.ducks.Count > 0) d.ducks[d.ducks.Count - 1].kind = "normal";
