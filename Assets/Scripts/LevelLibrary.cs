@@ -31,7 +31,7 @@ public static class LevelLibrary
     public const int SmashLevel = 101, SmashCount = 3;   // "phá đồ" destruction test levels 101..103
     public static bool IsSandbox(int n) => n >= TestLevel;
     public static string Title(int n) => n == TestLevel ? "Màn thử" : n >= SmashLevel ? "Phá đồ " + (n - SmashLevel + 1)
-        : IsSuperHard(n) ? "Siêu khó " + n : IsHard(n) ? "Màn khó " + n : (n <= Onboarding ? "Hướng dẫn " : "Màn ") + n;
+        : n == Count ? "Trùm cuối" : IsSuperHard(n) ? "Siêu khó " + n : IsHard(n) ? "Màn khó " + n : (n <= Onboarding ? "Hướng dẫn " : "Màn ") + n;
 
     // ---------- pixel-art album ----------
     public static readonly string[] ArtIds = { "star", "duck", "heart", "straw", "fish", "flower", "mush", "sun", "apple", "boat", "cat", "rainbow" };
@@ -257,6 +257,9 @@ public static class LevelLibrary
                 for (int i = 0; i < 7; i++) d.blocks.Add(B("plates", 90 + i * 60, 590));
                 d.bumpers.Add(BumperL(640)); d.bumpers.Add(BumperR(640));
                 break;
+            case 30:
+                d = BossLevel();
+                break;
             default:
                 d = IsHard(n) ? HardLevel(n) : Procedural(n);
                 break;
@@ -266,7 +269,7 @@ public static class LevelLibrary
         if (n >= 19 && !IsHard(n)) PlaceWhirl(d, n == 19 || n >= 23 ? 72 : 62);
         if (n == 19 && d.whirls.Count > 0) d.hint = "Xoáy nước: bẻ cong đường bay!";
         if (n == 23) d.hint = "Đồ đóng băng: cú đầu vỡ băng, cú sau mới vỡ!";
-        d.boss = false; d.hard = IsHard(n);
+        d.boss = n == 30; d.hard = IsHard(n);
         // unlock levels gift one special by transforming a plain duck: make sure there is one
         if (NewSpecialAt(n) != null && !d.ducks.Exists(x => x.kind == "normal") && d.ducks.Count > 0) d.ducks[d.ducks.Count - 1].kind = "normal";
         d.moves = Mathf.Max(3, d.moves);
@@ -493,6 +496,19 @@ public static class LevelLibrary
         int nd = RI(3, 4);
         var spots = new[] { (150f, 800f), (270f, 800f), (390f, 800f), (270f, 710f) };
         for (int i = 0; i < nd; i++) d.ducks.Add(new DuckDef(spots[i].Item1, spots[i].Item2, RandKind()));
+        return d;
+    }
+
+    // finale: the Cookie King drifts across the top of the tub (24 hp, max 4 damage per hit) behind a guarded pile
+    static LevelDef BossLevel()
+    {
+        var d = new LevelDef { moves = 12, hint = "TRÙM CUỐI: hạ Vua Bánh Quy và phá sạch bồn!" };
+        d.blocks.Add(Boss(270, 285, 24, 150, 0.7f));
+        float y = 420; int guard = 0;
+        while (y < 590 && guard++ < 10) y = AddModule(d, y, false);
+        for (int i = 0; i < 11; i++) { float q = R(); d.blocks.Add(B(q < 0.22f ? "stone" : q < 0.4f ? "bathbomb" : PropKind(), 70 + i * 40, Mathf.Max(y + 10, 620))); }
+        d.blocks.Add(B("ring", 110, 700)); d.blocks.Add(B("ring", 430, 700));
+        d.ducks.Add(new DuckDef(150, 810, "heavy")); d.ducks.Add(new DuckDef(270, 810, "bomb")); d.ducks.Add(new DuckDef(390, 810, "normal"));
         return d;
     }
 

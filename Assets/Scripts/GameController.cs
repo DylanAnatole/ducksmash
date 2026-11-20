@@ -2581,7 +2581,12 @@ public class GameController : MonoBehaviour
             if (feverPopT <= 0) feverPop.gameObject.SetActive(false);
         }
         if (shownStreak != streak) { shownStreak = streak; streakTxt.text = streak > 0 ? "Chuỗi: điểm x" + (streak + 1) : ""; }
-        if (boss != null) { bossFill.anchorMax = new Vector2(Mathf.Clamp01((float)boss.hp / boss.max), 1); bossTxt.text = boss.alive ? "VUA BÁNH  " + Mathf.Max(0, boss.hp) + "/" + boss.max : "HẠ GỤC!"; }
+        if (boss != null && boss.alive && boss.view != null)
+        {   // the HP bar rides above the boss (the top of the HUD is already busy)
+            bossBar.anchorMin = bossBar.anchorMax = new Vector2(0.5f, 0.5f); bossBar.sizeDelta = new Vector2(330, 40);
+            bossBar.anchoredPosition = WorldToHud(W(boss.p, 0.2f)) + new Vector2(0, -95);   // just under the boss
+        }
+        if (boss != null) { bossFill.anchorMax = new Vector2(Mathf.Clamp01((float)boss.hp / boss.max), 1); bossTxt.text = boss.alive ? "VUA BÁNH QUY " + Mathf.Max(0, boss.hp) + "/" + boss.max : "HẠ GỤC!"; if (!boss.alive && bossBar.gameObject.activeSelf) bossBar.gameObject.SetActive(false); }
         string ht = target == "hammer" ? "Chạm vào một khối để đập vỡ (chạm Búa để huỷ)" : target == "bomb" ? "Chạm chỗ muốn thả bom nước" : moving ? "" : hint;
         hintPanel.gameObject.SetActive(!string.IsNullOrEmpty(ht) && state == "play"); hintTxt.text = ht;
         bool showCombo = moving && shotSmash >= 4;
