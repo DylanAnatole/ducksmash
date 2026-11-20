@@ -2060,6 +2060,7 @@ public class GameController : MonoBehaviour
             b.hit = Mathf.Max(0, b.hit - dt);
             float k = 1 + b.hit * (b.type == "boss" ? 0.4f : 1.2f);
             if (b.hit > 0 || b.scaled) { b.view.localScale = b.baseScale * k; b.scaled = b.hit > 0; }
+            if (b.type == "boss") b.view.localEulerAngles = new Vector3(0, 0, b.hit > 0 ? Mathf.Sin(t * 60f) * b.hit * 60f : 0);   // the king wobbles when struck
             // floating goodies bob gently on the bath water
             bool floats = !App.Mobile && (b.type == "cookie" || b.type == "gold" || b.type == "ice" || b.type == "pixel" || b.type == "chest" || b.type == "tnt" || b.type == "laser" || b.type == "boss");
             float lift = 0;
@@ -2646,6 +2647,7 @@ public class GameController : MonoBehaviour
             if (hardLevel) bonus.Add("Màn khó +80");
             var keep = new List<string>();
             if (newArt) keep.Add("<color=#ffe066>Tranh mới vào Album!</color>");
+            if (bossKilled) keep.Insert(0, "<color=#ffe066>Đã hạ Vua Bánh Quy!</color>");
             popBody.text = "Điểm " + score.ToString("N0") + (bonus.Count > 0 ? "\n<size=32>" + string.Join(" · ", bonus) + " xu</size>" : "")
                 + (keep.Count > 0 ? "\n<size=32>" + string.Join(" · ", keep) + "</size>" : "");
             popBody.verticalOverflow = VerticalWrapMode.Overflow;
@@ -2659,7 +2661,7 @@ public class GameController : MonoBehaviour
             foreach (var im in popStarImgs) im.gameObject.SetActive(false);
             popStars.text = "";
             int lft = GoalsLeft(); int pct = goalTotal > 0 ? Mathf.RoundToInt(100f * (goalTotal - lft) / goalTotal) : 0;
-            popBody.text = "Đã phá <b>" + pct + "%</b> · còn <b>" + lft + "</b> món\n<size=34>" + (pct >= 80 ? "Sắp xong rồi! Thêm lượt để phá nốt" : "Thử góc khác hoặc dùng booster nhé") + "</size>";
+            popBody.text = "Đã phá <b>" + pct + "%</b> · còn <b>" + lft + "</b> món\n<size=34>" + (bossBlock != null && bossBlock.alive ? "Vua Bánh Quy còn " + bossBlock.hp + " máu: canh lúc vua trôi tới rồi bắn!" : pct >= 80 ? "Sắp xong rồi! Thêm lượt để phá nốt" : "Thử góc khác hoặc dùng booster nhé") + "</size>";
             popReward.text = "";
             UIKit.BtnText(popA).text = "+5 lượt — " + CONTINUE_PRICE + " xu";
             popA.GetComponent<Image>().color = SaveData.Coins >= CONTINUE_PRICE ? new Color(0.37f, 0.83f, 0.37f) : new Color(0.7f, 0.7f, 0.75f);
