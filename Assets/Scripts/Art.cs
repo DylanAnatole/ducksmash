@@ -44,7 +44,7 @@ public static class Art
     static void ResetStatics()
     {
         mats.Clear(); baked.Clear(); bakedMats.Clear();
-        std = null; toon = null; flat = null; lowSphere = null; midSphere = null; primMeshes.Clear();
+        ringTex = null; std = null; toon = null; flat = null; lowSphere = null; midSphere = null; primMeshes.Clear();
     }
 
     // Cartoon material. smooth = highlight strength, metal brightens the highlight (for the Iron Duck).
@@ -62,6 +62,17 @@ public static class Art
         m.enableInstancing = true;                              // many identical cookies/pixels -> few draw calls
         if (outline <= 0f) m.EnableKeyword("NO_OUTLINE");       // outline pass collapses to nothing (see Toon.shader)
         mats[key] = m;
+        return m;
+    }
+
+    // Bath water: two scrolling caustic layers (DuckSmash/Water); falls back to the plain texture material.
+    public static Material Water(Texture tex, Vector2 tiling)
+    {
+        var holder = Resources.Load<Material>("WaterMat");
+        var sh = holder != null ? holder.shader : Shader.Find("DuckSmash/Water");
+        if (sh == null) return Toon(Color.white, tex, tiling, 0.3f);
+        var m = new Material(sh) { color = new Color(1.06f, 1.06f, 1.06f), mainTexture = tex, mainTextureScale = tiling };
+        m.SetFloat("_Speed", 1f); m.SetFloat("_Sparkle", 0.55f);
         return m;
     }
 
@@ -93,6 +104,46 @@ public static class Art
         m.renderQueue = 3000;
         if (emission > 0) { m.EnableKeyword("_EMISSION"); m.SetColor("_EmissionColor", c * emission); }
         return m;
+    }
+
+    // selection ring: soft-edged circle outline instead of a flat translucent disc
+    static Texture2D ringTex;
+    public static Material RingShared(Color c)
+    {
+        string key = "ring" + ColorUtility.ToHtmlStringRGBA(c);
+        if (mats.TryGetValue(key, out var m) && m != null) return m;
+        if (ringTex == null)
+        {
+            const int S = 128; ringTex = new Texture2D(S, S, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color[S * S];
+            for (int y = 0; y < S; y++)
+                for (int x = 0; x < S; x++)
+                {
+                    float dx = (x + 0.5f) / S * 2 - 1, dy = (y + 0.5f) / S * 2 - 1, r = Mathf.Sqrt(dx * dx + dy * dy);
+                    float band = Mathf.Clamp01(1f - Mathf.Abs(r - 0.86f) / 0.1f);         // bright rim
+                    float fill = r < 0.86f ? 0.3f * (r / 0.86f) : 0f;                     // faint inner glow
+                    px[y * S + x] = new Color(1, 1, 1, Mathf.Max(band * band, fill));
+                }
+            ringTex.SetPixels(px); ringTex.Apply();
+        }
+        m = Fade(c); m.mainTexture = ringTex; mats[key] = m;
+        return m;
+    }
+
+    // soft rounded-rect shadow (dark centre fading out at the edges), for grounding big objects
+    public static Texture2D SoftShadowTex(float aspect, int size = 96)
+    {
+        int W = size, H = Mathf.Max(8, Mathf.RoundToInt(size / Mathf.Max(0.1f, aspect)));
+        var tex = new Texture2D(W, H, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        var px = new Color[W * H];
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+            {
+                float dd = Mathf.Min(Mathf.Min(x, W - 1 - x), Mathf.Min(y, H - 1 - y)) / (float)W;
+                px[y * W + x] = new Color(1, 1, 1, Mathf.SmoothStep(0, 1, Mathf.Clamp01(dd / 0.16f)));
+            }
+        tex.SetPixels(px); tex.Apply();
+        return tex;
     }
 
     public static Material FadeShared(Color c)
@@ -336,7 +387,7 @@ public static class Art
             Prim(PrimitiveType.Cylinder, body, new Vector3(0, 1.0f, 0.24f), new Vector3(0.76f, 0.03f, 0.72f), helm);
         }
 
-        ring = Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.02f, 0), new Vector3(1.45f, 0.01f, 1.45f), FadeShared(new Color(0.37f, 0.9f, 0.37f, 0.55f)));
+        ring = Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.02f, 0), new Vector3(1.45f, 0.01f, 1.45f), RingShared(new Color(0.37f, 0.9f, 0.37f, 0.75f)));
         ring.name = "Ring";
         return root;
     }

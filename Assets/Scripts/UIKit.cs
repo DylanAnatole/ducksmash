@@ -129,6 +129,26 @@ public static class UIKit
         return rt;
     }
 
+    // soft glossy band over the top half of a panel/button (reads as a rounded, toy-like surface)
+    public static void Gloss(Transform target, float alpha = 0.18f)
+    {
+        var g = Panel(target, new Color(1f, 1f, 1f, alpha), "Gloss");
+        g.raycastTarget = false; g.transform.SetSiblingIndex(0);   // behind labels and icons, above the panel itself
+        var rt = g.rectTransform; rt.anchorMin = new Vector2(0, 0.55f); rt.anchorMax = new Vector2(1, 1);
+        rt.offsetMin = new Vector2(8, 0); rt.offsetMax = new Vector2(-8, -5);
+    }
+
+    // tiny pixel-art icon from rows of palette characters
+    public static Texture2D PixelIcon(string[] rows, System.Collections.Generic.Dictionary<char, Color> pal)
+    {
+        int h = rows.Length, w = 0; foreach (var r in rows) w = Mathf.Max(w, r.Length);
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                tex.SetPixel(x, h - 1 - y, x < rows[y].Length && pal.TryGetValue(rows[y][x], out var c) ? c : new Color(0, 0, 0, 0));
+        tex.Apply(); return tex;
+    }
+
     public static Image Panel(Transform parent, Color c, string name = "Panel", bool rounded = true)
     {
         var rt = Rect(name, parent);

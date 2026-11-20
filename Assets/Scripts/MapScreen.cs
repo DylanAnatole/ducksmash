@@ -21,6 +21,16 @@ public class MapScreen : MonoBehaviour
         var bg = root.gameObject.AddComponent<RawImage>();
         bg.texture = Art.TileTex(new Color(1f, 0.93f, 0.9f), new Color(0.94f, 0.84f, 0.84f)); bg.uvRect = new Rect(0, 0, 3, 5.3f);
 
+        // soap bubbles drifting up behind the path
+        var bub = UIKit.Stretch(UIKit.Rect("Bubbles", root)); bub.gameObject.AddComponent<Canvas>();
+        for (int i = 0; i < 12; i++)
+        {
+            var b = UIKit.Dot(bub, new Color(1f, 1f, 1f, 0.32f), "Bubble"); b.raycastTarget = false;
+            var o = b.gameObject.AddComponent<Outline>(); o.effectColor = new Color(0.75f, 0.9f, 1f, 0.6f); o.effectDistance = new Vector2(2, -2);
+            var rt = b.rectTransform; rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0); float sz = Random.Range(18f, 58f); rt.sizeDelta = new Vector2(sz, sz);
+            rt.anchoredPosition = new Vector2(Random.Range(-520f, 520f), Random.Range(0f, 1900f));
+            bubbles.Add((rt, Random.Range(30f, 75f), Random.Range(0f, 6.28f)));
+        }
         // scroll view
         var view = UIKit.Stretch(UIKit.Rect("Scroll", root), 0, 0, 0, 300);
         scroll = view.gameObject.AddComponent<ScrollRect>();
@@ -74,6 +84,13 @@ public class MapScreen : MonoBehaviour
             nodeStars[n] = UIKit.StarRow(st.transform, 3, 40, 2);
         }
 
+        // the player's duck stands on the current level node
+        duckMark = UIKit.Rect("YouAreHere", content).gameObject.AddComponent<RawImage>(); duckMark.raycastTarget = false;
+        duckMark.texture = LevelLibrary.ArtTexture("duck", false);
+        var dm = duckMark.rectTransform; dm.anchorMin = dm.anchorMax = new Vector2(0.5f, 0); dm.sizeDelta = new Vector2(104, 88);
+        var shadowDot = UIKit.Dot(dm, new Color(0.23f, 0.18f, 0.42f, 0.25f), "Shadow"); shadowDot.raycastTarget = false;
+        shadowDot.rectTransform.anchorMin = shadowDot.rectTransform.anchorMax = new Vector2(0.5f, 0); shadowDot.rectTransform.sizeDelta = new Vector2(70, 16);
+        shadowDot.rectTransform.anchoredPosition = new Vector2(0, -6); shadowDot.transform.SetAsFirstSibling();
         // header
         var head = UIKit.Panel(root, PurpleDark, "Header").rectTransform; UIKit.Place(head, 0.5f, 1, 0, -150, 1040, 250);
         var headIn = UIKit.Panel(head, Purple, "Inner").rectTransform; UIKit.Stretch(headIn, 0, 10, 0, 0);
@@ -115,6 +132,7 @@ public class MapScreen : MonoBehaviour
         if (!badgeTex.TryGetValue(k, out var t) || t == null) badgeTex[k] = t = LevelLibrary.ArtTexture(id, locked);
         return t;
     }
+    RawImage duckMark; readonly List<(RectTransform rt, float speed, float phase)> bubbles = new List<(RectTransform, float, float)>();
     RectTransform piggyFill, albumRoot; Text piggyTxt; Button piggyBtn; readonly List<RawImage> albumImgs = new List<RawImage>(); readonly List<Text> albumNames = new List<Text>();
     Text albumTitle;
 
@@ -217,6 +235,22 @@ public class MapScreen : MonoBehaviour
         if (!root.gameObject.activeSelf) return;
         // full piggy bank wiggles to beg for a smash
         if (piggyBtn != null) piggyBtn.transform.localEulerAngles = new Vector3(0, 0, SaveData.Piggy >= SaveData.PiggyMax ? Mathf.Sin(Time.time * 18) * 4 : 0);
+        // duck hops on the current node
+        if (duckMark != null)
+        {
+            var np = NodePos(Mathf.Min(SaveData.MaxLevel, LevelLibrary.Count));
+            float hop = Mathf.Abs(Mathf.Sin(Time.time * 3.2f)) * 26f;
+            duckMark.rectTransform.anchoredPosition = np + new Vector2(-6, 168 + hop);   // above the star row
+            duckMark.rectTransform.localScale = new Vector3(1f + (hop < 3f ? 0.12f : 0f), 1f - (hop < 3f ? 0.1f : 0f), 1f);   // squash on landing
+        }
+        // bubbles rise and sway, then wrap to the bottom
+        for (int i = 0; i < bubbles.Count; i++)
+        {
+            var (rt, sp, ph) = bubbles[i];
+            var p = rt.anchoredPosition; p.y += sp * Time.deltaTime; p.x += Mathf.Sin(Time.time * 1.3f + ph) * 12f * Time.deltaTime;
+            if (p.y > 2000f) p = new Vector2(Random.Range(-520f, 520f), -60f);
+            rt.anchoredPosition = p;
+        }
         // bob the current node
         foreach (var nd in nodes)
             if (nd.n == SaveData.MaxLevel) nd.img.transform.parent.localScale = Vector3.one * (1.12f + Mathf.Sin(Time.time * 4) * 0.04f);

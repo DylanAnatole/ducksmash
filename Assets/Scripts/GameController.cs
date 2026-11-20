@@ -87,7 +87,22 @@ public class GameController : MonoBehaviour
     string state = "play", target, hint;
     float freeze, shake, comboPulse, t, lastW, lastH;
     Duck drag; Vector2 dragPt, dragSm; int powerStep, shotBanks; bool lastWarned;
-    Transform popCard; float loseAnim;
+    Transform popCard; float loseAnim; RawImage sunburst;
+    static Texture2D SunburstTex()
+    {
+        const int S = 256; var tex = new Texture2D(S, S, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+        var px = new Color[S * S];
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                float dx = (x + 0.5f) / S * 2 - 1, dy = (y + 0.5f) / S * 2 - 1, r = Mathf.Sqrt(dx * dx + dy * dy);
+                float ang = Mathf.Atan2(dy, dx);
+                float ray = Mathf.SmoothStep(0.15f, 0.55f, 0.5f + 0.5f * Mathf.Cos(ang * 12f));   // 12 soft rays
+                float fade = Mathf.Clamp01(1f - r) * Mathf.Clamp01(r * 4f);
+                px[y * S + x] = new Color(1, 1, 1, ray * fade);
+            }
+        tex.SetPixels(px); tex.Apply(); return tex;
+    }
     RectTransform feverBar, feverGhost; Text feverHint, feverPop; float feverShown, feverPopT; int feverShownInt = -1, feverMode;
     Text powerTxt; int shownPower = -1; bool halfShown; RawImage popArt; GameObject popArtBg;
     bool aimVisible = true; RectTransform dynLayer, objFill; int goalTotal, shownLeft = -1; float goalPulse; int shownMoves = -1, shownScore = -1, shownStreak = -1;
@@ -312,6 +327,12 @@ public class GameController : MonoBehaviour
         ground.transform.SetParent(world, false); ground.transform.position = new Vector3(0, -0.35f, 0); ground.transform.eulerAngles = new Vector3(90, 0, 0); ground.transform.localScale = new Vector3(90, 90, 1);
         var gm = Art.Toon(Color.white, Art.TileTex(new Color(1f, 0.93f, 0.9f), new Color(0.93f, 0.82f, 0.82f)), new Vector2(22.5f, 22.5f), 0f);
         ground.GetComponent<Renderer>().sharedMaterial = gm;
+        // soft shadow under the tub so it sits on the floor instead of floating on it
+        var tubShadow = Art.NewPrim(PrimitiveType.Quad); tubShadow.transform.SetParent(world, false);
+        tubShadow.transform.position = new Vector3(0.25f, -0.33f, -0.35f); tubShadow.transform.eulerAngles = new Vector3(90, 0, 0);
+        tubShadow.transform.localScale = new Vector3(TW * K + 2.4f, TH * K + 2.4f, 1);
+        var tsm = Art.Fade(new Color(0.38f, 0.2f, 0.36f, 0.8f)); tsm.mainTexture = Art.SoftShadowTex((TW * K + 2.4f) / (TH * K + 2.4f));
+        var tsr = tubShadow.GetComponent<Renderer>(); tsr.sharedMaterial = tsm; tsr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; tsr.receiveShadows = false;
         // tub base (white porcelain)
         var porcelain = Art.Mat(new Color(0.96f, 0.97f, 1f), 0.85f, 0, 0, 0.0025f);
         var porcelainFlat = Art.Mat(new Color(0.96f, 0.97f, 1f), 0.85f, 0, 0, 0f);
@@ -321,7 +342,7 @@ public class GameController : MonoBehaviour
         var water = Art.NewPrim(PrimitiveType.Quad);
         water.transform.SetParent(world, false); water.transform.position = new Vector3(0, -0.04f, 0); water.transform.eulerAngles = new Vector3(90, 0, 0);
         water.transform.localScale = new Vector3(w, h, 1);
-        var wm = Art.Toon(Color.white, Art.WaterTex(), new Vector2(TW / 260f, TH / 260f), 0.3f);
+        var wm = Art.Water(Art.WaterTex(), new Vector2(TW / 260f, TH / 260f));   // animated on the GPU
         waterMat = wm;
         water.GetComponent<Renderer>().sharedMaterial = wm;
         // rim walls
@@ -331,6 +352,13 @@ public class GameController : MonoBehaviour
         Art.Prim(PrimitiveType.Capsule, world, new Vector3(0, rh / 2, -h / 2 - rim / 2), new Vector3(rh, (w + rim * 2) / 2, rim * 1.3f), porcelain, new Vector3(0, 0, 90));
         Art.Prim(PrimitiveType.Capsule, world, new Vector3(w / 2 + rim / 2, rh / 2, 0), new Vector3(rim * 1.3f, (h + rim * 2) / 2, rh), porcelain, new Vector3(90, 0, 0));
         Art.Prim(PrimitiveType.Capsule, world, new Vector3(-w / 2 - rim / 2, rh / 2, 0), new Vector3(rim * 1.3f, (h + rim * 2) / 2, rh), porcelain, new Vector3(90, 0, 0));
+        // pastel trim along the top of the rim: gives the tub a crisp edge even without outlines (phones)
+        var trim = Art.Mat(new Color(0.49f, 0.78f, 0.96f), 0.7f);
+        float tl = TR * K;
+        Art.Prim(PrimitiveType.Cube, world, new Vector3(0, rh + 0.005f, h / 2 + rim / 2), new Vector3(w - 2 * tl, 0.03f, 0.1f), trim);
+        Art.Prim(PrimitiveType.Cube, world, new Vector3(0, rh + 0.005f, -h / 2 - rim / 2), new Vector3(w - 2 * tl, 0.03f, 0.1f), trim);
+        Art.Prim(PrimitiveType.Cube, world, new Vector3(w / 2 + rim / 2, rh + 0.005f, 0), new Vector3(0.1f, 0.03f, h - 2 * tl), trim);
+        Art.Prim(PrimitiveType.Cube, world, new Vector3(-w / 2 - rim / 2, rh + 0.005f, 0), new Vector3(0.1f, 0.03f, h - 2 * tl), trim);
         // rounded corner fillers (visual only)
         float cr = TR * K;
         foreach (var s in new[] { new Vector2(-1, 1), new Vector2(1, 1), new Vector2(-1, -1), new Vector2(1, -1) })
@@ -647,7 +675,7 @@ public class GameController : MonoBehaviour
         bubbleTimer -= dt;
         if (bubbleTimer <= 0) { bubbleTimer = App.Mobile ? 0.7f : 0.25f; FxKit.Bubble(W(UnityEngine.Random.Range(TX + 20, TX + TW - 20), UnityEngine.Random.Range(TY + 20, TY + TH - 20))); }
         shake = Mathf.Max(0, shake - dt); comboPulse = Mathf.Max(0, comboPulse - dt);
-        if (waterMat != null) waterMat.mainTextureOffset = new Vector2(Mathf.Sin(t * 0.15f) * 0.05f, t * 0.02f);
+
         UpdateViews(dt);
         UpdateFx(dt);
         UpdateAim();
@@ -1321,6 +1349,12 @@ public class GameController : MonoBehaviour
             if (popCard) popCard.localScale = Vector3.one * BackOut((state == "win" ? popAnim : loseAnim) / 0.35f);
             if (state != "win") loseAnim += rdt;
         }
+        if (sunburst != null)
+        {
+            bool sb = popupRoot.gameObject.activeSelf && state == "win";
+            if (sunburst.gameObject.activeSelf != sb) sunburst.gameObject.SetActive(sb);
+            if (sb) { sunburst.rectTransform.localEulerAngles = new Vector3(0, 0, -Time.unscaledTime * 18f); sunburst.rectTransform.localScale = Vector3.one * BackOut(popAnim / 0.5f); }
+        }
         if (popupRoot.gameObject.activeSelf && state == "win")
         {
             popAnim += rdt;
@@ -1715,12 +1749,12 @@ public class GameController : MonoBehaviour
             d.ring.gameObject.SetActive(selectable || d.frenzy || (frenzyReady && !moving));
             if (d.ring.gameObject.activeSelf)
             {
-                float pulse = 1.45f + Mathf.Sin(t * 5 + d.p.x) * 0.08f + (dragged ? 0.25f + pw * 0.25f : 0);
+                float pulse = 1.8f + Mathf.Sin(t * 5 + d.p.x) * 0.08f + (dragged ? 0.25f + pw * 0.25f : 0);
                 d.ring.localScale = new Vector3(pulse, 0.01f, pulse);
                 Color rc = frenzyReady || d.frenzy ? new Color(1f, 0.5f, 0.75f, 0.6f)
                          : dragged ? (Color)(Color32)Color.Lerp(new Color(1, 1, 1, 0.7f), new Color(1f, 0.45f, 0.3f, 0.75f), powerStep / 4f)
                          : d.special ? new Color(1f, 0.8f, 0.3f, 0.6f) : new Color(0.37f, 0.9f, 0.37f, 0.55f);
-                if (d.ringCol != rc) { d.ringCol = rc; d.ring.GetComponent<Renderer>().sharedMaterial = Art.FadeShared(rc); }   // only when the colour changes (the cache key is a string)
+                if (d.ringCol != rc) { d.ringCol = rc; d.ring.GetComponent<Renderer>().sharedMaterial = Art.RingShared(rc); }   // only when the colour changes (the cache key is a string)
             }
             var spark = d.body.Find("Spark"); if (spark) spark.gameObject.SetActive((d.charged || d.special) && Mathf.Sin(t * 14) > -0.3f);
             if (spd > 120 && UnityEngine.Random.value < 0.5f) FxKit.Wake(W(d.p - d.v.normalized * d.r));
@@ -1926,6 +1960,7 @@ public class GameController : MonoBehaviour
         // top bar
         var top = UIKit.Panel(hud, PurpleDark, "TopBar").rectTransform; UIKit.Place(top, 0.5f, 1, 0, -150, 1040, 250);
         var topIn = UIKit.Panel(top, Purple, "Inner").rectTransform; UIKit.Stretch(topIn, 0, 10, 0, 0);
+        UIKit.Gloss(topIn, 0.2f);
         var mframe = UIKit.Panel(topIn, Yellow, "MovesFrame").rectTransform; UIKit.Place(mframe, 0, 0.5f, 125, 18, 206, 196);
         var mb = UIKit.Panel(topIn, Color.white, "Moves").rectTransform; UIKit.Place(mb, 0, 0.5f, 125, 18, 186, 176);
         movesTxt = UIKit.Label(mb, "10", 100, Ink); movesTxt.rectTransform.offsetMin = new Vector2(0, 26);
@@ -1949,6 +1984,7 @@ public class GameController : MonoBehaviour
         // FRENZY meter: how much is banked, what a full bar gives, and what this shot will add
         feverBar = UIKit.Panel(hud, new Color(0.25f, 0.19f, 0.45f, 1f), "Fever").rectTransform; UIKit.Place(feverBar, 0.5f, 1, 0, -312, 1010, 62);
         var ftrack = UIKit.Rect("Track", feverBar); UIKit.Stretch(ftrack, 6, 6, 6, 6);
+        UIKit.Gloss(feverBar, 0.16f);
         feverGhost = UIKit.Panel(ftrack, new Color(1f, 1f, 1f, 0.4f), "Ghost").rectTransform;
         var ff = UIKit.Panel(ftrack, new Color(1f, 0.42f, 0.68f), "Fill"); feverFill = ff.rectTransform;
         foreach (var r in new[] { feverGhost, feverFill }) { r.anchorMin = Vector2.zero; r.anchorMax = new Vector2(0, 1); r.offsetMin = r.offsetMax = Vector2.zero; r.pivot = new Vector2(0, 0.5f); }
@@ -1986,7 +2022,11 @@ public class GameController : MonoBehaviour
             string k = keys[i];
             var b = UIKit.Btn(bar, "", Yellow, Ink, 36, () => UseBooster(k), "Boost_" + k);
             UIKit.Place((RectTransform)b.transform, 0, 0.5f, 335 + i * 270, 0, 250, 170);
-            var lbl = UIKit.BtnText(b); lbl.lineSpacing = 1.05f;
+            var lbl = UIKit.BtnText(b); lbl.lineSpacing = 1.05f; lbl.fontSize = 32;
+            lbl.rectTransform.offsetMin = new Vector2(84, lbl.rectTransform.offsetMin.y);   // room for the icon
+            var bIcon = UIKit.Rect("Icon", b.transform).gameObject.AddComponent<RawImage>(); bIcon.raycastTarget = false;
+            UIKit.Place(bIcon.rectTransform, 0, 0.5f, 54, 4, 76, 76); bIcon.texture = BoosterIcon(k);
+            UIKit.Gloss(b.transform, 0.3f);
             boostTxt[k] = lbl; boostImg[k] = b.GetComponent<Image>();
         }
         // popup
@@ -1995,6 +2035,9 @@ public class GameController : MonoBehaviour
         var card = UIKit.Panel(popupRoot, Purple, "Card").rectTransform; UIKit.Place(card, 0.5f, 0.5f, 0, 0, 900, 1000);
         popTitle = UIKit.Outlined(UIKit.Label(card, "", 90, Color.white), Ink, 5); UIKit.Place(popTitle.rectTransform, 0.5f, 1, 0, -120, 860, 140);
         popStars = UIKit.Label(card, "", 130, Yellow); UIKit.Place(popStars.rectTransform, 0.5f, 1, 0, -290, 860, 170);
+        sunburst = UIKit.Rect("Sunburst", popStars.transform).gameObject.AddComponent<RawImage>(); sunburst.raycastTarget = false;
+        sunburst.texture = SunburstTex(); sunburst.color = new Color(1f, 0.9f, 0.45f, 0.55f);
+        UIKit.Place(sunburst.rectTransform, 0.5f, 0.5f, 0, 0, 620, 620);
         popStarImgs = UIKit.StarRow(popStars.transform, 3, 150, 24);
         popBody = UIKit.Label(card, "", 44, Color.white); UIKit.Place(popBody.rectTransform, 0.5f, 1, 0, -440, 860, 120);
         popReward = UIKit.Outlined(UIKit.Label(card, "", 64, Yellow), Ink, 4); UIKit.Place(popReward.rectTransform, 0.5f, 1, 0, -540, 860, 100);
@@ -2041,6 +2084,24 @@ public class GameController : MonoBehaviour
                 px[y * S + x] = new Color(1, 1, 1, Mathf.SmoothStep(0, 1, Mathf.Clamp01((d - 0.75f) / 0.6f)));
             }
         tex.SetPixels(px); tex.Apply(); return tex;
+    }
+
+    // pixel icons for the booster buttons (same chunky style as the album pictures)
+    static readonly Dictionary<char, Color> ICON_PAL = new Dictionary<char, Color>
+    {
+        { 'K', new Color(0.16f, 0.12f, 0.3f) }, { 'S', new Color(0.8f, 0.84f, 0.9f) }, { 'D', new Color(0.55f, 0.6f, 0.7f) },
+        { 'N', new Color(0.62f, 0.4f, 0.2f) }, { 'B', new Color(0.23f, 0.6f, 1f) }, { 'L', new Color(0.75f, 0.9f, 1f) },
+        { 'G', new Color(0.3f, 0.78f, 0.3f) }, { 'W', Color.white },
+    };
+    static Texture2D BoosterIcon(string k)
+    {
+        string[] rows = k == "hammer" ? new[] {
+            ".DDDDDDDD.", "DSSSSSSSSD", "DSSSSSSSSD", ".DDDNNDDD.", "....NN....", "....NN....", "....NN....", "....NN....", "....NN....", "...KNNK...", }
+        : k == "bomb" ? new[] {
+            "....KK....", "...KWWK...", "..KBBBBK..", ".KBLBBBBK.", ".KLLBBBBK.", ".KBBBBBBK.", ".KBBBBBBK.", "..KBBBBK..", "...KKKK...", }
+        : new[] {
+            "..KKKKKK..", ".KGGGGGGK.", "KGGGWWGGGK", "KGGGWWGGGK", "KGWWWWWWGK", "KGWWWWWWGK", "KGGGWWGGGK", "KGGGWWGGGK", ".KGGGGGGK.", "..KKKKKK..", };
+        return UIKit.PixelIcon(rows, ICON_PAL);
     }
 
     // ===================== combo bar: how many smashes this shot, and which duck each milestone gives =====================
