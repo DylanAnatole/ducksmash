@@ -69,19 +69,21 @@ public static class FxKit
     public static void Explosion(Vector3 p, float radius)
     {
         Emit(flash, p + Vector3.up * 0.4f, Vector3.zero, new Color(1f, 0.95f, 0.8f, 1f), radius * 1.6f, 0.18f);
-        for (int i = 0; i < 18; i++)
+        // phones: big soft fire/smoke sprites are pure overdraw, so emit far fewer
+        int fires = App.Mobile ? 7 : 18, smokes = App.Mobile ? 3 : 10, sparkN = App.Mobile ? 8 : 20;
+        for (int i = 0; i < fires; i++)
         {
             var d = Random.onUnitSphere; d.y = Mathf.Abs(d.y) * 0.8f + 0.2f;
             Emit(fire, p + d * 0.2f + Vector3.up * 0.3f, d * Random.Range(1.5f, 4f) * radius,
                 Color.Lerp(new Color(1f, 0.85f, 0.3f), new Color(1f, 0.35f, 0.15f), Random.value), Random.Range(0.5f, 0.9f) * radius, Random.Range(0.3f, 0.5f));
         }
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < smokes; i++)
         {
             var d = Random.onUnitSphere; d.y = Mathf.Abs(d.y);
             Emit(smoke, p + d * 0.3f + Vector3.up * 0.4f, d * Random.Range(0.6f, 1.5f) * radius + Vector3.up * 0.6f,
                 new Color(0.55f, 0.5f, 0.6f, 0.55f), Random.Range(0.6f, 1f) * radius, Random.Range(0.7f, 1.1f));
         }
-        for (int i = 0; i < 20; i++)
+        for (int i = 0; i < sparkN; i++)
         {
             var d = Random.onUnitSphere; d.y = Mathf.Abs(d.y) + 0.3f;
             Emit(sparks, p + Vector3.up * 0.3f, d.normalized * Random.Range(5f, 9f), new Color(1f, 0.85f, 0.4f), Random.Range(0.06f, 0.1f), Random.Range(0.3f, 0.55f));

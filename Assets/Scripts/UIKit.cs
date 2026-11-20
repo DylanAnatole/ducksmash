@@ -162,6 +162,8 @@ public static class UIKit
 
     public static Text Outlined(Text t, Color outline, float dist = 3f)
     {
+        // Outline copies the text mesh 4x; on phones a single drop shadow (1 copy) reads almost as well
+        if (App.Mobile) { var sh = t.gameObject.AddComponent<Shadow>(); sh.effectColor = outline; sh.effectDistance = new Vector2(dist * 0.8f, -dist * 1.4f); return t; }
         var o = t.gameObject.AddComponent<Outline>();
         o.effectColor = outline; o.effectDistance = new Vector2(dist, -dist);
         return t;

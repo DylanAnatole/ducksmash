@@ -89,7 +89,7 @@ public class GameController : MonoBehaviour
     Duck drag; Vector2 dragPt, dragSm; int powerStep, shotBanks; bool lastWarned;
     bool aimVisible = true; RectTransform dynLayer; int shownMoves = -1, shownScore = -1, shownStreak = -1;
     float swoop, flashA, hudTick; Image flashImg; int comboShown = -1; Block bossBlock;
-    int piggyGain, dominoFalls, shotClears, piggyAdded; string levelArt; bool newArt;
+    int piggyGain, dominoFalls, shotClears, piggyAdded; string levelArt; bool newArt, perfect;
     bool HasNext => level < LevelLibrary.Count || (level >= LevelLibrary.SmashLevel && level < LevelLibrary.SmashLevel + LevelLibrary.SmashCount - 1);
     class Line { public List<Block> m; public bool hz, done; public float c, a, b; }
     readonly List<Line> lines = new List<Line>();
@@ -236,22 +236,7 @@ public class GameController : MonoBehaviour
 
         FxKit.Clear();
         cam.cullingMask = ~0;
-        if (tubRoot == null)
-        {
-            var saved = world; world = tubRoot = new GameObject("Tub").transform; BuildTub(); world = saved;
-            // pre-create debris chunks once so the first big smash doesn't instantiate them mid-explosion
-            bitRoot = Art.Root("Debris", tubRoot);
-            foreach (var (pt, cnt) in new[] { (PrimitiveType.Cube, App.Mobile ? 40 : 100), (PrimitiveType.Sphere, 12), (PrimitiveType.Cylinder, 16) })
-            {
-                if (!bitPools.TryGetValue(pt, out var pool)) bitPools[pt] = pool = new Stack<Transform>();
-                for (int i = 0; i < cnt; i++)
-                {
-                    var tr = Art.Prim(pt, bitRoot, Vector3.zero, Vector3.one * 0.1f, Art.Mat(Color.white, 0.4f));
-                    var rr = tr.GetComponent<Renderer>(); rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; rr.receiveShadows = false;
-                    tr.gameObject.SetActive(false); pool.Push(tr);
-                }
-            }
-        }
+        EnsureTub();
         tubRoot.gameObject.SetActive(true);
         foreach (var d in L.ducks) NewDuck(new Vector2(d.x, d.y), d.kind);
         foreach (var d in L.blocks)
@@ -435,6 +420,53 @@ public class GameController : MonoBehaviour
         var slip = Art.Mat(new Color(1f, 0.85f, 0.45f), 0.3f);
         foreach (float x in new[] { 3.6f, 4.3f }) Art.Prim(PrimitiveType.Capsule, root, new Vector3(x, -0.15f, bottom + 0.2f), new Vector3(0.5f, 0.55f, 0.25f), slip, new Vector3(90, 0, 0));
         Art.Bake(root, "decor", 0.5f, 0.002f);
+    }
+
+    // Build the templates of the common block + duck kinds one per frame right after boot,
+    // so entering a level never has to build them mid-transition.
+    void EnsureTub()
+    {
+        if (tubRoot == null)
+        {
+            var saved = world; world = tubRoot = new GameObject("Tub").transform; BuildTub(); world = saved;
+            // pre-create debris chunks once so the first big smash doesn't instantiate them mid-explosion
+            bitRoot = Art.Root("Debris", tubRoot);
+            foreach (var (pt, cnt) in new[] { (PrimitiveType.Cube, App.Mobile ? 40 : 100), (PrimitiveType.Sphere, 12), (PrimitiveType.Cylinder, 16) })
+            {
+                if (!bitPools.TryGetValue(pt, out var pool)) bitPools[pt] = pool = new Stack<Transform>();
+                for (int i = 0; i < cnt; i++)
+                {
+                    var tr = Art.Prim(pt, bitRoot, Vector3.zero, Vector3.one * 0.1f, Art.Mat(Color.white, 0.4f));
+                    var rr = tr.GetComponent<Renderer>(); rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; rr.receiveShadows = false;
+                    tr.gameObject.SetActive(false); pool.Push(tr);
+                }
+            }
+        }
+    }
+
+    public System.Collections.IEnumerator Prewarm()
+    {
+        yield return null;
+        if (tubRoot == null) { EnsureTub(); if (!Active) tubRoot.gameObject.SetActive(false); }
+        var specs = new List<Block>
+        {
+            new Block { type = "glass", r = 16 }, new Block { type = "soap", r = 16 }, new Block { type = "vase", r = 17 },
+            new Block { type = "plates", r = 17 }, new Block { type = "bathbomb", r = 17 }, new Block { type = "gold", r = 16 },
+            new Block { type = "tnt", r = 17 }, new Block { type = "screw", r = 12 },
+            new Block { type = "stone", rect = true, w = 36, h = 36 }, new Block { type = "chest", rect = true, w = 50, h = 40 },
+            new Block { type = "domino", rect = true, w = 10, h = 32 }, new Block { type = "domino", rect = true, w = 32, h = 10 },
+            new Block { type = "laser", r = 16, dir = "h" }, new Block { type = "laser", r = 16, dir = "v" },
+        };
+        foreach (var b in specs)
+        {
+            yield return null;
+            var saved = world; world = TplRoot; MakeView(b); if (b.view) Destroy(b.view.gameObject); world = saved;
+        }
+        foreach (var k in new[] { "normal", "heavy", "bomb", "zap" })
+        {
+            yield return null;
+            var saved = world; world = TplRoot; var d = new Duck { kind = k }; BuildDuckView(d); if (d.view) Destroy(d.view.gameObject); world = saved;
+        }
     }
 
     Transform BuildBlockArt(Block b, Transform parent)
@@ -1026,6 +1058,10 @@ public class GameController : MonoBehaviour
         d.stretch = 0.22f; d.pullVis = 0;
         Sfx.Play("shoot"); Sfx.Play("squeak", 0.5f, 1.3f); FxKit.Splash(W(d.p), 6); FxKit.Ripple(W(d.p), 1.1f);
         if (d.special) d.spent = true;
+        if (moves == 0 && !d.frenzy && state == "play" && GoalsLeft() <= 6)
+        {   // last shot and so close: the duck drills through everything (frustration saver, feels great)
+            d.frenzy = true; BigText("CƠ HỘI CUỐI!", new Color(1f, 0.85f, 0.3f)); Sfx.Play("frenzy", 0.8f, 1.2f); FxKit.StarBurst(W(d.p, 0.5f), 14);
+        }
         if (d.kind == "rocket")
         {
             d.rocketT = ROCKET_TIME; d.v = v.normalized * ROCKET_SPEED;
@@ -1088,6 +1124,7 @@ public class GameController : MonoBehaviour
         score += left * 150;
         if (!rewarded && LevelLibrary.IsSandbox(level)) { rewarded = true; reward = 0; }   // test levels: no progress saved
         newArt = false; piggyAdded = 0;
+        perfect = true; foreach (var b in blocks) if (b.alive && !b.Hard) { perfect = false; break; }
         if (!LevelLibrary.IsSandbox(level) && state == "win")
         {
             int before = SaveData.Piggy; SaveData.Piggy = before + piggyGain; piggyAdded = SaveData.Piggy - before; piggyGain = 0;
@@ -1097,7 +1134,7 @@ public class GameController : MonoBehaviour
         {
             rewarded = true;
             bool first = SaveData.GetStars(level) == 0;
-            reward = 20 + stars * 10 + left * 5 + rushCoins + (hardLevel ? 80 : 0) + (first ? 20 : 0);
+            reward = 20 + stars * 10 + left * 5 + rushCoins + (hardLevel ? 80 : 0) + (first ? 20 : 0) + (perfect ? 25 : 0);
             SaveData.Coins += reward; SaveData.SetStars(level, stars);
             SaveData.MaxLevel = Mathf.Min(LevelLibrary.Count, Mathf.Max(SaveData.MaxLevel, level + 1));
             if (hardLevel && first) foreach (var k in PRICE.Keys) SaveData.SetBoost(k, SaveData.GetBoost(k) + 1);   // hard level chest
@@ -1895,7 +1932,7 @@ public class GameController : MonoBehaviour
             popTitle.text = hardLevel ? "VƯỢT MÀN KHÓ!" : (level <= LevelLibrary.Onboarding ? "Giỏi lắm!" : "Well Done!");
             popStars.text = "";
             for (int i = 0; i < 3; i++) { popStarImgs[i].gameObject.SetActive(true); popStarImgs[i].color = i < stars ? Yellow : new Color(0.49f, 0.42f, 0.84f); popStarImgs[i].rectTransform.localScale = Vector3.one * (i == 1 ? 1.2f : 1f); }
-            popBody.text = "Điểm " + score.ToString("N0") + (hardLevel ? "\nThưởng màn khó: +80 xu" + (SaveData.GetStars(level) > 0 ? "" : "") : "")
+            popBody.text = "Điểm " + score.ToString("N0") + (perfect ? "\n<color=#7dffa0>PHÁ SẠCH SÀNH SANH! +25 xu</color>" : "") + (hardLevel ? "\nThưởng màn khó: +80 xu" + (SaveData.GetStars(level) > 0 ? "" : "") : "")
                 + (piggyAdded > 0 ? "\n<size=36>Ống heo +" + piggyAdded + "  (" + SaveData.Piggy + "/" + SaveData.PiggyMax + ")</size>" : "")
                 + (newArt ? "\n<size=36><color=#ffe066>Tranh \"" + LevelLibrary.ArtName(levelArt) + "\" vào Album!</color></size>" : "");
             popBody.verticalOverflow = VerticalWrapMode.Overflow;

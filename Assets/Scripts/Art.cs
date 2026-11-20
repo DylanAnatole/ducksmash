@@ -151,7 +151,7 @@ public static class Art
         var go = new GameObject("Baked");
         go.transform.SetParent(root, false);
         go.AddComponent<MeshFilter>().sharedMesh = mesh;
-        go.AddComponent<MeshRenderer>().sharedMaterial = BakedMat(gloss, outline);
+        go.AddComponent<MeshRenderer>().sharedMaterial = BakedMat(gloss, outline, key != "decor");   // room decor is not in the water
     }
 
     static bool IsKept(Transform t, Transform root, string[] keep)
@@ -161,12 +161,13 @@ public static class Art
         return false;
     }
 
-    static Material BakedMat(float gloss, float outline)
+    static Material BakedMat(float gloss, float outline, bool ground)
     {
-        string key = gloss + "|" + outline;
+        string key = gloss + "|" + outline + "|" + ground;
         if (bakedMats.TryGetValue(key, out var m) && m != null) return m;
         m = new Material(outline > 0f ? ToonShader : FlatShader) { color = Color.white, enableInstancing = true };
         m.SetFloat("_UseVC", 1); m.SetFloat("_Gloss", gloss); m.SetFloat("_Outline", outline);
+        m.SetFloat("_Ground", ground ? 1 : 0);   // baked props + ducks sit "in" the water
         m.SetColor("_OutlineColor", new Color(0.33f, 0.24f, 0.42f)); m.SetColor("_ShadowTint", new Color(0.74f, 0.72f, 0.88f));
         if (outline <= 0f) m.EnableKeyword("NO_OUTLINE");
         bakedMats[key] = m;

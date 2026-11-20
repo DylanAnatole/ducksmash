@@ -56,6 +56,7 @@ public static class App
         Map = new GameObject("Map").AddComponent<MapScreen>(); Map.transform.SetParent(root.transform); Map.Build(Canvas.transform);
         Settings = new GameObject("SettingsCtl").AddComponent<SettingsPopup>(); Settings.transform.SetParent(root.transform); Settings.Build(Canvas.transform);
         ShowMap();
+        Game.StartCoroutine(Game.Prewarm());   // build block/duck templates in the background while the map is shown
     }
 
     public static void ShowMap() { Game.Close(); Map.Show(); }

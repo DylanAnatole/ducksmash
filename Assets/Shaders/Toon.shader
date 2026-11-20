@@ -12,6 +12,7 @@ Shader "DuckSmash/Toon"
         _Outline ("Outline Width", Range(0,0.03)) = 0.008
         _OutlineColor ("Outline Color", Color) = (0.2,0.13,0.28,1)
         _UseVC ("Use Vertex Color", Float) = 0
+        _Ground ("Water contact darkening", Float) = 0
     }
     SubShader
     {
@@ -31,7 +32,7 @@ Shader "DuckSmash/Toon"
 
             sampler2D _MainTex; float4 _MainTex_ST;
             fixed4 _Color, _ShadowTint, _Emission;
-            half _Gloss, _UseVC;
+            half _Gloss, _UseVC, _Ground;
 
             struct v2f
             {
@@ -79,6 +80,7 @@ Shader "DuckSmash/Toon"
                 float rim = pow(1.0 - saturate(dot(n, v)), 3.0);
                 c += rim * 0.18 * col.rgb + rim * 0.06;
 
+                c *= lerp(1.0, lerp(0.68, 1.0, saturate(i.wp.y * 3.2 + 0.08)), _Ground);   // grounded look without a shadow pass
                 c += _Emission.rgb;
                 return fixed4(c, 1);
             }
