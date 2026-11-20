@@ -1737,7 +1737,15 @@ public class GameController : MonoBehaviour
                 for (int i = 0; i < blocks.Count; i++)
                 {
                     var b = blocks[i];
-                    if (!b.alive || Covered(b) || b.falling > 0 || simHits.Contains(b) || !Collide(gp, d.r, b, out _)) continue;
+                    if (!b.alive || Covered(b) || b.falling > 0 || simHits.Contains(b)) continue;
+                    bool hitIt;
+                    if (b.mvAmp > 0)
+                    {   // moving target: where it will be when the duck gets there (same rule as the aim preview)
+                        var saved = b.p; b.p.x = b.mvCx + Mathf.Sin(b.mvPhase + st / (MAX_SPEED * 0.85f) * b.mvSp) * b.mvAmp;
+                        hitIt = Collide(gp, d.r, b, out _); b.p = saved;
+                    }
+                    else hitIt = Collide(gp, d.r, b, out _);
+                    if (!hitIt) continue;
                     if (!b.Hard && b.hp <= dmg) { simHits.Add(b); len -= 10; score += b.type == "bathbomb" || b.type == "tnt" || b.type == "laser" || b.type == "domino" || b.type == "screw" ? 5f : b.type == "gold" ? 6f : 1f; }
                     else { if (b.type == "ring" && b.hp > 1) score += 4f; else if (b.type == "boss") score += 3f; stop = true; break; }   // knocking a ring sends it skating; boss hits count
                 }
