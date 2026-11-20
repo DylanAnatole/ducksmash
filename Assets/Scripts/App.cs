@@ -10,6 +10,7 @@ public static class App
     public static MapScreen Map;
     public static GameController Game;
     public static SettingsPopup Settings;
+    public static bool Mobile;   // phone/tablet browser: lighter effects + shadows
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Boot()
@@ -26,11 +27,15 @@ public static class App
         var sun = Object.FindObjectOfType<Light>();
         if (sun == null) sun = new GameObject("Sun").AddComponent<Light>();
         sun.type = LightType.Directional; sun.transform.rotation = Quaternion.Euler(58, -35, 0);
-        sun.intensity = 1.05f; sun.shadows = LightShadows.Soft; sun.shadowStrength = 0.55f; sun.color = new Color(1f, 0.97f, 0.92f);
+        // phones: hard low-res shadows, no MSAA (fill-rate is the bottleneck on mobile WebGL)
+        Mobile = Application.isMobilePlatform;
+        sun.intensity = 1.05f; sun.shadows = Mobile ? LightShadows.Hard : LightShadows.Soft; sun.shadowStrength = 0.55f; sun.color = new Color(1f, 0.97f, 0.92f);
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
         RenderSettings.ambientLight = new Color(0.62f, 0.6f, 0.72f);
         QualitySettings.shadowDistance = 32; QualitySettings.shadowCascades = 1;            // whole tub fits in one cascade
-        QualitySettings.shadowResolution = ShadowResolution.Medium; QualitySettings.shadowProjection = ShadowProjection.StableFit;
+        QualitySettings.shadowResolution = Mobile ? ShadowResolution.Low : ShadowResolution.Medium; QualitySettings.shadowProjection = ShadowProjection.StableFit;
+        QualitySettings.antiAliasing = Mobile ? 0 : QualitySettings.antiAliasing;
+        QualitySettings.pixelLightCount = 1; QualitySettings.softParticles = false;
 
         if (Object.FindObjectOfType<EventSystem>() == null) new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
 

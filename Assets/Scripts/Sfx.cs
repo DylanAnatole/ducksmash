@@ -10,6 +10,7 @@ public class Sfx : MonoBehaviour
     readonly Dictionary<string, AudioClip> clips = new Dictionary<string, AudioClip>();
     readonly Dictionary<string, float> lastPlayed = new Dictionary<string, float>();
     const int SR = 44100;
+    int frame, playedThisFrame;
 
     public static void Init(GameObject host)
     {
@@ -32,12 +33,12 @@ public class Sfx : MonoBehaviour
     public static void Play(string name, float volume = 1f, float pitch = 1f)
     {
         if (I == null || !SaveData.Sound || !I.clips.TryGetValue(name, out var clip)) return;
-        if (name == "pop" || name == "crunch" || name == "wood" || name == "splash")
-        {
-            I.lastPlayed.TryGetValue(name, out float last);
-            if (Time.unscaledTime - last < 0.035f) return;
-            I.lastPlayed[name] = Time.unscaledTime;
-        }
+        // every PlayOneShot is a new WebAudio node: throttle each sound and cap sounds per frame
+        if (Time.frameCount != I.frame) { I.frame = Time.frameCount; I.playedThisFrame = 0; }
+        if (I.playedThisFrame >= 3) return;
+        I.lastPlayed.TryGetValue(name, out float last);
+        if (Time.unscaledTime - last < (name == "pop" || name == "crunch" || name == "wood" || name == "splash" || name == "ice" ? 0.05f : 0.03f)) return;
+        I.lastPlayed[name] = Time.unscaledTime; I.playedThisFrame++;
         I.sfx.pitch = pitch;
         I.sfx.PlayOneShot(clip, volume);
     }

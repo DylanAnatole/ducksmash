@@ -7,6 +7,7 @@ public static class FxKit
     static Transform root;
     static ParticleSystem sparkle, crumbs, drops, ripple, fire, smoke, flash, sparks, wake, confetti, stars, bubbles;
     static Texture2D softTex, starTex, ringTex, squareTex;
+    static int budgetFrame, emitted;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() { root = null; }
@@ -131,6 +132,9 @@ public static class FxKit
     static void Emit(ParticleSystem ps, Vector3 pos, Vector3 vel, Color c, float size, float life)
     {
         if (ps == null) return;
+        // per-frame budget: a 40-block smash must not emit thousands of particles in one frame
+        if (Time.frameCount != budgetFrame) { budgetFrame = Time.frameCount; emitted = 0; }
+        if (++emitted > (App.Mobile ? 70 : 220)) return;
         var ep = new ParticleSystem.EmitParams
         {
             position = pos, velocity = vel, startColor = c, startSize = size, startLifetime = life,
@@ -145,7 +149,8 @@ public static class FxKit
         var ps = go.AddComponent<ParticleSystem>();
         ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         var main = ps.main;
-        main.playOnAwake = false; main.loop = true;   // keeps the system "playing" so manual Emit() always simulates main.maxParticles = max;
+        main.playOnAwake = false; main.loop = true;   // keeps the system "playing" so manual Emit() always simulates
+        main.maxParticles = App.Mobile ? Mathf.Max(30, max / 3) : max;
         main.simulationSpace = ParticleSystemSimulationSpace.World; main.gravityModifier = gravity;
         main.scalingMode = ParticleSystemScalingMode.Shape;
         var em = ps.emission; em.enabled = false;

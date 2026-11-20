@@ -51,7 +51,7 @@ public class GameController : MonoBehaviour
     }
     class Bumper { public float x, y, w, h, pulse; public Transform view; }
     class Timer { public float t; public Action fn; }
-    class Bit { public Transform t; public Vector3 v, spin, scale0; public float life, max; public bool grav; }
+    class Bit { public PrimitiveType type; public Transform t; public Vector3 v, spin, scale0; public float life, max; public bool grav; }
     class Ring { public Transform t; public Material m; public float life, max, r0, r1; public Color c; }
     class Pop { public Text t; public Vector3 world; public float life, max, rise; public bool big; }
     class Zap { public LineRenderer lr; public Vector2 a, b; public float life; }
@@ -63,6 +63,7 @@ public class GameController : MonoBehaviour
     readonly List<Bumper> bumpers = new List<Bumper>();
     readonly List<Timer> timers = new List<Timer>();
     readonly List<Bit> bits = new List<Bit>(); readonly Stack<Transform> bitPool = new Stack<Transform>();
+    readonly Dictionary<PrimitiveType, Stack<Transform>> bitPools = new Dictionary<PrimitiveType, Stack<Transform>>();
     readonly List<Ring> rings = new List<Ring>();
     readonly List<Pop> pops = new List<Pop>();
     readonly List<Zap> zaps = new List<Zap>();
@@ -75,7 +76,8 @@ public class GameController : MonoBehaviour
     string state = "play", target, hint;
     float freeze, shake, comboPulse, t, lastW, lastH;
     Duck drag; Vector2 dragPt, dragSm; int powerStep, shotBanks; bool lastWarned;
-    float swoop, flashA; Image flashImg;
+    bool aimVisible = true;
+    float swoop, flashA, hudTick; Image flashImg; int comboShown = -1; Block bossBlock;
     int piggyGain, dominoFalls, shotClears, piggyAdded; string levelArt; bool newArt;
     bool HasNext => level < LevelLibrary.Count || (level >= LevelLibrary.SmashLevel && level < LevelLibrary.SmashLevel + LevelLibrary.SmashCount - 1);
     class Line { public List<Block> m; public bool hz, done; public float c, a, b; }
@@ -137,7 +139,7 @@ public class GameController : MonoBehaviour
         float len = (ln.b - ln.a + 40) * K;
         beam.position = W(mid, 0.4f);
         beam.localScale = ln.hz ? new Vector3(len, 0.12f, 0.45f) : new Vector3(0.45f, 0.12f, len);
-        rings.Add(new Ring { t = beam, m = beam.GetComponent<Renderer>().material, life = 0.45f, max = 0.45f, r0 = -1, c = new Color(1f, 0.9f, 0.5f, 0.9f) });
+        rings.Add(new Ring { t = beam, m = beam.GetComponent<Renderer>().sharedMaterial, life = 0.45f, max = 0.45f, r0 = -1, c = new Color(1f, 0.9f, 0.5f, 0.9f) });
         for (int i = 0; i <= 10; i++) { float f = i / 10f; var q = ln.hz ? new Vector2(Mathf.Lerp(ln.a, ln.b, f), ln.c) : new Vector2(ln.c, Mathf.Lerp(ln.a, ln.b, f)); FxKit.Sparkle(W(q, 0.3f), gold, 2); }
         // shockwave chips the rows right next to it (can chain into more clears)
         Later(0.06f, () =>
@@ -209,7 +211,7 @@ public class GameController : MonoBehaviour
         level = n;
         var L = LevelLibrary.Get(n);
         world = new GameObject("World").transform; fx = new GameObject("FX").transform;
-        ducks.Clear(); blocks.Clear(); bumpers.Clear(); timers.Clear(); bits.Clear(); bitPool.Clear(); rings.Clear(); zaps.Clear(); dying.Clear();
+        ducks.Clear(); blocks.Clear(); bumpers.Clear(); timers.Clear(); bits.Clear(); bitPool.Clear(); bitPools.Clear(); rings.Clear(); zaps.Clear(); dying.Clear();
         foreach (var c in coins) if (c.rt) Destroy(c.rt.gameObject);
         coins.Clear(); slowTimer = camZoom = rushTimer = 0; rushLeft = rushCoins = 0; movesAtClear = -1; displayScore = 0;
         foreach (var p in pops) if (p.t) Destroy(p.t.gameObject);
@@ -245,14 +247,15 @@ public class GameController : MonoBehaviour
         if (n >= 4)
         {
             var rng = new System.Random(n * 31 + 7);
-            var pool = blocks.Where(b => b.type == "cookie" && b.under == null).ToList();
+            var pool = blocks.Where(b => (b.type == "cookie" || b.type == "soap" || b.type == "glass") && b.under == null).ToList();
             int golds = Mathf.Min(pool.Count / 12, 1);
             for (int i = 0; i < golds; i++) { var g = pool[rng.Next(pool.Count)]; pool.Remove(g); g.type = "gold"; }
         }
         // build-in animation: blocks drop onto the water row by row
         foreach (var b in blocks) { b.appear = 0; b.delay = 0.15f + (b.p.y - TY) / TH * 0.7f + UnityEngine.Random.value * 0.08f; }
         foreach (var b in blocks) MakeView(b);
-        swoop = 1f; flashA = 0; piggyGain = 0; levelArt = L.art;
+        swoop = 1f; flashA = 0; piggyGain = 0; levelArt = L.art; hudTick = 0; comboShown = -1;
+        bossBlock = blocks.FirstOrDefault(b => b.type == "boss");
         BuildLines();
         foreach (var bd in L.bumpers)
         {
@@ -433,6 +436,7 @@ public class GameController : MonoBehaviour
         b.view.position = W(b.p);
         b.baseScale = b.view.localScale;
         b.rends = b.view.GetComponentsInChildren<Renderer>().Where(r => r.gameObject.activeSelf && r.sharedMaterial != null && r.sharedMaterial.HasProperty("_Emission")).ToArray();
+        if (App.Mobile) foreach (var r in b.view.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;   // phones: only ducks + decor cast shadows
     }
 
     Duck NewDuck(Vector2 p, string kind)
@@ -600,8 +604,9 @@ public class GameController : MonoBehaviour
 
     void Step(float dt)
     {
-        foreach (var d in ducks.ToArray())
+        for (int di = 0; di < ducks.Count; di++)
         {
+            var d = ducks[di];
             d.p += d.v * dt;
             float sp = d.v.magnitude;
             if (d.rocketT > 0) { d.rocketT -= dt; if (sp > 1) d.v *= ROCKET_SPEED / sp; }   // rocket: full thrust, no friction
@@ -843,7 +848,7 @@ public class GameController : MonoBehaviour
         bool hz = b.dir == "h";
         beam.position = hz ? new Vector3(0, 0.4f, W(b.p).z) : new Vector3(W(b.p).x, 0.4f, 0);
         beam.localScale = hz ? new Vector3(TW * K, 0.15f, 0.35f) : new Vector3(0.35f, 0.15f, TH * K);
-        rings.Add(new Ring { t = beam, m = beam.GetComponent<Renderer>().material, life = 0.4f, max = 0.4f, r0 = -1, c = new Color(0.85f, 0.75f, 1f, 0.9f) });
+        rings.Add(new Ring { t = beam, m = beam.GetComponent<Renderer>().sharedMaterial, life = 0.4f, max = 0.4f, r0 = -1, c = new Color(0.85f, 0.75f, 1f, 0.9f) });
         Later(0.06f, () =>
         {
             foreach (var o in blocks.ToArray())
@@ -1270,7 +1275,7 @@ public class GameController : MonoBehaviour
 
     void BuildAim()
     {
-        aimRoot = Art.Root("Aim", fx); aimDots.Clear(); pushDots.Clear();
+        aimRoot = Art.Root("Aim", fx); aimDots.Clear(); pushDots.Clear(); aimVisible = true;
         if (mpb == null) mpb = new MaterialPropertyBlock();
         var m = Art.Mat(Color.white, 0.5f, 0, 0.6f, 0.0035f);   // outlined so the dots pop on the bright water
         for (int i = 0; i < 48; i++)
@@ -1313,6 +1318,8 @@ public class GameController : MonoBehaviour
 
     void UpdateAim()
     {
+        if ((drag == null || moving) && !aimVisible) { powerStep = 0; return; }
+        aimVisible = drag != null && !moving;
         foreach (var d in aimDots) d.gameObject.SetActive(false);
         foreach (var d in pushDots) d.gameObject.SetActive(false);
         aimX.gameObject.SetActive(false); aimTarget.gameObject.SetActive(false); aimGrab.gameObject.SetActive(false);
@@ -1515,24 +1522,34 @@ public class GameController : MonoBehaviour
     void Splash(Vector2 p, int n) => FxKit.Splash(W(p), Mathf.Max(3, n), n > 12 ? 1.4f : 1f);
     void Debris(Vector2 p, Color c, int n, float power)
     {
-        int chunks = Mathf.Clamp(n / 3, 1, 12);   // a few solid 3D chunks + many cheap particles
+        int chunks = Mathf.Clamp(n / 3, 1, App.Mobile ? 2 : 4);   // a few solid 3D chunks + many cheap particles
         for (int i = 0; i < chunks; i++) SpawnBit(W(p, 0.3f), c, UnityEngine.Random.Range(0.1f, 0.22f), 4.5f * power, UnityEngine.Random.Range(0.6f, 1f), PrimitiveType.Cube);
-        FxKit.Crumbs(W(p), c, Mathf.RoundToInt(n * 1.2f));
-        FxKit.Sparkle(W(p), c, Mathf.Clamp(n / 3, 2, 6));
+        FxKit.Crumbs(W(p), c, Mathf.RoundToInt(n * (App.Mobile ? 0.6f : 1.1f)));
+        FxKit.Sparkle(W(p), c, Mathf.Clamp(n / 3, 2, App.Mobile ? 3 : 6));
     }
 
     void SpawnBit(Vector3 pos, Color c, float size, float speed, float life, PrimitiveType type)
     {
-        if (bits.Count > 450) return;
-        var tr = Art.Prim(type, fx, pos, Vector3.one * size, Art.Mat(c, 0.4f));
+        if (bits.Count > (App.Mobile ? 40 : 140)) return;
+        // reuse pooled chunks: creating + destroying GameObjects per debris piece was the main hitch on big smashes
+        Transform tr;
+        if (!bitPools.TryGetValue(type, out var pool)) bitPools[type] = pool = new Stack<Transform>();
+        if (pool.Count > 0 && pool.Peek() != null) { tr = pool.Pop(); tr.gameObject.SetActive(true); tr.position = pos; tr.localScale = Vector3.one * size; tr.rotation = Quaternion.identity; }
+        else
+        {
+            if (pool.Count > 0) pool.Clear();
+            tr = Art.Prim(type, fx, pos, Vector3.one * size, Art.Mat(c, 0.4f));
+            var rr = tr.GetComponent<Renderer>(); rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; rr.receiveShadows = false;
+        }
+        tr.GetComponent<Renderer>().sharedMaterial = Art.Mat(c, 0.4f);
         var dir = UnityEngine.Random.insideUnitCircle.normalized;
-        bits.Add(new Bit { t = tr, v = new Vector3(dir.x, UnityEngine.Random.Range(0.6f, 1.6f), dir.y) * speed * UnityEngine.Random.Range(0.4f, 1f), spin = UnityEngine.Random.insideUnitSphere * 720, scale0 = tr.localScale, life = life, max = life, grav = true });
+        bits.Add(new Bit { type = type, t = tr, v = new Vector3(dir.x, UnityEngine.Random.Range(0.6f, 1.6f), dir.y) * speed * UnityEngine.Random.Range(0.4f, 1f), spin = UnityEngine.Random.insideUnitSphere * 720, scale0 = tr.localScale, life = life, max = life, grav = true });
     }
 
     void AddRing(Vector2 p, float radius, Color c)
     {
         var tr = Art.Prim(PrimitiveType.Cylinder, fx, W(p, 0.3f), Vector3.one, Art.Fade(c, 0.8f));
-        rings.Add(new Ring { t = tr, m = tr.GetComponent<Renderer>().material, life = 0.35f, max = 0.35f, r0 = 0.2f, r1 = radius * 2 * K, c = c });
+        rings.Add(new Ring { t = tr, m = tr.GetComponent<Renderer>().sharedMaterial, life = 0.35f, max = 0.35f, r0 = 0.2f, r1 = radius * 2 * K, c = c });
     }
 
     void UpdateFx(float dt)
@@ -1540,7 +1557,7 @@ public class GameController : MonoBehaviour
         for (int i = bits.Count - 1; i >= 0; i--)
         {
             var b = bits[i]; b.life -= dt;
-            if (b.life <= 0) { Destroy(b.t.gameObject); bits.RemoveAt(i); continue; }
+            if (b.life <= 0) { if (b.t) { b.t.gameObject.SetActive(false); bitPools[b.type].Push(b.t); } bits.RemoveAt(i); continue; }
             b.v.y -= 14 * dt; b.t.position += b.v * dt;
             if (b.t.position.y < 0) { b.t.position = new Vector3(b.t.position.x, 0, b.t.position.z); b.v *= 0.5f; b.v.y = Mathf.Abs(b.v.y) * 0.3f; }
             b.t.Rotate(b.spin * dt); b.t.localScale = b.scale0 * Mathf.Clamp01(b.life / b.max * 1.5f);
@@ -1548,7 +1565,7 @@ public class GameController : MonoBehaviour
         for (int i = rings.Count - 1; i >= 0; i--)
         {
             var r = rings[i]; r.life -= dt; float f = 1 - r.life / r.max;
-            if (r.life <= 0) { Destroy(r.t.gameObject); rings.RemoveAt(i); continue; }
+            if (r.life <= 0) { Destroy(r.t.gameObject); if (r.m) Destroy(r.m); rings.RemoveAt(i); continue; }
             if (r.r0 >= 0) { float s = Mathf.Lerp(r.r0, r.r1, Mathf.Sqrt(f)); r.t.localScale = new Vector3(s, 0.05f + (1 - f) * 0.3f, s); }
             var c = r.c; c.a *= 1 - f; r.m.color = c;
         }
@@ -1585,6 +1602,8 @@ public class GameController : MonoBehaviour
 
     void PopText(string s, Vector2 simPos, Color c, int size)
     {
+        // too many floating labels at once is unreadable and each one is an outlined UI mesh: drop the oldest
+        if (pops.Count >= (App.Mobile ? 6 : 10)) { if (pops[0].t) Destroy(pops[0].t.gameObject); pops.RemoveAt(0); }
         var tx = UIKit.Outlined(UIKit.Label(hud, s, size, c), new Color(0.23f, 0.18f, 0.42f), 4);
         var rt = tx.rectTransform; rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f); rt.sizeDelta = new Vector2(600, 120);
         pops.Add(new Pop { t = tx, world = W(simPos, 0.6f), life = 0.9f, max = 0.9f });
@@ -1734,10 +1753,14 @@ public class GameController : MonoBehaviour
         movesTxt.color = moves <= 2 && state == "play" ? new Color(1f, 0.35f, 0.3f) : Ink;
         int proj = moves >= Mathf.CeilToInt(startMoves * 0.5f) ? 3 : moves >= Mathf.CeilToInt(startMoves * 0.2f) ? 2 : 1;
         for (int i = 0; i < 3; i++) starPreview[i].color = i < proj ? Yellow : new Color(1, 1, 1, 0.35f);
+        // goal counts, boosters and titles only change on smashes: refresh them ~8x/s instead of every frame (GC + text rebuilds)
+        hudTick -= Time.unscaledDeltaTime;
+        bool slow = hudTick <= 0; if (slow) hudTick = 0.12f;
+        var boss = bossBlock;
+        if (slow) {
         int cookies = blocks.Count(b => b.alive && (b.type == "cookie" || b.type == "ice"));
         int chests = blocks.Count(b => b.alive && b.type == "chest"), pixels = blocks.Count(b => b.alive && b.type == "pixel");
         var g = new List<string>();
-        var boss = blocks.FirstOrDefault(b => b.type == "boss");
         if (boss != null) g.Add(boss.alive ? "Boss " + Mathf.Max(0, boss.hp) : "Boss xong");
         if (blocks.Any(b => b.type == "cookie" || b.type == "ice")) g.Add("Bánh " + (cookies == 0 ? "xong" : cookies.ToString()));
         if (blocks.Any(b => b.type == "chest")) g.Add("Rương " + (chests == 0 ? "xong" : chests.ToString()));
@@ -1745,6 +1768,13 @@ public class GameController : MonoBehaviour
         goalsTxt.text = "MỤC TIÊU\n" + string.Join("   ", g);
         levelTxt.text = LevelLibrary.Title(level);
         if (blocks.Any(b => b.Prop)) { int pl = blocks.Count(b => b.alive && b.Prop); g.Add("Đồ " + (pl == 0 ? "xong" : pl.ToString())); goalsTxt.text = "MỤC TIÊU\n" + string.Join("   ", g); }
+        foreach (var k in PRICE.Keys)
+        {
+            int n = SaveData.GetBoost(k);
+            boostTxt[k].text = BNAME[k] + "\n" + (n > 0 ? "còn " + n : PRICE[k] + " xu");
+            boostImg[k].color = target == k ? new Color(0.37f, 0.83f, 0.37f) : Yellow;
+        }
+        }
         scoreTxt.text = Mathf.RoundToInt(displayScore).ToString("N0");
         scoreTxt.rectTransform.localScale = Vector3.one * (1 + scorePulse * 1.5f);
         float fr = frenzyReady ? 1 : fever / FEVER_MAX;
@@ -1759,20 +1789,16 @@ public class GameController : MonoBehaviour
         comboTxt.gameObject.SetActive(showCombo);
         if (showCombo)
         {   // live progress toward the next special duck
+            if (comboShown != shotSmash * 10 + shotBanks) {
+            comboShown = shotSmash * 10 + shotBanks;
             var nt = NextTier(shotSmash);
             string sub = nt.kind != null ? "\n<size=44>còn " + (nt.need - shotSmash) + " → " + nt.name + "</size>"
                        : nt.maxed ? "\n<size=44>" + nt.name + "!</size>" : "";
-            comboTxt.text = "x" + shotSmash + " SMASH" + sub;
+            comboTxt.text = "x" + shotSmash + " SMASH" + sub + (shotBanks > 0 ? "\n<size=40>BĂNG x" + (shotBanks + 1) + " ĐIỂM</size>" : "");
+            }
             comboTxt.color = shotSmash >= 25 ? Color.HSVToRGB(t * 1.5f % 1f, 0.55f, 1f) : shotSmash >= 16 ? new Color(1f, 0.35f, 0.2f) : shotSmash >= 10 ? new Color(1f, 0.6f, 0.3f) : Yellow;
             comboTxt.rectTransform.localScale = Vector3.one * (1 + comboPulse * 2.5f + Mathf.Min(shotSmash, 30) * 0.006f);
             comboTxt.rectTransform.localEulerAngles = new Vector3(0, 0, Mathf.Sin(t * 30f) * comboPulse * 40f);   // wobble on every smash
-            if (shotBanks > 0) comboTxt.text += "\n<size=40>BĂNG x" + (shotBanks + 1) + " ĐIỂM</size>";
-        }
-        foreach (var k in PRICE.Keys)
-        {
-            int n = SaveData.GetBoost(k);
-            boostTxt[k].text = BNAME[k] + "\n" + (n > 0 ? "còn " + n : PRICE[k] + " xu");
-            boostImg[k].color = target == k ? new Color(0.37f, 0.83f, 0.37f) : Yellow;
         }
     }
 
