@@ -62,6 +62,9 @@ public static class FxKit
         Emit(ripple, p + Vector3.up * 0.02f, Vector3.zero, new Color(1, 1, 1, 0.7f), 0.5f * power, 0.5f);
     }
 
+    // quick white "pop" where something breaks (one additive sprite, very cheap)
+    public static void PopFlash(Vector3 p, float size) => Emit(flash, p, Vector3.zero, new Color(1f, 1f, 0.95f, 0.85f), size, 0.13f);
+
     public static void Ripple(Vector3 p, float size = 0.6f) => Emit(ripple, p + Vector3.up * 0.02f, Vector3.zero, new Color(1, 1, 1, 0.55f), size, 0.6f);
 
     public static void Wake(Vector3 p) => Emit(wake, p + Vector3.up * 0.02f, Vector3.zero, new Color(1, 1, 1, 0.45f), Random.Range(0.25f, 0.4f), 0.55f);

@@ -87,6 +87,7 @@ public class GameController : MonoBehaviour
     string state = "play", target, hint;
     float freeze, shake, comboPulse, t, lastW, lastH;
     Duck drag; Vector2 dragPt, dragSm; int powerStep, shotBanks; bool lastWarned;
+    Transform popCard; float loseAnim;
     Text powerTxt; int shownPower = -1; bool halfShown; RawImage popArt; GameObject popArtBg;
     bool aimVisible = true; RectTransform dynLayer, objFill; int goalTotal, shownLeft = -1; float goalPulse; int shownMoves = -1, shownScore = -1, shownStreak = -1;
     float swoop, flashA, hudTick; Image flashImg; int comboShown = -1; Block bossBlock;
@@ -830,12 +831,13 @@ public class GameController : MonoBehaviour
         int pts = 10 * (1 + streak) * (1 + shotBanks); score += pts; comboPulse = 0.18f;   // bank shots multiply score
         if (shotSmash <= 3) PopText("+" + pts, b.p, Color.white, 40);
         Shake(b.type == "pixel" ? 0.06f : 0.12f);
-        float pitch = 1f + Mathf.Min(shotSmash, 25) * 0.025f;
+        float pitch = PopPitch(shotSmash);
         if (b.type == "crate" || b.type == "screw" || b.type == "domino") Sfx.Play("wood", 0.7f, pitch);
         else if (b.type == "glass" || b.type == "plates" || b.type == "vase") { Sfx.Play("ice", 0.75f, pitch * 1.35f); Sfx.Play("crash", 0.35f, pitch * 1.6f); }
         else Sfx.Play("crunch", 0.7f, pitch);
         Sfx.Play("pop", 0.35f, pitch);
         Debris(b.p, BlockColor(b), b.type == "pixel" ? 4 : b.type == "boss" ? 40 : 9, b.type == "boss" ? 1.6f : 1f);
+        FxKit.PopFlash(W(b.p, 0.45f), b.type == "pixel" ? 0.45f : 0.75f);
         if (b.view)
         {
             bool tall = b.Prop || b.type == "domino" || b.type == "bathbomb" || b.type == "tnt";
@@ -918,6 +920,18 @@ public class GameController : MonoBehaviour
                 break;
         }
     }
+
+    static readonly int[] PENTA = { 0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24 };
+    static float PopPitch(int n)
+    {
+        n = Mathf.Max(0, n - 1);
+        // climb the scale, then keep bouncing between the top three notes (no jarring drop, no shrill top)
+        int semis = n < 8 ? PENTA[n] : PENTA[6 + (n - 8) % 3];
+        return Mathf.Pow(2f, semis / 12f) * 0.85f;
+    }
+
+    // easing: overshoot then settle (the "pop" in pop-ups)
+    static float BackOut(float x) { x = Mathf.Clamp01(x); const float c1 = 2.2f, c3 = c1 + 1f; float m = x - 1f; return 1f + c3 * m * m * m + c1 * m * m; }
 
     static Color BlockColor(Block b)
     {
@@ -1298,6 +1312,12 @@ public class GameController : MonoBehaviour
         scorePulse = Mathf.Max(0, scorePulse - rdt);
         displayScore = Mathf.MoveTowards(displayScore, score, Mathf.Max(30, Mathf.Abs(score - displayScore) * 6) * rdt);
         // win popup: stars pop one by one, coins count up
+        if (popupRoot.gameObject.activeSelf)
+        {
+            if (popCard == null) popCard = popupRoot.Find("Card");
+            if (popCard) popCard.localScale = Vector3.one * BackOut((state == "win" ? popAnim : loseAnim) / 0.35f);
+            if (state != "win") loseAnim += rdt;
+        }
         if (popupRoot.gameObject.activeSelf && state == "win")
         {
             popAnim += rdt;
@@ -1828,17 +1848,20 @@ public class GameController : MonoBehaviour
         {
             var p = pops[i]; p.life -= dt;
             if (p.life <= 0) { Destroy(p.t.gameObject); pops.RemoveAt(i); continue; }
-            p.rise += dt * 90;
+            float age = p.max - p.life;
+            p.rise += dt * (age < 0.18f ? 25f : 95f);
             var sp = cam.WorldToScreenPoint(p.world);
             RectTransformUtility.ScreenPointToLocalPointInRectangle(hud, sp, null, out var lp);
             var rt = p.t.rectTransform; rt.anchoredPosition = lp + new Vector2(0, p.rise);
+            rt.localScale = Vector3.one * BackOut(age / 0.22f);
+            rt.localEulerAngles = new Vector3(0, 0, (1f - Mathf.Clamp01(age / 0.3f)) * ((p.t.GetInstanceID() & 1) == 0 ? 8f : -8f));
             var c = p.t.color; c.a = Mathf.Clamp01(p.life / p.max * 2.5f); p.t.color = c;
         }
         // big center text
         if (bigLife > 0)
         {
             bigLife -= dt;
-            float s = 1 + Mathf.Max(0, bigLife - 1.15f) * 4;
+            float s = BackOut((1.4f - bigLife) / 0.28f) * (1f + Mathf.Sin(Mathf.Clamp01((1.4f - bigLife) / 0.28f) * Mathf.PI) * 0.12f);
             bigTxt.rectTransform.localScale = Vector3.one * s;
             var c = bigTxt.color; c.a = Mathf.Clamp01(bigLife * 2.5f); bigTxt.color = c;
         }
@@ -2165,7 +2188,7 @@ public class GameController : MonoBehaviour
 
     void ShowPopup(bool win)
     {
-        popupRoot.gameObject.SetActive(true); popAnim = 0;
+        popupRoot.gameObject.SetActive(true); popAnim = 0; loseAnim = 0;
         introTimer = 0; introRoot.gameObject.SetActive(false); popupRoot.SetAsLastSibling();
         if (win)
         {
