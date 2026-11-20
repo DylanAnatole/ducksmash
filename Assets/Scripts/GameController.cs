@@ -28,6 +28,7 @@ public class GameController : MonoBehaviour
         public float squash, zapCd, face = -Mathf.PI / 2; public Transform view, ring, body;
         public int Dmg => kind == "heavy" ? 3 : 1;
         // special (combo-reward) ducks are one-use: after their power fires they turn back into a normal duck
+        public RectTransform tag; public string tagKind;
         public bool special, spent, rainbowReady; public float rocketT, spawnT, stretch, pullVis, bankCd; public TrailRenderer trail; public Color ringCol = Color.clear;
     }
     // combo tiers: smashing this many in ONE shot hatches a special duck
@@ -43,7 +44,7 @@ public class GameController : MonoBehaviour
         public string type; public Vector2 p; public float w, h, r; public bool rect; public int hp, max; public bool alive = true;
         public float hit, falling; public Block under, plankRef; public List<Block> screws; public string dir; public Color color;
         public float mvCx, mvAmp, mvSp; public int pid; public Transform view; public Vector3 baseScale = Vector3.one;
-        public Renderer[] rends; public bool flashing, scaled; public Transform pips; public float appear = 1, delay; public Vector2 hitDir;
+        public Renderer[] rends; public bool flashing, scaled; public Transform pips; public RectTransform tag; public float appear = 1, delay; public Vector2 hitDir;
         public bool shelf;
         public bool Prop => type == "glass" || type == "vase" || type == "soap" || type == "plates";
         public bool Goal => !Hard;   // single objective: smash EVERYTHING breakable in the tub (only stone + shelf boards stay)
@@ -71,7 +72,7 @@ public class GameController : MonoBehaviour
     int level, moves, startMoves, shotSmash, streak, pushes, score, stars, reward;
     static float fever; static bool frenzyReady;
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { fever = 0; frenzyReady = false; trailMat = null; pipMat = null; templates.Clear(); tplRoot = null; }
+    static void ResetStatics() { fever = 0; frenzyReady = false; trailMat = null; pipMat = null; tagDuckIcon = null; templates.Clear(); tplRoot = null; }
 
     // Building a block from primitives + baking it costs ~0.5 ms; cloning a cached template is ~20x cheaper.
     // Every block/duck kind is built ONCE (under an inactive root) and Instantiate()d afterwards.
@@ -87,7 +88,7 @@ public class GameController : MonoBehaviour
     string state = "play", target, hint;
     float freeze, shake, comboPulse, t, lastW, lastH;
     Duck drag; Vector2 dragPt, dragSm; int powerStep, shotBanks; bool lastWarned;
-    Transform popCard; float loseAnim; RawImage sunburst;
+    Transform popCard; float loseAnim; int leftAtWin; RawImage sunburst;
     static Texture2D SunburstTex()
     {
         const int S = 256; var tex = new Texture2D(S, S, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
@@ -162,7 +163,7 @@ public class GameController : MonoBehaviour
         PopText(shotClears >= 2 ? "CLEAR x" + shotClears + "!" : "CLEAR!", mid + new Vector2(0, -30), gold, 64 + Mathf.Min(shotClears, 5) * 8);
         int bonus = 150 * shotClears; score += bonus; comboPulse = 0.3f;
         Sfx.Play("laser", 0.7f, 1.3f + shotClears * 0.05f); Sfx.Play("combo", 0.6f, 1f + shotClears * 0.1f);
-        Flash(0.15f + Mathf.Min(shotClears, 4) * 0.05f); Shake(0.25f); freeze = Mathf.Max(freeze, 0.04f);
+        Flash(0.15f + Mathf.Min(shotClears, 4) * 0.05f); Shake(0.25f); HitStop(0.04f);
         // golden sweep along the cleared line
         var beam = Art.Prim(PrimitiveType.Cube, fx, Vector3.zero, Vector3.one, Art.Fade(new Color(1f, 0.9f, 0.5f, 0.9f), 1.5f));
         float len = (ln.b - ln.a + 40) * K;
@@ -182,7 +183,7 @@ public class GameController : MonoBehaviour
             }
         });
     }
-    void Flash(float a) => flashA = Mathf.Max(flashA, a);
+    void Flash(float a) => flashA = Mathf.Max(flashA, a * 0.5f);
     Transform aimTarget, aimGrab; readonly List<Transform> pushDots = new List<Transform>(); LineRenderer band2;
     MaterialPropertyBlock mpb; static Material trailMat;
     Vector3 camBase; Material waterMat;
@@ -226,6 +227,7 @@ public class GameController : MonoBehaviour
         Active = false;
         if (hud != null) hud.gameObject.SetActive(false);
         if (tubRoot != null) tubRoot.gameObject.SetActive(false);
+        ClearTags();
         if (cam != null) cam.cullingMask = 0;   // map screen: don't keep rendering the 3D bath behind the UI
         if (world != null) Destroy(world.gameObject);
         if (fx != null) Destroy(fx.gameObject);
@@ -252,7 +254,7 @@ public class GameController : MonoBehaviour
         moves = startMoves = L.moves; state = "play"; moving = false; shotSmash = streak = pushes = score = 0;
         frenzyShot = bossKilled = rewarded = false; hardLevel = L.hard; target = null; hint = level <= LevelLibrary.Onboarding || LevelLibrary.IsSandbox(level) ? L.hint : ""; freeze = shake = 0; drag = null;
 
-        FxKit.Clear();
+        FxKit.Clear(); ClearTags();
         cam.cullingMask = ~0;
         EnsureTub();
         tubRoot.gameObject.SetActive(true);
@@ -289,6 +291,7 @@ public class GameController : MonoBehaviour
         // build-in animation: blocks drop onto the water row by row
         foreach (var b in blocks) { b.appear = 0; b.delay = 0.15f + (b.p.y - TY) / TH * 0.7f + UnityEngine.Random.value * 0.08f; }
         foreach (var b in blocks) MakeView(b);
+        foreach (var cb in blocks) if (cb.type == "chest" && cb.view != null) cb.tag = MakeTag("+2 vịt", new Color(1f, 0.7f, 0.2f), true);
         swoop = 1f; flashA = 0; piggyGain = 0; goalTotal = GoalsLeft(); shownLeft = -1; halfShown = false; idleT = 0; hintReady = false; hintSearch = -1; HideHint(); shownMoves = shownScore = shownStreak = -1; levelArt = L.art; hudTick = 0; comboShown = -1;
         bossBlock = blocks.FirstOrDefault(b => b.type == "boss");
         RefreshComboLabels(); comboShownFill = comboShownGhost = -1; if (guideRoot && guideRoot.gameObject.activeSelf) { guideRoot.gameObject.SetActive(false); Time.timeScale = 1f; }
@@ -680,14 +683,18 @@ public class GameController : MonoBehaviour
         UpdateFx(dt);
         UpdateAim();
         RefreshHud();
-        cam.transform.position = camBase + (shake > 0 ? UnityEngine.Random.insideUnitSphere * shake * 0.45f : Vector3.zero);
+        cam.transform.position = camBase + (shake > 0 ? UnityEngine.Random.insideUnitSphere * shake * 0.3f : Vector3.zero);
     }
 
     bool AllStill() { for (int i = 0; i < ducks.Count; i++) if (ducks[i].v.sqrMagnitude >= 14 * 14) return false; return true; }
     int GoalsLeft() { int c = 0; for (int i = 0; i < blocks.Count; i++) { var b = blocks[i]; if (b.alive && b.Goal) c++; } return c; }
     void Later(float t, Action fn) => timers.Add(new Timer { t = t, fn = fn });
     static bool Covered(Block b) => b.under != null && b.under.alive;
-    void Shake(float a) => shake = Mathf.Max(shake, a);
+    // Feedback: "too much shaking / stutter on combos". Shake is much smaller and capped, off when the
+    // Vibration setting is off; hitstops are short and at most one every 0.3 s (chains used to stack them).
+    void Shake(float a) { if (!SaveData.Vibration) return; shake = Mathf.Max(shake, Mathf.Min(0.2f, a * 0.4f)); }
+    float lastStop = -9f;
+    void HitStop(float a) { if (t - lastStop < 0.3f) return; lastStop = t; freeze = Mathf.Max(freeze, Mathf.Min(a, 0.05f)); }
 
     // ---------- physics ----------
     struct Hit { public Vector2 n; public float pen; }
@@ -812,8 +819,8 @@ public class GameController : MonoBehaviour
                     if (-vn > 220)
                     {
                         a.hot = b.hot = true; a.squash = b.squash = 0.2f; var mid = (a.p + b.p) / 2;
-                        Splash(mid, 8); FxKit.Sparkle(W(mid), Color.white, 6); Shake(0.15f); freeze = Mathf.Max(freeze, 0.03f); pushes++; shotSmash++; comboPulse = 0.18f;
-                        PopText(LevelLibrary.Unlocked("zap", level) && pushes <= ZAP_PUSHES ? "CỐC! " + pushes + "/" + ZAP_PUSHES : "CỐC!", mid, Color.white, 46 + Mathf.Min(20, pushes * 4));
+                        Splash(mid, 8); FxKit.Sparkle(W(mid), Color.white, 6); Shake(0.15f); HitStop(0.03f); pushes++; shotSmash++; comboPulse = 0.18f;
+                        PopText(LevelLibrary.Unlocked("zap", level) && pushes == ZAP_PUSHES ? "ĐỦ 3 CỐC → VỊT SÉT!" : LevelLibrary.Unlocked("zap", level) && pushes < ZAP_PUSHES ? "CỐC! " + pushes + "/" + ZAP_PUSHES : "CỐC!", mid, Color.white, 46 + Mathf.Min(20, pushes * 4));
                         Sfx.Play(pushes % 2 == 1 ? "quack" : "squeak", 0.9f, 1f + pushes * 0.08f);
                     }
                 }
@@ -852,7 +859,12 @@ public class GameController : MonoBehaviour
 
     void DestroyBlock(Block b)
     {
-        b.alive = false; shotSmash++; if (!LevelLibrary.IsSandbox(level)) piggyGain++;
+        b.alive = false; shotSmash++;
+        if (b.tag) { tags.Remove(b.tag); Destroy(b.tag.gameObject); b.tag = null; }
+        if (state == "play")
+            foreach (var tr in TIERS)
+                if (shotSmash == tr.need && LevelLibrary.Unlocked(tr.kind, level))
+                { PopText("ĐỦ " + tr.need + " → " + Cap(tr.name) + "!", new Vector2(270, 205), tr.col, 58); Sfx.Play("star", 0.9f, 1.4f); } if (!LevelLibrary.IsSandbox(level)) piggyGain++;
         // Block-Blast style: emptying a whole row / column fires a line clear
         if (lineOf.TryGetValue(b, out var myLines))
             foreach (var ln in myLines)
@@ -936,7 +948,7 @@ public class GameController : MonoBehaviour
                 if (pl != null && pl.falling <= 0 && pl.screws.All(s => !s.alive)) { pl.falling = 0.0001f; PopText("RƠI XUỐNG!", pl.p, new Color(1f, 0.88f, 0.3f), 56); Later(0.35f, () => Crash(pl)); }
                 break;
             case "chest":
-                freeze = 0.06f; Shake(0.3f); PopText("+2 Vịt!", b.p, new Color(1f, 0.88f, 0.3f), 56); Sfx.Play("coin"); FxKit.StarBurst(W(b.p, 0.5f));
+                HitStop(0.06f); Shake(0.3f); PopText("+2 Vịt!", b.p, new Color(1f, 0.88f, 0.3f), 56); Sfx.Play("coin"); FxKit.StarBurst(W(b.p, 0.5f));
                 for (int i = 0; i < 2; i++)
                 {
                     var nd = NewDuck(b.p + new Vector2(i == 0 ? -14 : 14, 0), "normal");
@@ -944,7 +956,7 @@ public class GameController : MonoBehaviour
                 }
                 break;
             case "boss":
-                freeze = 0.15f; Shake(0.9f); slowTimer = 1f; Flash(0.7f); camZoom = 1f; BigText("BOSS HẠ GỤC!", new Color(1f, 0.88f, 0.3f)); bossKilled = true; Sfx.Play("boom"); Sfx.Vibrate();
+                HitStop(0.15f); Shake(0.9f); slowTimer = 1f; Flash(0.7f); camZoom = 1f; BigText("BOSS HẠ GỤC!", new Color(1f, 0.88f, 0.3f)); bossKilled = true; Sfx.Play("boom"); Sfx.Vibrate();
                 for (int i = 0; i < 6; i++) { int k = i; Later(k * 0.08f, () => { var q = b.p + UnityEngine.Random.insideUnitCircle * 60; AddRing(q, 70, new Color(1f, 0.7f, 0.3f, 0.7f)); Debris(q, new Color(0.94f, 0.63f, 0.29f), 18, 1.4f); Sfx.Play("boom", 0.5f, 1.2f); }); }
                 break;
         }
@@ -985,7 +997,7 @@ public class GameController : MonoBehaviour
 
     void Explode(Vector2 p, float R, int dmg)
     {
-        freeze = Mathf.Max(freeze, 0.05f); Shake(0.45f); Flash(0.28f);
+        HitStop(0.05f); Shake(0.45f); Flash(0.28f);
         AddRing(p, R * 1.3f, new Color(1f, 0.75f, 0.35f, 0.5f));
         FxKit.Explosion(W(p), R * K * 0.6f);
         Debris(p, new Color(1f, 0.7f, 0.28f), 16, 1.5f); Debris(p, new Color(1f, 0.35f, 0.2f), 10, 1.2f);
@@ -1008,7 +1020,7 @@ public class GameController : MonoBehaviour
 
     void FireLaser(Block b)
     {
-        Shake(0.35f); freeze = Mathf.Max(freeze, 0.04f);
+        Shake(0.35f); HitStop(0.04f);
         PopText(b.dir == "h" ? "XOÁ HÀNG!" : "XOÁ CỘT!", b.p, new Color(0.88f, 0.8f, 1f), 56);
         Sfx.Play("laser");
         for (int i = 0; i <= 12; i++) { var q = hzLine(b, i / 12f); FxKit.Sparkle(W(q), new Color(0.8f, 0.7f, 1f), 2); }
@@ -1029,7 +1041,7 @@ public class GameController : MonoBehaviour
 
     void Crash(Block pl)
     {
-        pl.alive = false; pl.falling = 0; Shake(0.6f); Flash(0.3f); freeze = Mathf.Max(freeze, 0.07f);
+        pl.alive = false; pl.falling = 0; Shake(0.6f); Flash(0.3f); HitStop(0.07f);
         if (pl.view) Destroy(pl.view.gameObject);
         AddRing(pl.p, pl.w * 0.55f, new Color(0.85f, 0.65f, 0.4f, 0.7f));
         for (int i = 0; i < 6; i++) Debris(pl.p + new Vector2(UnityEngine.Random.Range(-pl.w / 2, pl.w / 2), 0), new Color(0.72f, 0.51f, 0.29f), 4, 1.2f);
@@ -1075,7 +1087,7 @@ public class GameController : MonoBehaviour
     {
         var targets = blocks.Where(b => b.alive && !Covered(b) && !b.Hard && b.falling <= 0)
             .OrderBy(b => b.Goal ? 0 : 1).ThenBy(_ => UnityEngine.Random.value).Take(16).ToList();
-        BigText("CẦU VỒNG!", new Color(1f, 0.55f, 0.85f)); Sfx.Play("frenzy", 0.9f, 1.3f); Shake(0.4f); Flash(0.45f); freeze = Mathf.Max(freeze, 0.06f);
+        BigText("CẦU VỒNG!", new Color(1f, 0.55f, 0.85f)); Sfx.Play("frenzy", 0.9f, 1.3f); Shake(0.4f); Flash(0.45f); HitStop(0.06f);
         FxKit.StarBurst(W(d.p, 0.6f), 24); AddRing(d.p, 120, new Color(1f, 0.7f, 0.95f, 0.6f));
         var from = d.p;
         for (int i = 0; i < targets.Count; i++)
@@ -1090,6 +1102,29 @@ public class GameController : MonoBehaviour
         }
     }
 
+    // ---------- floating UI tags (who is special, what a chest gives) ----------
+    readonly List<RectTransform> tags = new List<RectTransform>();
+    static Texture2D tagDuckIcon;
+    RectTransform MakeTag(string text, Color bg, bool duckIcon)
+    {
+        var p = UIKit.Panel(dynLayer, bg, "Tag"); p.raycastTarget = false;
+        var o = p.gameObject.AddComponent<Outline>(); o.effectColor = new Color(1, 1, 1, 0.9f); o.effectDistance = new Vector2(2, -2);
+        var rt = p.rectTransform; rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f); rt.sizeDelta = new Vector2(duckIcon ? 150 : 24 + text.Length * 17, 44);
+        var l = UIKit.Label(rt, text, 26, Color.white); l.raycastTarget = false;
+        if (duckIcon)
+        {
+            if (tagDuckIcon == null) tagDuckIcon = LevelLibrary.ArtTexture("duck", false);
+            var ic = UIKit.Rect("Icon", rt).gameObject.AddComponent<RawImage>(); ic.texture = tagDuckIcon; ic.raycastTarget = false;
+            UIKit.Place(ic.rectTransform, 0, 0.5f, 30, 2, 40, 34);
+            l.rectTransform.offsetMin = new Vector2(44, 0);
+        }
+        tags.Add(rt); return rt;
+    }
+    void ClearTags() { foreach (var tg in tags) if (tg) Destroy(tg.gameObject); tags.Clear(); }
+    static string KindTag(string kind) => kind == "bomb" ? "BOM" : kind == "zap" ? "SÉT" : kind == "rocket" ? "TÊN LỬA" : kind == "rainbow" ? "CẦU VỒNG" : kind == "heavy" ? "SẮT" : null;
+    static Color KindColor(string kind) => kind == "bomb" ? new Color(1f, 0.38f, 0.32f) : kind == "zap" ? new Color(0.25f, 0.62f, 1f)
+        : kind == "rocket" ? new Color(1f, 0.55f, 0.2f) : kind == "rainbow" ? new Color(0.85f, 0.4f, 0.9f) : new Color(0.45f, 0.5f, 0.62f);
+
     void HatchSpecial(string kind, string name, Color col)
     {
         // a special never adds a duck: it transforms ONE random plain duck (no plain duck -> no reward)
@@ -1100,7 +1135,6 @@ public class GameController : MonoBehaviour
         d.spawnT = 0.45f;   // little hop + splash so the player sees which duck changed
         BigText(name + "!", col); Sfx.Play("star", 1f, 1.3f); Sfx.Play("quack", 0.8f, 1.3f);
         FxKit.StarBurst(W(d.p, 0.8f), 18);
-        PopText("COMBO THƯỞNG", d.p + new Vector2(0, -60), col, 40);
     }
 
     // next locked-in-reach tier for the live combo text; maxed = best unlocked tier already reached
@@ -1188,7 +1222,7 @@ public class GameController : MonoBehaviour
     void Win()
     {
         state = "win";
-        int left = movesAtClear >= 0 ? movesAtClear : moves;
+        int left = movesAtClear >= 0 ? movesAtClear : moves; leftAtWin = left;
         stars = left >= Mathf.CeilToInt(startMoves * 0.5f) ? 3 : left >= Mathf.CeilToInt(startMoves * 0.2f) ? 2 : 1;
         score += left * 150;
         if (!rewarded && LevelLibrary.IsSandbox(level)) { rewarded = true; reward = 0; }   // test levels: no progress saved
@@ -1252,7 +1286,7 @@ public class GameController : MonoBehaviour
         // reminder of the combo ducks the player has already unlocked
         var known = LevelLibrary.Specials.Where(s => LevelLibrary.Unlocked(s.kind, level) && LevelLibrary.NewSpecialAt(level) != s).ToList();
         string combos = "";   // no combo recipe reminder on every level (players found it patronising); the COMBO ? guide has it
-        introBody.text = string.Join("\n", g) + "\n\n" + moves + " lượt bắn" + combos;
+        introBody.text = string.Join("\n", g) + "\n\n" + moves + " lượt bắn\n<size=30><color=#c9a400>3 sao khi còn ≥ " + Mathf.CeilToInt(startMoves * 0.5f) + " lượt</color></size>" + combos;
         introMax = introTimer = 1.6f;
         introRoot.sizeDelta = new Vector2(760, 480);
 
@@ -1274,15 +1308,12 @@ public class GameController : MonoBehaviour
         if (nw != null)
         {
             introTitle.text = "VỊT MỚI!";
-            introBody.text = "<size=56><color=#ff7a3d>" + nw.name + "</color></size>\n" +
-                "<size=34><b>Cách mở:</b> " + nw.how + "\n→ 1 vịt thường ngẫu nhiên hoá " + Cap(nw.name) + "\n" +
-                "<b>Tác dụng:</b> " + nw.use + "\n(chỉ dùng 1 lần)\n\n" +
-                "<color=#3fa34d>Tặng 1 con có vòng vàng — bắn thử ngay!</color></size>\n<size=28>(chạm để bắt đầu)</size>";
-            introRoot.sizeDelta = new Vector2(820, 640);
+            introBody.text = "<size=58><color=#ff7a3d>" + nw.name + "</color></size>\n\n<size=38>" + nw.use + "</size>\n<size=32><color=#7a4dd8>Có khi: " + nw.how.ToLower() + "</color></size>";
+            introRoot.sizeDelta = new Vector2(820, 520);
             introMax = introTimer = 6f;
             var pool = ducks.Where(x => x.kind == "normal").ToList(); if (pool.Count == 0) pool = ducks.Where(x => !x.special).ToList();
             if (pool.Count > 0) SetKind(pool[UnityEngine.Random.Range(0, pool.Count)], nw.kind, true);
-            hint = "Bắn con " + Cap(nw.name) + " (vòng vàng) để xem sức mạnh! " + nw.how + " để có thêm.";
+            hint = "Thử ngay " + Cap(nw.name) + "!";
         }
         introBody.verticalOverflow = VerticalWrapMode.Overflow; introBody.horizontalOverflow = HorizontalWrapMode.Wrap;
         introRoot.gameObject.SetActive(true);
@@ -1423,7 +1454,7 @@ public class GameController : MonoBehaviour
             if (dd < bd) { bd = dd; best = b; }
         }
         if (best == null || bd > 30) { SaveData.SetBoost(k, SaveData.GetBoost(k) + 1); PopText("Trượt!", p, Color.white, 40); return; }
-        freeze = 0.08f; Shake(0.5f); PopText("BỐP!", best.p, new Color(1f, 0.88f, 0.3f), 70); Sfx.Play("crash", 0.7f, 1.4f);
+        HitStop(0.08f); Shake(0.5f); PopText("BỐP!", best.p, new Color(1f, 0.88f, 0.3f), 70); Sfx.Play("crash", 0.7f, 1.4f);
         if (best.type == "plank") { best.falling = 0.0001f; var pl = best; Later(0.2f, () => Crash(pl)); }
         else if (best.type == "stone") { best.alive = false; Debris(best.p, Color.gray, 10, 1); Destroy(best.view.gameObject); }
         else Damage(best, 99);
@@ -1609,6 +1640,14 @@ public class GameController : MonoBehaviour
 
     void UpdateAim()
     {
+        if (target != null && state == "play" && !moving && ScreenToSim(Input.mousePosition, out var tp))
+        {
+            float rad = target == "bomb" ? 120f : 34f;
+            aimTarget.gameObject.SetActive(true); aimTarget.position = W(tp, 0.1f);
+            aimTarget.localScale = Vector3.one * rad * K * (1f + Mathf.Sin(Time.unscaledTime * 8f) * 0.04f);
+            var tlr = aimTarget.GetComponent<LineRenderer>(); var tc = target == "bomb" ? new Color(0.35f, 0.75f, 1f, 0.95f) : new Color(1f, 0.85f, 0.3f, 0.95f);
+            tlr.startColor = tlr.endColor = tc; aimVisible = true; return;
+        }
         if ((drag == null || moving) && !aimVisible) { powerStep = 0; return; }
         aimVisible = drag != null && !moving;
         foreach (var d in aimDots) d.gameObject.SetActive(false);
@@ -1759,6 +1798,9 @@ public class GameController : MonoBehaviour
             var spark = d.body.Find("Spark"); if (spark) spark.gameObject.SetActive((d.charged || d.special) && Mathf.Sin(t * 14) > -0.3f);
             if (spd > 120 && UnityEngine.Random.value < 0.5f) FxKit.Wake(W(d.p - d.v.normalized * d.r));
             if (d.trail) d.trail.emitting = spd > 260 && d.spawnT <= 0;
+            string want = d.clone ? null : KindTag(d.kind);
+            if (want != d.tagKind) { if (d.tag) { tags.Remove(d.tag); Destroy(d.tag.gameObject); } d.tag = want != null ? MakeTag(want, KindColor(d.kind), false) : null; d.tagKind = want; }
+            if (d.tag) d.tag.anchoredPosition = WorldToHud(W(d.p, 0.9f)) + new Vector2(0, 52);
             if (spd < 20 && d.spawnT <= 0 && UnityEngine.Random.value < dt * 0.5f) FxKit.Ripple(W(d.p), 0.75f);   // lazy idle ripples
             if (d.rocketT > 0) { FxKit.Flame(W(d.p - d.v.normalized * d.r * 1.2f, 0.3f)); if (UnityEngine.Random.value < 0.3f) FxKit.Smoke(W(d.p - d.v.normalized * d.r * 1.6f), 0.3f, 1); }
             if (d.special && !moving && UnityEngine.Random.value < dt * 4) FxKit.Sparkle(W(d.p, 0.5f), d.kind == "rainbow" ? Color.HSVToRGB(UnityEngine.Random.value, 0.5f, 1f) : new Color(1f, 0.85f, 0.4f), 1);
@@ -1801,6 +1843,7 @@ public class GameController : MonoBehaviour
             }
             if (b.type == "plank" && b.falling > 0) { float f = Mathf.Min(1, b.falling / 0.35f); b.view.position = W(b.p, -f * 0.6f); }
             if (b.type == "laser") b.view.Find("Arrow").localScale = Vector3.one * (1 + Mathf.Sin(t * 8) * 0.08f);
+            if (b.tag) b.tag.anchoredPosition = WorldToHud(W(b.p, 1.2f)) + new Vector2(0, 58 + Mathf.Sin(t * 3f + b.p.x) * 6f);
             if (b.type == "screw") b.view.localEulerAngles = new Vector3(0, t * 30 + b.p.x, 0);
         }
         for (int i = dying.Count - 1; i >= 0; i--)
@@ -2175,19 +2218,15 @@ public class GameController : MonoBehaviour
     {
         Sfx.Play("click");
         var sb = new System.Text.StringBuilder();
-        sb.Append("Mỗi phát bắn đếm <b>số món bị phá</b> (thanh combo). Chạm mốc → <b>1 vịt thường hoá vịt đặc biệt</b>, dùng 1 lần:\n\n");
+        sb.Append("Phá nhiều món trong <b>1 phát</b> → 1 vịt thường hoá <b>vịt đặc biệt</b> (dùng 1 lần):\n\n");
         foreach (var sp in LevelLibrary.Specials)
         {
             bool ok = LevelLibrary.Unlocked(sp.kind, level);
-            string need = sp.kind == "bomb" ? "phá 10 món" : sp.kind == "zap" ? "đẩy trúng 3 vịt" : sp.kind == "rocket" ? "phá 16 món" : "phá 25 món";
-            string use = sp.kind == "bomb" ? "nổ tung khi chạm" : sp.kind == "zap" ? "phóng sét sang khối gần" : sp.kind == "rocket" ? "lao thẳng, xuyên tất cả" : "sét đánh 16 khối";
-            sb.Append(ok ? "• <color=#7a4dd8><b>" + Cap(sp.name) + "</b></color>  (" + need + "): " + use + "\n"
-                         : "• <color=#9a94ad>" + Cap(sp.name) + " — mở ở màn " + sp.level + "</color>\n");
+            string need = sp.kind == "bomb" ? "10 món" : sp.kind == "zap" ? "cốc 3 vịt" : sp.kind == "rocket" ? "16 món" : "25 món";
+            string use = sp.kind == "bomb" ? "nổ tung" : sp.kind == "zap" ? "phóng sét" : sp.kind == "rocket" ? "xuyên thẳng" : "sét 16 món";
+            sb.Append(ok ? "• <b>" + Cap(sp.name) + "</b> (" + need + "): " + use + "\n" : "• <color=#9a94ad>" + Cap(sp.name) + " – mở ở màn " + sp.level + "</color>\n");
         }
-        sb.Append("\n<b>Nhân điểm</b> (chỉ tăng điểm):\n");
-        sb.Append("• Nảy băng: đập tường rồi mới phá → điểm x2, x3, x4\n");
-        sb.Append("• Chuỗi: nhiều phát liền, mỗi phát phá từ 6 món → điểm x2, x3…\n");
-        sb.Append("\n<b>Khác</b>:\n• Phá sạch 1 hàng = <b>CLEAR</b>, nổ lan hàng bên\n• Đầy thanh <b>FRENZY</b> = phát sau bắn ra 5 vịt\n• Khi ngắm, vệt trắng trên thanh combo = số món dự kiến phá");
+        sb.Append("\n• Nảy tường rồi phá: điểm x2\n• Đầy FRENZY: phát sau bắn 5 vịt");
         guideBody.text = sb.ToString();
         guideRoot.gameObject.SetActive(true); guideRoot.SetAsLastSibling(); Time.timeScale = 0f;
     }
@@ -2286,7 +2325,7 @@ public class GameController : MonoBehaviour
             popArtBg.SetActive(newArt);
             if (newArt) popArt.texture = LevelLibrary.ArtTexture(levelArt, false);
             for (int i = 0; i < 3; i++) { popStarImgs[i].gameObject.SetActive(true); popStarImgs[i].color = i < stars ? Yellow : new Color(0.49f, 0.42f, 0.84f); popStarImgs[i].rectTransform.localScale = Vector3.one * (i == 1 ? 1.2f : 1f); }
-            popBody.text = "Điểm " + score.ToString("N0") + (perfect ? "\n<color=#7dffa0>PHÁ SẠCH SÀNH SANH! +25 xu</color>" : "") + (hardLevel ? "\nThưởng màn khó: +80 xu" + (SaveData.GetStars(level) > 0 ? "" : "") : "")
+            popBody.text = "Điểm " + score.ToString("N0") + (leftAtWin > 0 ? "\n<size=36>Lượt dư " + leftAtWin + " → +" + leftAtWin * 5 + " xu</size>" : "") + (perfect ? "\n<color=#7dffa0>PHÁ SẠCH SÀNH SANH! +25 xu</color>" : "") + (hardLevel ? "\nThưởng màn khó: +80 xu" + (SaveData.GetStars(level) > 0 ? "" : "") : "")
                 + (piggyAdded > 0 ? "\n<size=36>Ống heo +" + piggyAdded + "  (" + SaveData.Piggy + "/" + SaveData.PiggyMax + ")</size>" : "")
                 + (newArt ? "\n<size=36><color=#ffe066>Tranh \"" + LevelLibrary.ArtName(levelArt) + "\" vào Album!</color></size>" : "");
             popBody.verticalOverflow = VerticalWrapMode.Overflow;

@@ -164,17 +164,17 @@ public static class LevelLibrary
         {
             // ======== ONBOARDING: one new kind of breakable per level ========
             case 1:
-                d = L(8, "Kéo một con vịt ra sau rồi thả để bắn! Phá hết 1 hàng = CLEAR!", (200, 790, null), (340, 790, null), (270, 690, null));
+                d = L(8, "Kéo vịt ra sau, thả để bắn!", (200, 790, null), (340, 790, null), (270, 690, null));
                 d.blocks.AddRange(PixelArt(ART_STAR, 270, 318, 34)); d.art = "star"; d.blocks.AddRange(Row("soap", 70, 500, 11, 40));
                 d.bumpers.Add(BumperL(500)); d.bumpers.Add(BumperR(500));
                 break;
             case 2:
-                d = L(9, "Bắn vịt vào vịt → đẩy nhau bay đi phá tiếp!", (270, 810, null), (270, 650, null), (170, 570, null), (370, 570, null));
+                d = L(9, "Bắn vịt vào vịt để đẩy đi!", (270, 810, null), (270, 650, null), (170, 570, null), (370, 570, null));
                 d.blocks.AddRange(Cluster("soap", 270, 245, 3, 11, 40)); d.blocks.AddRange(Col("glass", 70, 380, 5, 40)); d.blocks.AddRange(Col("glass", 470, 380, 5, 40));
                 d.blocks.AddRange(Row("glass", 150, 410, 7, 40));
                 break;
             case 3:
-                d = L(7, "Bắn trúng bom tắm → nổ tung cả vùng!", (200, 800, null), (340, 800, null), (270, 710, null));
+                d = L(7, "Bắn bom tắm: nổ cả vùng!", (200, 800, null), (340, 800, null), (270, 710, null));
                 d.blocks.AddRange(Cluster("glass", 270, 230, 3, 11, 40));
                 d.blocks.Add(B("bathbomb", 110, 340)); d.blocks.Add(B("bathbomb", 270, 340)); d.blocks.Add(B("bathbomb", 430, 340));
                 d.blocks.AddRange(Row("soap", 150, 340, 2, 40)); d.blocks.AddRange(Row("soap", 310, 340, 2, 40));
@@ -182,13 +182,13 @@ public static class LevelLibrary
                 d.bumpers.Add(BumperL(600)); d.bumpers.Add(BumperR(600));
                 break;
             case 4:
-                d = L(11, "Đồ có CHẤM ĐEN: mỗi chấm = 1 cú cần đập (bình 2, chồng đĩa 3). Phá rương được thêm 2 vịt!", (150, 800, null), (270, 800, null), (390, 800, null), (270, 690, null));
+                d = L(11, "Chấm đen = số cú. Rương: +2 vịt!", (150, 800, null), (270, 800, null), (390, 800, null), (270, 690, null));
                 for (int i = 0; i < 7; i++) d.blocks.Add(B("plates", 90 + i * 60, 240));
                 d.blocks.AddRange(Row("vase", 70, 320, 11, 40)); d.blocks.Add(B("chest", 270, 400));
                 d.blocks.AddRange(Cluster("glass", 270, 480, 2, 11, 40));
                 break;
             case 5:
-                d = L(7, "Đẩy đổ 1 quân domino → cả dây đổ theo!", (200, 800, null), (340, 800, null), (270, 710, null));
+                d = L(7, "Đổ 1 domino, đổ cả dây!", (200, 800, null), (340, 800, null), (270, 710, null));
                 d.blocks.AddRange(Cluster("glass", 270, 220, 2, 11, 40));
                 for (int i = 0; i < 19; i++) d.blocks.Add(Dom(60 + i * 22, 310, true, 0));
                 d.blocks.Add(B("bathbomb", 488, 310));
