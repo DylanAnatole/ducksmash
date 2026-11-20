@@ -1070,7 +1070,7 @@ public class GameController : MonoBehaviour
                 }
                 break;
             case "boss":
-                HitStop(0.15f); Shake(0.9f); slowTimer = 1f; Flash(0.7f); camZoom = 1f; BigText("BOSS HẠ GỤC!", new Color(1f, 0.88f, 0.3f)); bossKilled = true; Sfx.Play("boom"); Sfx.Vibrate();
+                HitStop(0.15f); Shake(0.9f); slowTimer = 1f; Flash(0.7f); camZoom = 1f; BigText("HẠ VUA BÁNH QUY!", new Color(1f, 0.88f, 0.3f)); FxKit.Confetti(W(b.p, 1f), 3f, 80); bossKilled = true; Sfx.Play("boom"); Sfx.Vibrate();
                 for (int i = 0; i < 6; i++) { int k = i; Later(k * 0.08f, () => { var q = b.p + UnityEngine.Random.insideUnitCircle * 60; AddRing(q, 70, new Color(1f, 0.7f, 0.3f, 0.7f)); Debris(q, new Color(0.94f, 0.63f, 0.29f), 18, 1.4f); Sfx.Play("boom", 0.5f, 1.2f); }); }
                 break;
         }
