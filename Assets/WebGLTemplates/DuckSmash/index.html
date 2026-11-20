@@ -41,7 +41,7 @@
     };
     // phones report devicePixelRatio 2-3: rendering at full DPR triples the pixel work, so cap it
     var mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    config.devicePixelRatio = Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 2);
+    config.devicePixelRatio = Math.min(window.devicePixelRatio || 1, mobile ? 1 : 2);
     var s = document.createElement("script");
     s.src = buildUrl + "/{{{ LOADER_FILENAME }}}";
     s.onload = function () {

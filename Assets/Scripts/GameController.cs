@@ -28,7 +28,7 @@ public class GameController : MonoBehaviour
         public float squash, zapCd, face = -Mathf.PI / 2; public Transform view, ring, body;
         public int Dmg => kind == "heavy" ? 3 : 1;
         // special (combo-reward) ducks are one-use: after their power fires they turn back into a normal duck
-        public bool special, spent, rainbowReady; public float rocketT, spawnT, stretch, pullVis, bankCd; public TrailRenderer trail;
+        public bool special, spent, rainbowReady; public float rocketT, spawnT, stretch, pullVis, bankCd; public TrailRenderer trail; public Color ringCol = Color.clear;
     }
     // combo tiers: smashing this many in ONE shot hatches a special duck
     static readonly (int need, string kind, string name, Color col)[] TIERS =
@@ -43,7 +43,7 @@ public class GameController : MonoBehaviour
         public string type; public Vector2 p; public float w, h, r; public bool rect; public int hp, max; public bool alive = true;
         public float hit, falling; public Block under, plankRef; public List<Block> screws; public string dir; public Color color;
         public float mvCx, mvAmp, mvSp; public int pid; public Transform view; public Vector3 baseScale = Vector3.one;
-        public Renderer[] rends; public bool flashing; public float appear = 1, delay; public Vector2 hitDir;
+        public Renderer[] rends; public bool flashing, scaled; public float appear = 1, delay; public Vector2 hitDir;
         public bool shelf;
         public bool Prop => type == "glass" || type == "vase" || type == "soap" || type == "plates";
         public bool Goal => type == "cookie" || type == "chest" || type == "pixel" || type == "ice" || type == "boss" || Prop;
@@ -71,12 +71,23 @@ public class GameController : MonoBehaviour
     int level, moves, startMoves, shotSmash, streak, pushes, score, stars, reward;
     static float fever; static bool frenzyReady;
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { fever = 0; frenzyReady = false; trailMat = null; }
+    static void ResetStatics() { fever = 0; frenzyReady = false; trailMat = null; templates.Clear(); tplRoot = null; }
+
+    // Building a block from primitives + baking it costs ~0.5 ms; cloning a cached template is ~20x cheaper.
+    // Every block/duck kind is built ONCE (under an inactive root) and Instantiate()d afterwards.
+    static readonly Dictionary<string, GameObject> templates = new Dictionary<string, GameObject>();
+    static Transform tplRoot;
+    static Transform TplRoot { get { if (tplRoot == null) { var go = new GameObject("Templates"); go.SetActive(false); tplRoot = go.transform; } return tplRoot; } }
+    static Transform Spawn(string key, Func<Transform, Transform> build, Transform parent)
+    {
+        if (!templates.TryGetValue(key, out var tpl) || tpl == null) { tpl = build(TplRoot).gameObject; templates[key] = tpl; }
+        return Instantiate(tpl, parent).transform;
+    }
     bool moving, frenzyShot, bossKilled, rewarded, hardLevel;
     string state = "play", target, hint;
     float freeze, shake, comboPulse, t, lastW, lastH;
     Duck drag; Vector2 dragPt, dragSm; int powerStep, shotBanks; bool lastWarned;
-    bool aimVisible = true; RectTransform dynLayer;
+    bool aimVisible = true; RectTransform dynLayer; int shownMoves = -1, shownScore = -1, shownStreak = -1;
     float swoop, flashA, hudTick; Image flashImg; int comboShown = -1; Block bossBlock;
     int piggyGain, dominoFalls, shotClears, piggyAdded; string levelArt; bool newArt;
     bool HasNext => level < LevelLibrary.Count || (level >= LevelLibrary.SmashLevel && level < LevelLibrary.SmashLevel + LevelLibrary.SmashCount - 1);
@@ -191,10 +202,13 @@ public class GameController : MonoBehaviour
         Build(n);
     }
 
+    Transform tubRoot, bitRoot;
     public void Close()
     {
         Active = false;
         if (hud != null) hud.gameObject.SetActive(false);
+        if (tubRoot != null) tubRoot.gameObject.SetActive(false);
+        if (cam != null) cam.cullingMask = 0;   // map screen: don't keep rendering the 3D bath behind the UI
         if (world != null) Destroy(world.gameObject);
         if (fx != null) Destroy(fx.gameObject);
         world = fx = null;
@@ -211,7 +225,8 @@ public class GameController : MonoBehaviour
         level = n;
         var L = LevelLibrary.Get(n);
         world = new GameObject("World").transform; fx = new GameObject("FX").transform;
-        ducks.Clear(); blocks.Clear(); bumpers.Clear(); timers.Clear(); bits.Clear(); bitPool.Clear(); bitPools.Clear(); rings.Clear(); zaps.Clear(); dying.Clear();
+        foreach (var bt in bits) if (bt.t) { bt.t.gameObject.SetActive(false); bitPools[bt.type].Push(bt.t); }   // debris pool persists across levels
+        ducks.Clear(); blocks.Clear(); bumpers.Clear(); timers.Clear(); bits.Clear(); bitPool.Clear(); rings.Clear(); zaps.Clear(); dying.Clear();
         foreach (var c in coins) if (c.rt) Destroy(c.rt.gameObject);
         coins.Clear(); slowTimer = camZoom = rushTimer = 0; rushLeft = rushCoins = 0; movesAtClear = -1; displayScore = 0;
         foreach (var p in pops) if (p.t) Destroy(p.t.gameObject);
@@ -220,7 +235,24 @@ public class GameController : MonoBehaviour
         frenzyShot = bossKilled = rewarded = false; hardLevel = L.hard; target = null; hint = L.hint; freeze = shake = 0; drag = null;
 
         FxKit.Clear();
-        BuildTub();
+        cam.cullingMask = ~0;
+        if (tubRoot == null)
+        {
+            var saved = world; world = tubRoot = new GameObject("Tub").transform; BuildTub(); world = saved;
+            // pre-create debris chunks once so the first big smash doesn't instantiate them mid-explosion
+            bitRoot = Art.Root("Debris", tubRoot);
+            foreach (var (pt, cnt) in new[] { (PrimitiveType.Cube, App.Mobile ? 40 : 100), (PrimitiveType.Sphere, 12), (PrimitiveType.Cylinder, 16) })
+            {
+                if (!bitPools.TryGetValue(pt, out var pool)) bitPools[pt] = pool = new Stack<Transform>();
+                for (int i = 0; i < cnt; i++)
+                {
+                    var tr = Art.Prim(pt, bitRoot, Vector3.zero, Vector3.one * 0.1f, Art.Mat(Color.white, 0.4f));
+                    var rr = tr.GetComponent<Renderer>(); rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; rr.receiveShadows = false;
+                    tr.gameObject.SetActive(false); pool.Push(tr);
+                }
+            }
+        }
+        tubRoot.gameObject.SetActive(true);
         foreach (var d in L.ducks) NewDuck(new Vector2(d.x, d.y), d.kind);
         foreach (var d in L.blocks)
         {
@@ -254,7 +286,7 @@ public class GameController : MonoBehaviour
         // build-in animation: blocks drop onto the water row by row
         foreach (var b in blocks) { b.appear = 0; b.delay = 0.15f + (b.p.y - TY) / TH * 0.7f + UnityEngine.Random.value * 0.08f; }
         foreach (var b in blocks) MakeView(b);
-        swoop = 1f; flashA = 0; piggyGain = 0; levelArt = L.art; hudTick = 0; comboShown = -1;
+        swoop = 1f; flashA = 0; piggyGain = 0; shownMoves = shownScore = shownStreak = -1; levelArt = L.art; hudTick = 0; comboShown = -1;
         bossBlock = blocks.FirstOrDefault(b => b.type == "boss");
         BuildLines();
         foreach (var bd in L.bumpers)
@@ -263,7 +295,7 @@ public class GameController : MonoBehaviour
             bu.view = Art.Bumper(world, bd.w * K, bd.h * K); bu.view.position = W(bd.x + bd.w / 2, bd.y + bd.h / 2);
             bumpers.Add(bu);
         }
-        BuildAim();
+        if (aimRoot == null) BuildAim(); else aimVisible = true;
         ShowIntro(L);
         popupRoot.gameObject.SetActive(false);
         bossBar.gameObject.SetActive(L.boss);
@@ -348,11 +380,13 @@ public class GameController : MonoBehaviour
         // soap bar on the right rim
         Art.Prim(PrimitiveType.Capsule, world, new Vector3(w / 2 + rim / 2, 0.62f, h * 0.18f), new Vector3(0.3f, 0.22f, 0.22f), Art.Mat(new Color(1f, 0.72f, 0.82f), 0.9f, 0, 0, 0.003f), new Vector3(90, 0, 90));
         // deeper-looking water toward the walls
+        if (!App.Mobile) {
         var depth = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(depth.GetComponent<Collider>());
         depth.transform.SetParent(world, false); depth.transform.position = new Vector3(0, -0.03f, 0); depth.transform.eulerAngles = new Vector3(90, 0, 0);
         depth.transform.localScale = new Vector3(w, h, 1);
         var dm = Art.Fade(Color.white); dm.mainTexture = Art.EdgeShadeTex(w / h); depth.GetComponent<Renderer>().sharedMaterial = dm;
         depth.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
         BuildDecor(w, h, rim);
     }
 
@@ -403,42 +437,52 @@ public class GameController : MonoBehaviour
         Art.Bake(root, "decor", 0.5f, 0.002f);
     }
 
-    void MakeView(Block b)
+    Transform BuildBlockArt(Block b, Transform parent)
     {
-        float d = b.r * 2 * K;
+        float d = b.r * 2 * K; Transform v = null;
         switch (b.type)
         {
-            case "cookie": b.view = Art.Cookie(world, d); break;
-            case "gold": b.view = Art.GoldCookie(world, d); break;
-            case "glass": b.view = Art.Glass(world, d); break;
-            case "vase": b.view = Art.Vase(world, d); break;
-            case "soap": b.view = Art.Soap(world, d); break;
-            case "plates": b.view = Art.Plates(world, d); break;
-            case "bathbomb": b.view = Art.BathBomb(world, d); break;
-            case "domino": b.view = Art.Domino(world, b.w * K, b.h * K); break;
-            case "ice": b.view = Art.Ice(world, d); break;
-            case "crate": b.view = Art.Crate(world, b.w * K, b.h * K); break;
-            case "chest": b.view = Art.Chest(world, b.w * K, b.h * K); break;
-            case "tnt": b.view = Art.Tnt(world, d); break;
-            case "stone": b.view = Art.Stone(world, b.w * K, b.h * K); break;
-            case "laser": b.view = Art.Laser(world, d, b.dir == "h"); break;
-            case "screw": b.view = Art.Screw(world, d); break;
-            case "plank": b.view = Art.Plank(world, b.w * K, b.h * K); break;
-            case "pixel": b.view = Art.Pixel(world, b.w * K, b.color); break;
-            case "boss": b.view = Art.Boss(world, d); break;
+            case "cookie": v = Art.Cookie(parent, d); break;
+            case "gold": v = Art.GoldCookie(parent, d); break;
+            case "glass": v = Art.Glass(parent, d); break;
+            case "vase": v = Art.Vase(parent, d); break;
+            case "soap": v = Art.Soap(parent, d); break;
+            case "plates": v = Art.Plates(parent, d); break;
+            case "bathbomb": v = Art.BathBomb(parent, d); break;
+            case "domino": v = Art.Domino(parent, b.w * K, b.h * K); break;
+            case "ice": v = Art.Ice(parent, d); break;
+            case "crate": v = Art.Crate(parent, b.w * K, b.h * K); break;
+            case "chest": v = Art.Chest(parent, b.w * K, b.h * K); break;
+            case "tnt": v = Art.Tnt(parent, d); break;
+            case "stone": v = Art.Stone(parent, b.w * K, b.h * K); break;
+            case "laser": v = Art.Laser(parent, d, b.dir == "h"); break;
+            case "screw": v = Art.Screw(parent, d); break;
+            case "plank": v = Art.Plank(parent, b.w * K, b.h * K); break;
+            case "pixel": v = Art.Pixel(parent, b.w * K, b.color); break;
+            default: v = Art.Boss(parent, d); break;
         }
-        // merge the primitive parts into one shared mesh per block kind (huge draw-call saving)
+        return v;
+    }
+
+    void MakeView(Block b)
+    {
+        // one shared mesh per block kind (instanced), one template per kind (cloned)
         string key = b.type + "_" + Mathf.RoundToInt(b.r * 2) + "_" + Mathf.RoundToInt(b.w) + "x" + Mathf.RoundToInt(b.h)
                      + (b.type == "pixel" ? ColorUtility.ToHtmlStringRGB(b.color) : "") + (b.type == "laser" ? b.dir : "");
-        float outline = b.type == "stone" || b.type == "screw" ? 0.003f : 0f;
-        float gloss = b.type == "screw" ? 0.9f : b.type == "chest" ? 0.7f : 0.4f;
-        Art.Bake(b.view, key, gloss, outline, "Spark", "IceShell", "Arrow", "Glow", "Plate1", "Plate2", "Plate3");
-        if (b.type == "plates")   // each plate becomes one baked, instanced mesh (3 draws per stack instead of 6)
-            for (int i = 1; i <= 3; i++) { var pc = b.view.Find("Plate" + i); if (pc) Art.Bake(pc, "plate_" + Mathf.RoundToInt(b.r * 2), 0.9f, 0.003f); }
+        b.view = Spawn(key, parent =>
+        {
+            var v = BuildBlockArt(b, parent);
+            float outline = b.type == "stone" || b.type == "screw" ? 0.003f : 0f;
+            float gloss = b.type == "screw" ? 0.9f : b.type == "chest" ? 0.7f : 0.4f;
+            Art.Bake(v, key, gloss, outline, "Spark", "IceShell", "Arrow", "Glow", "Plate1", "Plate2", "Plate3");
+            if (b.type == "plates")   // each plate: one baked, instanced mesh
+                for (int i = 1; i <= 3; i++) { var pc = v.Find("Plate" + i); if (pc) Art.Bake(pc, "plate_" + Mathf.RoundToInt(b.r * 2), 0.9f, 0.003f); }
+            if (App.Mobile) foreach (var r in v.GetComponentsInChildren<Renderer>(true)) { r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false; }
+            return v;
+        }, world);
         b.view.position = W(b.p);
         b.baseScale = b.view.localScale;
-        b.rends = b.view.GetComponentsInChildren<Renderer>().Where(r => r.gameObject.activeSelf && r.sharedMaterial != null && r.sharedMaterial.HasProperty("_Emission")).ToArray();
-        if (App.Mobile) foreach (var r in b.view.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;   // phones: only ducks + decor cast shadows
+        b.rends = b.view.GetComponentsInChildren<Renderer>().Where(r => r.sharedMaterial != null && r.sharedMaterial.HasProperty("_Emission")).ToArray();
     }
 
     Duck NewDuck(Vector2 p, string kind)
@@ -453,9 +497,19 @@ public class GameController : MonoBehaviour
     {
         if (d.view) Destroy(d.view.gameObject);
         d.r = d.kind == "heavy" ? 20 : 17;
-        d.view = Art.Duck(world, d.kind, out d.ring);
-        d.body = d.view.Find("Body");
-        Art.Bake(d.body, "duck_" + d.kind, d.kind == "heavy" ? 0.9f : 0.75f, 0.002f, "Spark");
+        string kind = d.kind;
+        d.view = Spawn("duck_" + kind, parent =>
+        {
+            var v = Art.Duck(parent, kind, out _);
+            Art.Bake(v.Find("Body"), "duck_" + kind, kind == "heavy" ? 0.9f : 0.75f, 0.002f, "Spark");
+            if (App.Mobile)
+            {   // no realtime shadows on phones: a soft dark disc under the duck instead
+                foreach (var r in v.GetComponentsInChildren<Renderer>(true)) { r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false; }
+                Art.Prim(PrimitiveType.Cylinder, v, new Vector3(0.08f, 0.012f, -0.06f), new Vector3(1.05f, 0.004f, 1.05f), Art.FadeShared(new Color(0.12f, 0.2f, 0.4f, 0.28f))).name = "Blob";
+            }
+            return v;
+        }, world);
+        d.body = d.view.Find("Body"); d.ring = d.view.Find("Ring"); d.ringCol = Color.clear;
         d.view.localScale = Vector3.one * d.r * 2 * K;
         d.view.position = W(d.p);
         // water streak behind a fast duck
@@ -520,7 +574,7 @@ public class GameController : MonoBehaviour
                 lastWarned = true; BigText("LƯỢT CUỐI!", new Color(1f, 0.4f, 0.35f)); Sfx.Play("squeak", 0.7f, 0.7f); movesPulse = 0.5f;
             }
             if (state == "play" || state == "rush" || moving) for (int i = 0; i < 6; i++) Step(dt / 6f);
-            if (moving && timers.Count == 0 && ducks.All(d => d.v.magnitude < 14)) { foreach (var d in ducks) d.v = Vector2.zero; EndShot(); }
+            if (moving && timers.Count == 0 && AllStill()) { foreach (var d in ducks) d.v = Vector2.zero; EndShot(); }
             if (state == "play" && !moving && timers.Count == 0)
             {
                 if (GoalsLeft() == 0) StartRush();
@@ -533,7 +587,7 @@ public class GameController : MonoBehaviour
         float sw = swoop * swoop * (3 - 2 * swoop);   // smoothstep ease: camera glides in at level start
         cam.fieldOfView = 36f * (1 - camZoom * 0.1f + sw * 0.18f);
         bubbleTimer -= dt;
-        if (bubbleTimer <= 0) { bubbleTimer = 0.25f; FxKit.Bubble(W(UnityEngine.Random.Range(TX + 20, TX + TW - 20), UnityEngine.Random.Range(TY + 20, TY + TH - 20))); }
+        if (bubbleTimer <= 0) { bubbleTimer = App.Mobile ? 0.7f : 0.25f; FxKit.Bubble(W(UnityEngine.Random.Range(TX + 20, TX + TW - 20), UnityEngine.Random.Range(TY + 20, TY + TH - 20))); }
         shake = Mathf.Max(0, shake - dt); comboPulse = Mathf.Max(0, comboPulse - dt);
         if (waterMat != null) waterMat.mainTextureOffset = new Vector2(Mathf.Sin(t * 0.15f) * 0.05f, t * 0.02f);
         UpdateViews(dt);
@@ -543,6 +597,7 @@ public class GameController : MonoBehaviour
         cam.transform.position = camBase + (shake > 0 ? UnityEngine.Random.insideUnitSphere * shake * 0.45f : Vector3.zero);
     }
 
+    bool AllStill() { for (int i = 0; i < ducks.Count; i++) if (ducks[i].v.sqrMagnitude >= 14 * 14) return false; return true; }
     int GoalsLeft() { int c = 0; for (int i = 0; i < blocks.Count; i++) { var b = blocks[i]; if (b.alive && b.Goal) c++; } return c; }
     void Later(float t, Action fn) => timers.Add(new Timer { t = t, fn = fn });
     static bool Covered(Block b) => b.under != null && b.under.alive;
@@ -568,9 +623,10 @@ public class GameController : MonoBehaviour
         hit = new Hit { n = d / dist, pen = r - dist };
         return true;
     }
+    static readonly Block bumperTmp = new Block();
     static bool CircleRect(Vector2 p, float r, Bumper b, out Hit hit)
     {
-        var tmp = new Block { p = new Vector2(b.x + b.w / 2, b.y + b.h / 2), w = b.w, h = b.h };
+        var tmp = bumperTmp; tmp.p = new Vector2(b.x + b.w / 2, b.y + b.h / 2); tmp.w = b.w; tmp.h = b.h;   // reused: this ran 36x per frame and allocated each time
         return CircleRect(p, r, tmp, out hit);
     }
     static bool CircleCircle(Vector2 p, float r, Vector2 c, float rc, out Hit hit)
@@ -583,10 +639,11 @@ public class GameController : MonoBehaviour
     static void Reflect(ref Vector2 v, Vector2 n, float rest) { float vn = Vector2.Dot(v, n); if (vn < 0) v -= (1 + rest) * vn * n; }
 
     // rounded-rect tub walls
+    static readonly Vector2[] Corners = { new Vector2(TX + TR, TY + TR), new Vector2(TX + TW - TR, TY + TR), new Vector2(TX + TR, TY + TH - TR), new Vector2(TX + TW - TR, TY + TH - TR) };
     static bool TubWalls(ref Vector2 p, ref Vector2 v, float r, float rest = 0.94f)
     {
         float L = TX + r, R = TX + TW - r, T = TY + r, B = TY + TH - r, cr = TR; bool hit = false;
-        Vector2[] corners = { new Vector2(TX + cr, TY + cr), new Vector2(TX + TW - cr, TY + cr), new Vector2(TX + cr, TY + TH - cr), new Vector2(TX + TW - cr, TY + TH - cr) };
+        var corners = Corners;
         foreach (var c in corners)
         {
             bool inX = c.x < 270 ? p.x < c.x : p.x > c.x, inY = c.y < 510 ? p.y < c.y : p.y > c.y;
@@ -1289,7 +1346,7 @@ public class GameController : MonoBehaviour
 
     void BuildAim()
     {
-        aimRoot = Art.Root("Aim", fx); aimDots.Clear(); pushDots.Clear(); aimVisible = true;
+        aimRoot = Art.Root("Aim", tubRoot); aimDots.Clear(); pushDots.Clear(); aimVisible = true;
         if (mpb == null) mpb = new MaterialPropertyBlock();
         var m = Art.Mat(Color.white, 0.5f, 0, 0.6f, 0.0035f);   // outlined so the dots pop on the bright water
         for (int i = 0; i < 48; i++)
@@ -1473,7 +1530,7 @@ public class GameController : MonoBehaviour
                 Color rc = frenzyReady || d.frenzy ? new Color(1f, 0.5f, 0.75f, 0.6f)
                          : dragged ? (Color)(Color32)Color.Lerp(new Color(1, 1, 1, 0.7f), new Color(1f, 0.45f, 0.3f, 0.75f), powerStep / 4f)
                          : d.special ? new Color(1f, 0.8f, 0.3f, 0.6f) : new Color(0.37f, 0.9f, 0.37f, 0.55f);
-                d.ring.GetComponent<Renderer>().sharedMaterial = Art.FadeShared(rc);
+                if (d.ringCol != rc) { d.ringCol = rc; d.ring.GetComponent<Renderer>().sharedMaterial = Art.FadeShared(rc); }   // only when the colour changes (the cache key is a string)
             }
             var spark = d.body.Find("Spark"); if (spark) spark.gameObject.SetActive((d.charged || d.special) && Mathf.Sin(t * 14) > -0.3f);
             if (spd > 120 && UnityEngine.Random.value < 0.5f) FxKit.Wake(W(d.p - d.v.normalized * d.r));
@@ -1488,16 +1545,16 @@ public class GameController : MonoBehaviour
             if (!b.alive || b.view == null) continue;
             b.hit = Mathf.Max(0, b.hit - dt);
             float k = 1 + b.hit * (b.type == "boss" ? 0.4f : 1.2f);
-            b.view.localScale = b.baseScale * k;
+            if (b.hit > 0 || b.scaled) { b.view.localScale = b.baseScale * k; b.scaled = b.hit > 0; }
             // floating goodies bob gently on the bath water
-            bool floats = b.type == "cookie" || b.type == "gold" || b.type == "ice" || b.type == "pixel" || b.type == "chest" || b.type == "tnt" || b.type == "laser" || b.type == "boss";
+            bool floats = !App.Mobile && (b.type == "cookie" || b.type == "gold" || b.type == "ice" || b.type == "pixel" || b.type == "chest" || b.type == "tnt" || b.type == "laser" || b.type == "boss");
             float lift = 0;
             if (b.appear < 1)
             {   // level build-in: drop from above with a little overshoot squash
-                if (b.delay > 0) { b.delay -= dt; b.view.localScale = Vector3.zero; continue; }
+                if (b.delay > 0) { b.delay -= dt; b.view.localScale = Vector3.zero; b.scaled = true; continue; }
                 b.appear = Mathf.Min(1, b.appear + dt / 0.28f);
                 float e = b.appear; lift = (1 - e) * (1 - e) * 5f;
-                b.view.localScale = b.baseScale * (e < 1 ? Mathf.Lerp(0.5f, 1f, e) : 1f);
+                b.view.localScale = b.baseScale * (e < 1 ? Mathf.Lerp(0.5f, 1f, e) : 1f); b.scaled = true;
                 if (b.appear >= 1) { b.hit = 0.08f; if (UnityEngine.Random.value < 0.25f) FxKit.Ripple(W(b.p), 0.7f); }
             }
             if (b.under != null && b.under.shelf && b.under.view != null)
@@ -1507,7 +1564,6 @@ public class GameController : MonoBehaviour
                 if (fall > 0) b.view.localEulerAngles = new Vector3(fall * 40f, 0, fall * 25f);
             }
             if (b.mvAmp > 0 || floats || lift > 0 || b.appear < 1) b.view.position = W(b.p, lift + (floats ? Mathf.Sin(t * 2.2f + b.p.x * 0.031f + b.p.y * 0.017f) * 0.035f : 0));
-            else if (b.type != "plank") b.view.position = W(b.p);
             // white flash on hit (property block keeps the shared baked material untouched)
             // last few targets glow softly so the player can find them
             bool glow = (fewLeft && b.Goal && !Covered(b)) || b.type == "gold";
@@ -1559,7 +1615,7 @@ public class GameController : MonoBehaviour
         else
         {
             if (pool.Count > 0) pool.Clear();
-            tr = Art.Prim(type, fx, pos, Vector3.one * size, Art.Mat(c, 0.4f));
+            tr = Art.Prim(type, bitRoot, pos, Vector3.one * size, Art.Mat(c, 0.4f));
             var rr = tr.GetComponent<Renderer>(); rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; rr.receiveShadows = false;
         }
         tr.GetComponent<Renderer>().sharedMaterial = Art.Mat(c, 0.4f);
@@ -1775,7 +1831,7 @@ public class GameController : MonoBehaviour
         if (!Active) return;
         flashA = Mathf.Max(0, flashA - Time.unscaledDeltaTime * 2.5f);
         flashImg.color = new Color(1f, 0.97f, 0.9f, flashA);
-        movesTxt.text = moves.ToString();
+        if (shownMoves != moves) { shownMoves = moves; movesTxt.text = moves.ToString(); }
         movesPulse = Mathf.Max(0, movesPulse - Time.unscaledDeltaTime);
         movesTxt.rectTransform.localScale = Vector3.one * (1 + movesPulse * 1.2f);
         movesTxt.color = moves <= 2 && state == "play" ? new Color(1f, 0.35f, 0.3f) : Ink;
@@ -1803,13 +1859,13 @@ public class GameController : MonoBehaviour
             boostImg[k].color = target == k ? new Color(0.37f, 0.83f, 0.37f) : Yellow;
         }
         }
-        scoreTxt.text = Mathf.RoundToInt(displayScore).ToString("N0");
+        int ds = Mathf.RoundToInt(displayScore); if (ds != shownScore) { shownScore = ds; scoreTxt.text = ds.ToString("N0"); }
         scoreTxt.rectTransform.localScale = Vector3.one * (1 + scorePulse * 1.5f);
         float fr = frenzyReady ? 1 : fever / FEVER_MAX;
         feverFill.anchorMax = new Vector2(fr, 1);
         feverFill.GetComponent<Image>().color = frenzyReady ? Color.HSVToRGB(t * 0.8f % 1, 0.6f, 1f) : new Color(1f, 0.49f, 0.71f);
         feverTxt.text = frenzyReady ? "DUCK FRENZY SẴN SÀNG — BẮN ĐI!" : "FRENZY";
-        streakTxt.text = streak > 0 ? "CHUỖI x" + (streak + 1) : "";
+        if (shownStreak != streak) { shownStreak = streak; streakTxt.text = streak > 0 ? "CHUỖI x" + (streak + 1) : ""; }
         if (boss != null) { bossFill.anchorMax = new Vector2(Mathf.Clamp01((float)boss.hp / boss.max), 1); bossTxt.text = boss.alive ? "VUA BÁNH  " + Mathf.Max(0, boss.hp) + "/" + boss.max : "HẠ GỤC!"; }
         string ht = target == "hammer" ? "Chạm vào một khối để đập vỡ (chạm Búa để huỷ)" : target == "bomb" ? "Chạm chỗ muốn thả bom nước" : moving ? "" : hint;
         hintPanel.gameObject.SetActive(!string.IsNullOrEmpty(ht) && state == "play"); hintTxt.text = ht;

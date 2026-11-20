@@ -27,9 +27,14 @@ public static class App
         var sun = Object.FindObjectOfType<Light>();
         if (sun == null) sun = new GameObject("Sun").AddComponent<Light>();
         sun.type = LightType.Directional; sun.transform.rotation = Quaternion.Euler(58, -35, 0);
-        // phones: hard low-res shadows, no MSAA (fill-rate is the bottleneck on mobile WebGL)
-        Mobile = Application.isMobilePlatform;
-        sun.intensity = 1.05f; sun.shadows = Mobile ? LightShadows.Hard : LightShadows.Soft; sun.shadowStrength = 0.55f; sun.color = new Color(1f, 0.97f, 0.92f);
+        // phone profile ("ds_forceMobile" pref lets us test it in the editor / on desktop)
+        Mobile = Application.isMobilePlatform || PlayerPrefs.GetInt("ds_forceMobile", 0) == 1;
+        // phones: no realtime shadow pass at all (ducks get a cheap blob instead), no HDR/MSAA buffers,
+        // and no physics stepping (the game has its own 2D sim; Unity physics has nothing to do)
+        cam.allowHDR = false; cam.allowMSAA = !Mobile;
+        Physics.simulationMode = SimulationMode.Script; Physics2D.simulationMode = SimulationMode2D.Script;
+        Physics.autoSyncTransforms = false;
+        sun.intensity = 1.05f; sun.shadows = Mobile ? LightShadows.None : LightShadows.Soft; sun.shadowStrength = 0.55f; sun.color = new Color(1f, 0.97f, 0.92f);
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
         RenderSettings.ambientLight = new Color(0.62f, 0.6f, 0.72f);
         QualitySettings.shadowDistance = 32; QualitySettings.shadowCascades = 1;            // whole tub fits in one cascade

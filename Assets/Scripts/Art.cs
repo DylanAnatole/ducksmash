@@ -21,6 +21,21 @@ public static class Art
         }
     }
 
+    // outline-free variant: a single pass per object (the Toon shader's outline pass costs a draw even when collapsed)
+    static Shader flat;
+    static Shader FlatShader
+    {
+        get
+        {
+            if (flat != null) return flat;
+            var holder = Resources.Load<Material>("ToonFlatMat");
+            flat = holder != null ? holder.shader : Shader.Find("DuckSmash/ToonFlat");
+            if (flat == null) flat = ToonShader;
+            return flat;
+        }
+    }
+    static bool IsToon(Shader sh) => sh == ToonShader || sh == FlatShader;
+
     public static readonly Color OutlineCol = new Color(0.2f, 0.13f, 0.28f);
 
     // Play Mode runs without domain reload, so statics survive between sessions while the
@@ -29,15 +44,16 @@ public static class Art
     static void ResetStatics()
     {
         mats.Clear(); baked.Clear(); bakedMats.Clear();
-        std = null; toon = null; lowSphere = null; midSphere = null;
+        std = null; toon = null; flat = null; lowSphere = null; midSphere = null;
     }
 
     // Cartoon material. smooth = highlight strength, metal brightens the highlight (for the Iron Duck).
     public static Material Mat(Color c, float smooth = 0.55f, float metal = 0f, float emission = 0f, float outline = 0f)
     {
+        if (App.Mobile) outline = 0f;   // phones: no outline passes at all (ducks keep theirs via Bake)
         string key = ColorUtility.ToHtmlStringRGBA(c) + "|" + smooth + "|" + metal + "|" + emission + "|" + outline;
         if (mats.TryGetValue(key, out var m) && m != null) return m;
-        m = new Material(ToonShader) { color = c };
+        m = new Material(outline > 0f ? ToonShader : FlatShader) { color = c };
         m.SetFloat("_Gloss", Mathf.Clamp01(smooth + metal * 0.4f));
         m.SetFloat("_Outline", outline);
         m.SetColor("_OutlineColor", Color.Lerp(c, OutlineCol, 0.72f));   // tinted outline, softer than pure ink
@@ -51,7 +67,7 @@ public static class Art
 
     public static Material Toon(Color c, Texture tex, Vector2 tiling, float gloss = 0.2f)
     {
-        var m = new Material(ToonShader) { color = c, mainTexture = tex, mainTextureScale = tiling };
+        var m = new Material(FlatShader) { color = c, mainTexture = tex, mainTextureScale = tiling };
         m.SetFloat("_Gloss", gloss); m.SetFloat("_Outline", 0f);
         m.SetColor("_ShadowTint", new Color(0.8f, 0.8f, 0.9f));
         return m;
@@ -91,7 +107,7 @@ public static class Art
         float vol = scale.x * scale.y * scale.z;
         if (vol < 0.004f) { rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; rend.receiveShadows = false; } // tiny details
         // Unity's built-in sphere is 768 tris; most of ours are small, so use lighter meshes
-        if (t == PrimitiveType.Sphere) go.GetComponent<MeshFilter>().sharedMesh = vol < 0.01f ? LowSphere : MidSphere;
+        if (t == PrimitiveType.Sphere) go.GetComponent<MeshFilter>().sharedMesh = vol < (App.Mobile ? 0.15f : 0.01f) ? LowSphere : MidSphere;
         return go.transform;
     }
 
@@ -104,12 +120,13 @@ public static class Art
 
     public static void Bake(Transform root, string key, float gloss, float outline, params string[] keep)
     {
+        if (App.Mobile && !key.StartsWith("duck_")) outline = 0f;   // phones: only ducks keep a silhouette outline
         var parts = new List<MeshFilter>();
         foreach (var mf in root.GetComponentsInChildren<MeshFilter>(true))
         {
             if (IsKept(mf.transform, root, keep)) continue;
             var r = mf.GetComponent<Renderer>();
-            if (r == null || r.sharedMaterial == null || r.sharedMaterial.shader != ToonShader) continue;   // transparent/other stay
+            if (r == null || r.sharedMaterial == null || !IsToon(r.sharedMaterial.shader)) continue;   // transparent/other stay
             parts.Add(mf);
         }
         if (parts.Count == 0) return;
@@ -130,7 +147,7 @@ public static class Art
             foreach (var ci in combine) Object.Destroy(ci.mesh);
             baked[key] = mesh;
         }
-        foreach (var mf in parts) { mf.gameObject.SetActive(false); Object.Destroy(mf.gameObject); }
+        foreach (var mf in parts) Object.DestroyImmediate(mf.gameObject);   // immediate: baked roots get cloned as templates right after
         var go = new GameObject("Baked");
         go.transform.SetParent(root, false);
         go.AddComponent<MeshFilter>().sharedMesh = mesh;
@@ -148,7 +165,7 @@ public static class Art
     {
         string key = gloss + "|" + outline;
         if (bakedMats.TryGetValue(key, out var m) && m != null) return m;
-        m = new Material(ToonShader) { color = Color.white, enableInstancing = true };
+        m = new Material(outline > 0f ? ToonShader : FlatShader) { color = Color.white, enableInstancing = true };
         m.SetFloat("_UseVC", 1); m.SetFloat("_Gloss", gloss); m.SetFloat("_Outline", outline);
         m.SetColor("_OutlineColor", new Color(0.33f, 0.24f, 0.42f)); m.SetColor("_ShadowTint", new Color(0.74f, 0.72f, 0.88f));
         if (outline <= 0f) m.EnableKeyword("NO_OUTLINE");
