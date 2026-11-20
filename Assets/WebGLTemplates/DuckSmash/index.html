@@ -18,7 +18,9 @@
 </head>
 <body>
   <div id="wrap"><canvas id="unity-canvas" tabindex="-1"></canvas></div>
-  <div id="loading"><div>Duck Smash</div><div id="bar"><div id="fill"></div></div></div>
+  <div id="loading"><div>Duck Smash</div><div id="bar"><div id="fill"></div></div><div id="lmsg" style="font-weight:600;font-size:14px">Đang tải 0%</div>
+    <button id="retry" style="display:none;padding:10px 18px;border:0;border-radius:10px;background:#9a88ee;color:#fff;font-weight:700"
+      onclick="location.reload()">Lâu quá? Chạm để tải lại</button></div>
   <div id="warn"></div>
   <script>
     var canvas = document.querySelector("#unity-canvas");
@@ -42,12 +44,19 @@
     // phones report devicePixelRatio 2-3: rendering at full DPR triples the pixel work, so cap it
     var mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     config.devicePixelRatio = Math.min(window.devicePixelRatio || 1, mobile ? 1 : 2);
+    var lmsg = document.querySelector("#lmsg"), started = false;
+    // if the game hasn't started after a long while (bad network / stale cache), offer a reload
+    setTimeout(function () { if (!started) document.querySelector("#retry").style.display = "block"; }, 30000);
     var s = document.createElement("script");
     s.src = buildUrl + "/{{{ LOADER_FILENAME }}}";
+    s.onerror = function () { lmsg.textContent = "Không tải được game. Kiểm tra mạng rồi tải lại."; document.querySelector("#retry").style.display = "block"; };
     s.onload = function () {
-      createUnityInstance(canvas, config, function (p) { document.querySelector("#fill").style.width = (100 * p) + "%"; })
-        .then(function () { document.querySelector("#loading").style.display = "none"; })
-        .catch(function (m) { alert(m); });
+      createUnityInstance(canvas, config, function (p) {
+        document.querySelector("#fill").style.width = (100 * p) + "%";
+        lmsg.textContent = p < 0.9 ? "Đang tải " + Math.round(p * 100) + "%" : "Đang khởi động...";
+      })
+        .then(function () { started = true; document.querySelector("#loading").style.display = "none"; })
+        .catch(function (m) { lmsg.textContent = "Lỗi: " + m; document.querySelector("#retry").style.display = "block"; });
     };
     document.body.appendChild(s);
   </script>

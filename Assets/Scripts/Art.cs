@@ -44,7 +44,7 @@ public static class Art
     static void ResetStatics()
     {
         mats.Clear(); baked.Clear(); bakedMats.Clear();
-        std = null; toon = null; flat = null; lowSphere = null; midSphere = null;
+        std = null; toon = null; flat = null; lowSphere = null; midSphere = null; primMeshes.Clear();
     }
 
     // Cartoon material. smooth = highlight strength, metal brightens the highlight (for the Iron Duck).
@@ -102,10 +102,34 @@ public static class Art
         return m;
     }
 
+    // Primitive meshes WITHOUT GameObject.CreatePrimitive: that call also adds a physics collider, and the
+    // physics module is stripped from the WebGL build, so every call logged an error (thousands at startup,
+    // enough to stall phones on the loading screen). Each mesh is fetched once and cached.
+    static readonly Dictionary<PrimitiveType, Mesh> primMeshes = new Dictionary<PrimitiveType, Mesh>();
+    public static Mesh PrimMesh(PrimitiveType t)
+    {
+        if (primMeshes.TryGetValue(t, out var m) && m != null) return m;
+        string file = t == PrimitiveType.Cube ? "Cube.fbx" : t == PrimitiveType.Cylinder ? "New-Cylinder.fbx" : t == PrimitiveType.Capsule ? "New-Capsule.fbx"
+                    : t == PrimitiveType.Quad ? "Quad.fbx" : t == PrimitiveType.Plane ? "New-Plane.fbx" : "New-Sphere.fbx";
+        try { m = Resources.GetBuiltinResource<Mesh>(file); } catch { m = null; }
+        if (m == null)
+        {   // fallback: borrow the mesh from one temporary primitive (at most one log line per type)
+            var tmp = GameObject.CreatePrimitive(t); m = tmp.GetComponent<MeshFilter>().sharedMesh; Object.Destroy(tmp);
+        }
+        primMeshes[t] = m;
+        return m;
+    }
+    public static GameObject NewPrim(PrimitiveType t)
+    {
+        var go = new GameObject(t.ToString());
+        go.AddComponent<MeshFilter>().sharedMesh = PrimMesh(t);
+        go.AddComponent<MeshRenderer>();
+        return go;
+    }
+
     public static Transform Prim(PrimitiveType t, Transform parent, Vector3 pos, Vector3 scale, Material m, Vector3 euler = default)
     {
-        var go = GameObject.CreatePrimitive(t);
-        Object.Destroy(go.GetComponent<Collider>());
+        var go = NewPrim(t);
         go.transform.SetParent(parent, false);
         go.transform.localPosition = pos;
         go.transform.localScale = scale;

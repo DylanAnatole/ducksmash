@@ -306,7 +306,7 @@ public class GameController : MonoBehaviour
     void BuildTub()
     {
         // floor outside
-        var ground = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(ground.GetComponent<Collider>());
+        var ground = Art.NewPrim(PrimitiveType.Quad);
         ground.transform.SetParent(world, false); ground.transform.position = new Vector3(0, -0.35f, 0); ground.transform.eulerAngles = new Vector3(90, 0, 0); ground.transform.localScale = new Vector3(90, 90, 1);
         var gm = Art.Toon(Color.white, Art.TileTex(new Color(1f, 0.93f, 0.9f), new Color(0.93f, 0.82f, 0.82f)), new Vector2(22.5f, 22.5f), 0f);
         ground.GetComponent<Renderer>().sharedMaterial = gm;
@@ -316,7 +316,7 @@ public class GameController : MonoBehaviour
         float w = TW * K, h = TH * K, rim = 0.36f;
         Art.Prim(PrimitiveType.Cube, world, new Vector3(0, -0.2f, 0), new Vector3(w + rim * 2, 0.3f, h + rim * 2), porcelain);
         // water
-        var water = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(water.GetComponent<Collider>());
+        var water = Art.NewPrim(PrimitiveType.Quad);
         water.transform.SetParent(world, false); water.transform.position = new Vector3(0, -0.04f, 0); water.transform.eulerAngles = new Vector3(90, 0, 0);
         water.transform.localScale = new Vector3(w, h, 1);
         var wm = Art.Toon(Color.white, Art.WaterTex(), new Vector2(TW / 260f, TH / 260f), 0.3f);
@@ -368,7 +368,7 @@ public class GameController : MonoBehaviour
         Art.Prim(PrimitiveType.Capsule, world, new Vector3(w / 2 + rim / 2, 0.62f, h * 0.18f), new Vector3(0.3f, 0.22f, 0.22f), Art.Mat(new Color(1f, 0.72f, 0.82f), 0.9f, 0, 0, 0.003f), new Vector3(90, 0, 90));
         // deeper-looking water toward the walls
         if (!App.Mobile) {
-        var depth = GameObject.CreatePrimitive(PrimitiveType.Quad); Destroy(depth.GetComponent<Collider>());
+        var depth = Art.NewPrim(PrimitiveType.Quad);
         depth.transform.SetParent(world, false); depth.transform.position = new Vector3(0, -0.03f, 0); depth.transform.eulerAngles = new Vector3(90, 0, 0);
         depth.transform.localScale = new Vector3(w, h, 1);
         var dm = Art.Fade(Color.white); dm.mainTexture = Art.EdgeShadeTex(w / h); depth.GetComponent<Renderer>().sharedMaterial = dm;
