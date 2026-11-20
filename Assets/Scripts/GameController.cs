@@ -306,7 +306,7 @@ public class GameController : MonoBehaviour
         {
             var rng = new System.Random(n * 31 + 7);
             var pool = blocks.Where(b => (b.type == "cookie" || b.type == "soap" || b.type == "glass") && b.under == null).ToList();
-            int golds = Mathf.Min(pool.Count / 12, 1);
+            int golds = blocks.Any(b => b.type == "gold") ? 0 : Mathf.Min(pool.Count / 12, 1);   // one gold per level (a drifting one counts)
             for (int i = 0; i < golds; i++) { var g = pool[rng.Next(pool.Count)]; pool.Remove(g); g.type = "gold"; }
         }
         // build-in animation: blocks drop onto the water row by row
@@ -314,6 +314,7 @@ public class GameController : MonoBehaviour
         foreach (var b in blocks) MakeView(b);
         foreach (var cb in blocks) if (cb.type == "chest" && cb.view != null) cb.tag = MakeTag("+2 vịt", new Color(1f, 0.7f, 0.2f), true);
         foreach (var cb in blocks) if (cb.type == "ring" && cb.view != null) cb.tag = MakeTag("ĐẨY TRƯỢT", new Color(1f, 0.42f, 0.4f), false);
+        foreach (var cb in blocks) if (cb.type == "gold" && cb.mvAmp > 0 && cb.view != null) cb.tag = MakeTag("+1 LƯỢT", new Color(0.95f, 0.65f, 0.1f), false);
         // water colour by chapter: the bath changes as you progress (blue -> teal -> lavender bubble bath; hard = deeper)
         if (waterMat != null)
             waterMat.SetColor("_Shift", LevelLibrary.IsSandbox(level) || level <= 12 ? new Color(1, 1, 1, 0)
@@ -2072,7 +2073,7 @@ public class GameController : MonoBehaviour
             }
             if (b.type == "plank" && b.falling > 0) { float f = Mathf.Min(1, b.falling / 0.35f); b.view.position = W(b.p, -f * 0.6f); }
             if (b.type == "laser") b.view.Find("Arrow").localScale = Vector3.one * (1 + Mathf.Sin(t * 8) * 0.08f);
-            if (b.tag) b.tag.anchoredPosition = WorldToHud(W(b.p, 1.2f)) + new Vector2(0, 58 + Mathf.Sin(t * 3f + b.p.x) * 6f);
+            if (b.tag) b.tag.anchoredPosition = WorldToHud(W(b.p, 1.2f)) + new Vector2(0, (b.type == "gold" ? -70 : 58) + Mathf.Sin(t * 3f + b.p.x) * 6f);   // gold sits under the HUD: label goes below it
             if (b.type == "screw") b.view.localEulerAngles = new Vector3(0, t * 30 + b.p.x, 0);
         }
         for (int i = dying.Count - 1; i >= 0; i--)

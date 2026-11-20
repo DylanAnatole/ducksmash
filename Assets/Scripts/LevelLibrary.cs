@@ -261,6 +261,7 @@ public static class LevelLibrary
                 break;
         }
         if (n <= 13) d.bumpers.Clear();   // early game: no side bumpers until the player can judge power + angle
+        if (n >= 14 && !IsHard(n)) AddDriftingGold(d, n);
         if (n >= 19 && !IsHard(n)) PlaceWhirl(d, n == 19 || n >= 23 ? 72 : 62);
         if (n == 19 && d.whirls.Count > 0) d.hint = "Xoáy nước: bẻ cong đường bay!";
         d.boss = false; d.hard = IsHard(n);
@@ -414,6 +415,19 @@ public static class LevelLibrary
             }
     }
 
+    // a golden cookie (+1 move) gliding left-right across an empty lane: a timing shot worth taking
+    static void AddDriftingGold(LevelDef d, int n)
+    {
+        for (float y = 172; y <= 186; y += 2)   // along the far wall, behind the pile: reachable through gaps or off a bank
+        {
+            bool clear = true;
+            foreach (var b in d.blocks) { float ext = b.rect ? b.h * 0.5f : b.r; if (Mathf.Abs(b.y - y) < ext + 26) { clear = false; break; } }
+            if (!clear) continue;
+            var g = B("gold", 270, y); g.mvAmp = 200; g.mvSpeed = 0.8f + (n % 3) * 0.15f;
+            d.blocks.Add(g); return;
+        }
+    }
+
     // put a whirlpool in the most open stretch of water between the pile and the ducks
     static void PlaceWhirl(LevelDef d, float r)
     {
@@ -432,7 +446,7 @@ public static class LevelLibrary
 
     static LevelDef Procedural(int n)
     {
-        var d = new LevelDef { moves = 6 + n / 10 };   // bot tests: random aim cleared 14-24 in 3-6 shots, 9 moves made 3 stars free
+        var d = new LevelDef { moves = 5 + n / 10 };   // bot tests: random aim cleared 14-24 in 3-6 shots, 9 moves made 3 stars free
         float y = 205; int guard = 0;
         string pic = n == 14 ? "flower" : n == 16 ? "mush" : n == 17 ? "sun" : n == 18 ? "apple" : n == 19 ? "boat"
                    : n == 21 ? "cat" : n == 22 ? "rainbow" : n == 23 ? "heart" : n == 24 ? "duck"
@@ -449,6 +463,10 @@ public static class LevelLibrary
             ShapeLayout(d, SHAPES[n % SHAPES.Length], y + 18, rows); y += rows * 40 + 24;
         }
         while (y < 560 && guard++ < 10) y = AddModule(d, y, false);
+        // difficulty ramp: later levels turn a growing share of one-hit props into 2-3 hit ones (fewer free chain clears)
+        float tough = Mathf.Clamp((n - 12) * 0.025f, 0f, 0.35f);
+        foreach (var b in d.blocks)
+            if ((b.type == "glass" || b.type == "soap") && R() < tough) { bool pl = R() < 0.35f; b.type = pl ? "plates" : "vase"; b.r = 17; }
         foreach (var b in d.blocks) if (b.type == "plank") d.moves++;   // each shelf needs extra shots for its legs
         if (R() < 0.6f) d.blocks.Add(B("chest", RI(130, 410), Mathf.Min(y + 30, 660)));
         if (n >= 17)
@@ -472,7 +490,7 @@ public static class LevelLibrary
         float y = 200; int guard = 0;
         string hs = n == 15 || n == 30 ? "fortress" : n == 20 ? "ring" : n == 10 ? "diamond" : "xcross";
         ShapeLayout(d, hs, y + 6, 7); y += 7 * 40 + 20;
-        if (hs == "fortress") d.moves += 3;   // the walls only open at one gap: players need a few probing shots
+        if (hs == "fortress" && n < 30) d.moves += 3;   // the walls only open at one gap: players need a few probing shots
         while (y < 560 && guard++ < 10) y = AddModule(d, y, false);
         for (int i = 0; i < 11; i++) { float q = R(); d.blocks.Add(B(q < 0.25f ? "stone" : q < 0.4f ? "bathbomb" : PropKind(), 70 + i * 40, Mathf.Max(y + 10, 600))); }
         foreach (var b in d.blocks)
