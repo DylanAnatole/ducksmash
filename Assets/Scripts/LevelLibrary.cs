@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class BlockDef
@@ -183,7 +184,7 @@ public static class LevelLibrary
                 d.bumpers.Add(BumperL(600)); d.bumpers.Add(BumperR(600));
                 break;
             case 4:
-                d = L(11, "Chấm đen = số cú. Rương: +2 vịt!", (150, 800, null), (270, 800, null), (390, 800, null), (270, 690, null));
+                d = L(12, "Chấm đen = số cú. Rương: +2 vịt!", (150, 800, null), (270, 800, null), (390, 800, null), (270, 690, null));
                 for (int i = 0; i < 7; i++) d.blocks.Add(B("plates", 90 + i * 60, 240));
                 d.blocks.AddRange(Row("vase", 70, 320, 11, 40)); d.blocks.Add(B("chest", 270, 400));
                 d.blocks.AddRange(Cluster("glass", 270, 480, 2, 11, 40));
@@ -203,7 +204,7 @@ public static class LevelLibrary
                 d.bumpers.Add(BumperL(580, 160)); d.bumpers.Add(BumperR(580, 160));
                 break;
             case 7:
-                d = L(10, "Gãy 2 chân kệ → cả kệ đổ!", (150, 810, null), (270, 810, null), (390, 810, null));
+                d = L(11, "Gãy 2 chân kệ → cả kệ đổ!", (150, 810, null), (270, 810, null), (390, 810, null));
                 d.blocks.AddRange(Shelf(270, 230, 420, "glass", "vase", "glass", "vase", "glass", "vase", "glass", "vase"));
                 d.blocks.AddRange(Row("soap", 70, 300, 11, 40));
                 d.blocks.AddRange(Shelf(270, 380, 420, "vase", "glass", "glass", "vase", "glass", "glass", "vase", "glass"));
@@ -237,7 +238,7 @@ public static class LevelLibrary
                 d.blocks.AddRange(Shelf(270, 610, 360, "glass", "vase", "glass", "vase", "glass", "vase"));
                 break;
             case 11:
-                d = L(8, "Vịt Sét: giật 3 món gần nhất!", (150, 810, null), (270, 810, "zap"), (390, 810, null), (270, 720, "zap"));
+                d = L(10, "Vịt Sét: giật 3 món gần nhất!", (150, 810, null), (270, 810, "zap"), (390, 810, null), (270, 720, "zap"));
                 for (int r = 0; r < 7; r++) d.blocks.AddRange(Row(r % 3 == 2 ? "plates" : (r == 1 || r == 4 ? "vase" : "glass"), 70, 200 + r * 42, 11, 40));
                 d.blocks.Add(B("bathbomb", 270, 620)); d.blocks.Add(B("chest", 150, 620)); d.blocks.Add(B("chest", 390, 620));
                 d.bumpers.Add(BumperL(660)); d.bumpers.Add(BumperR(660));
@@ -264,6 +265,7 @@ public static class LevelLibrary
         if (n >= 14 && !IsHard(n)) AddDriftingGold(d, n);
         if (n >= 19 && !IsHard(n)) PlaceWhirl(d, n == 19 || n >= 23 ? 72 : 62);
         if (n == 19 && d.whirls.Count > 0) d.hint = "Xoáy nước: bẻ cong đường bay!";
+        if (n == 23) d.hint = "Đồ đóng băng: cú đầu vỡ băng, cú sau mới vỡ!";
         d.boss = false; d.hard = IsHard(n);
         // unlock levels gift one special by transforming a plain duck: make sure there is one
         if (NewSpecialAt(n) != null && !d.ducks.Exists(x => x.kind == "normal") && d.ducks.Count > 0) d.ducks[d.ducks.Count - 1].kind = "normal";
@@ -467,6 +469,18 @@ public static class LevelLibrary
         float tough = Mathf.Clamp((n - 12) * 0.025f, 0f, 0.35f);
         foreach (var b in d.blocks)
             if ((b.type == "glass" || b.type == "soap") && R() < tough) { bool pl = R() < 0.35f; b.type = pl ? "plates" : "vase"; b.r = 17; }
+        // from level 23: some props are frozen in ice (first hit cracks the shell, second smashes)
+        if (n >= 23)
+        {
+            float ice = n >= 27 ? 0.45f : 0.3f;
+            foreach (var b in d.blocks) if ((b.type == "glass" || b.type == "soap") && R() < ice) { b.type = "ice"; b.r = 16; }
+            int have = d.blocks.Count(b => b.type == "ice");
+            foreach (var b in d.blocks)   // at least 4 per level so the mechanic always shows up
+            {
+                if (have >= 4) break;
+                if (b.type == "vase" || b.type == "plates" || b.type == "glass" || b.type == "soap") { b.type = "ice"; b.r = 16; have++; }
+            }
+        }
         foreach (var b in d.blocks) if (b.type == "plank") d.moves++;   // each shelf needs extra shots for its legs
         if (R() < 0.6f) d.blocks.Add(B("chest", RI(130, 410), Mathf.Min(y + 30, 660)));
         if (n >= 17)

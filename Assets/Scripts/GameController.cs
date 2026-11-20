@@ -814,6 +814,7 @@ public class GameController : MonoBehaviour
             b.p += b.vel * dt;
             var v = b.vel; if (TubWalls(ref b.p, ref v, b.r, 0.8f)) Sfx.Play("push", 0.4f, 1.3f); b.vel = v;
             b.vel *= Mathf.Exp(-1.4f * dt);
+            if (whirls.Count > 0) { float om = WhirlTurn(b.p, out var dep); if (om > 0) b.vel = Rot(b.vel, om * dt) * Mathf.Exp(-1.6f * dep * dt); }   // rings swirl too
             if (b.vel.sqrMagnitude < 30 * 30) { b.vel = Vector2.zero; continue; }
             if (b.tag) { tags.Remove(b.tag); Destroy(b.tag.gameObject); b.tag = null; }   // it's been shown what it does
             if (b.vel.sqrMagnitude > 200 * 200 && UnityEngine.Random.value < dt * 30f) FxKit.Wake(W(b.p));
@@ -968,7 +969,8 @@ public class GameController : MonoBehaviour
         if (state == "play")
             foreach (var tr in TIERS)
                 if (shotSmash == tr.need && LevelLibrary.Unlocked(tr.kind, level))
-                { PopText("ĐỦ " + tr.need + " → " + Cap(tr.name) + "!", new Vector2(270, 265), tr.col, 58); Sfx.Play("star", 0.9f, 1.4f); }
+                { PopText("ĐỦ " + tr.need + " → " + Cap(tr.name) + "!", new Vector2(270, 265), tr.col, 58); Sfx.Play("star", 0.9f, 1.4f);
+                  slowTimer = Mathf.Max(slowTimer, tr.need >= 25 ? 0.7f : 0.3f); camZoom = Mathf.Max(camZoom, tr.need >= 25 ? 0.9f : 0.5f); }   // milestone moment: brief slow-mo + push-in
         // Block-Blast style: emptying a whole row / column fires a line clear
         if (lineOf.TryGetValue(b, out var myLines))
             foreach (var ln in myLines)
@@ -2489,6 +2491,8 @@ public class GameController : MonoBehaviour
         sb.Append("\n• Nảy tường rồi phá: điểm x2\n• Đầy FRENZY: phát sau bắn 5 vịt");
         if (level >= 17 && !LevelLibrary.IsSandbox(level)) sb.Append("\n• Phao bơi: bắn trúng → trượt húc vỡ đồ");
         if (whirls.Count > 0) sb.Append("\n• Xoáy nước: bẻ cong đường bay (bắn nhẹ cong nhiều)");
+        if (blocks.Any(b => b.type == "ice" && b.alive)) sb.Append("\n• Đồ đóng băng: cú đầu vỡ băng, cú sau mới vỡ");
+        if (blocks.Any(b => b.type == "gold" && b.mvAmp > 0 && b.alive)) sb.Append("\n• Bánh vàng trôi ở mép trên: trúng = +1 lượt");
         guideBody.text = sb.ToString();
         guideRoot.gameObject.SetActive(true); guideRoot.SetAsLastSibling(); Time.timeScale = 0f;
     }

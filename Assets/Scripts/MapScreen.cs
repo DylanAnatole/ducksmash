@@ -174,7 +174,7 @@ public class MapScreen : MonoBehaviour
     // zig-zag: 4 columns going up
     static Vector2 NodePos(int n)
     {
-        int i = n - 1; float[] xs = { -300, -100, 100, 300 };
+        int i = n - 1; float[] xs = { -270, -90, 90, 270 };   // kept clear of the side buttons
         int row = i / 4, col = i % 4; if (row % 2 == 1) col = 3 - col;
         float y = Bottom + i * NodeGap * 0.62f + row * 90;
         return new Vector2(xs[col], y);
