@@ -16,7 +16,11 @@ public static class App
     static void Boot()
     {
         if (GameObject.Find("DuckSmashApp") != null) return;
+#if UNITY_WEBGL && !UNITY_EDITOR
+        Application.targetFrameRate = -1;   // WebGL: -1 = browser requestAnimationFrame (vsync); a fixed value switches to setTimeout and judders
+#else
         Application.targetFrameRate = 60;
+#endif
         var root = new GameObject("DuckSmashApp");
 
         var cam = Camera.main;

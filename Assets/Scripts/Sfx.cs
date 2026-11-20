@@ -102,6 +102,8 @@ public class Sfx : MonoBehaviour
         var spB = Osc(t => Mathf.Lerp(500, 1400, t / 0.25f), t => Mathf.Exp(-t * 25) * 0.25f);
         clips["splash"] = Make("splash", 0.3f, t => spN(t) * 1.4f + spB(t));
         clips["click"] = Make("click", 0.05f, Osc(t => 1800, t => Mathf.Exp(-t * 110)));
+        // metallic "clank" for hitting things that don't break (stone, shelf boards): inharmonic partials, fast decay
+        clips["clank"] = Make("clank", 0.22f, t => (Mathf.Sin(2 * Mathf.PI * 1180 * t) + 0.7f * Mathf.Sin(2 * Mathf.PI * 1730 * t) + 0.45f * Mathf.Sin(2 * Mathf.PI * 2650 * t)) * Mathf.Exp(-t * 24) * 0.35f);
         clips["push"] = Make("push", 0.12f, Osc(t => Mathf.Lerp(260, 110, t / 0.12f), t => Mathf.Exp(-t * 30)));
         var whoosh = Filtered(0.12f, t => Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / 0.22f)));
         clips["shoot"] = Make("shoot", 0.22f, t => whoosh(t) * 2.2f);

@@ -17,13 +17,6 @@ public static class SaveData
         set { PlayerPrefs.SetInt(P + "coins", value); PlayerPrefs.Save(); }
     }
 
-    // piggy bank: every smashed block drops 1 coin in; when full the player breaks it for the whole stash
-    public const int PiggyMax = 300;
-    public static int Piggy
-    {
-        get => PlayerPrefs.GetInt(P + "piggy", 0);
-        set { PlayerPrefs.SetInt(P + "piggy", Mathf.Clamp(value, 0, PiggyMax)); PlayerPrefs.Save(); }
-    }
 
     // pixel-art album
     public static bool HasArt(string id) => PlayerPrefs.GetInt(P + "art_" + id, 0) == 1;

@@ -44,7 +44,7 @@ public static class Art
     static void ResetStatics()
     {
         mats.Clear(); baked.Clear(); bakedMats.Clear();
-        ringTex = null; std = null; toon = null; flat = null; lowSphere = null; midSphere = null; primMeshes.Clear();
+        ringTex = null; swirlTex = null; swirlMat = null; std = null; toon = null; flat = null; lowSphere = null; midSphere = null; primMeshes.Clear();
     }
 
     // Cartoon material. smooth = highlight strength, metal brightens the highlight (for the Iron Duck).
@@ -93,16 +93,29 @@ public static class Art
     }
 
     // Unshared fading material (alpha animated per instance).
+    // additive glow material (shock rings, flashes); falls back to alpha blend if the particle shader is missing
+    static Shader addSh;
+    public static Material Glow(Color c)
+    {
+        if (addSh == null) addSh = Shader.Find("Legacy Shaders/Particles/Additive");
+        if (addSh == null || !addSh.isSupported) return Fade(c);
+        var m = new Material(addSh) { renderQueue = 3000, mainTexture = RingTex() }; SetGlow(m, c); return m;   // hollow shock ring
+    }
+    public static void SetGlow(Material m, Color c)
+    {
+        if (m.HasProperty("_TintColor")) m.SetColor("_TintColor", new Color(c.r * 0.45f, c.g * 0.45f, c.b * 0.45f, c.a));
+        else m.color = c;
+    }
+
+    static Shader fadeSh;
+    static Shader FadeShader => fadeSh != null ? fadeSh : (fadeSh = Shader.Find("Sprites/Default"));
     public static Material Fade(Color c, float emission = 0f)
     {
-        var m = new Material(Std) { color = c };
-        m.SetFloat("_Mode", 2);
-        m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        m.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        m.SetInt("_ZWrite", 0);
-        m.DisableKeyword("_ALPHATEST_ON"); m.EnableKeyword("_ALPHABLEND_ON"); m.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+        // unlit alpha blend (Sprites/Default): these are shadows, rings and glow beams, they never needed the
+        // lit PBR Standard shader (heavy fragment cost + a variant compile hitch the first time one appears)
+        var col = emission > 0 ? new Color(Mathf.Min(1f, c.r * (1 + emission * 0.4f)), Mathf.Min(1f, c.g * (1 + emission * 0.4f)), Mathf.Min(1f, c.b * (1 + emission * 0.4f)), c.a) : c;
+        var m = new Material(FadeShader) { color = col };
         m.renderQueue = 3000;
-        if (emission > 0) { m.EnableKeyword("_EMISSION"); m.SetColor("_EmissionColor", c * emission); }
         return m;
     }
 
@@ -112,6 +125,37 @@ public static class Art
     {
         string key = "ring" + ColorUtility.ToHtmlStringRGBA(c);
         if (mats.TryGetValue(key, out var m) && m != null) return m;
+        m = Fade(c); m.mainTexture = RingTex(); mats[key] = m;
+        return m;
+    }
+    static Texture2D swirlTex; static Material swirlMat;
+    public static Material SwirlMat()
+    {
+        if (swirlMat != null) return swirlMat;
+        if (swirlTex == null)
+        {
+            const int S = 128; swirlTex = new Texture2D(S, S, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color[S * S];
+            for (int y = 0; y < S; y++)
+                for (int x = 0; x < S; x++)
+                {
+                    float dx = (x + 0.5f) / S * 2 - 1, dy = (y + 0.5f) / S * 2 - 1, r = Mathf.Sqrt(dx * dx + dy * dy);
+                    float ang = Mathf.Atan2(dy, dx);
+                    float arms = 0.5f + 0.5f * Mathf.Sin(3f * ang + r * 15f);                // 3 tightly wound arms
+                    float edge = Mathf.Clamp01((1f - r) / 0.3f), deep = Mathf.Clamp01(1f - r / 0.7f);
+                    float foam = Mathf.Pow(arms, 5f) * (0.35f + 0.65f * r) * edge;            // white foam streaks, stronger outside
+                    float dark = deep * deep * 0.6f;                                          // dark funnel in the middle
+                    var col = Color.Lerp(new Color(0.08f, 0.3f, 0.55f), Color.white, foam / Mathf.Max(0.001f, foam + dark));
+                    px[y * S + x] = r > 1f ? Color.clear : new Color(col.r, col.g, col.b, Mathf.Clamp01(foam * 0.9f + dark));
+                }
+            swirlTex.SetPixels(px); swirlTex.Apply();
+        }
+        swirlMat = Fade(Color.white); swirlMat.mainTexture = swirlTex; swirlMat.renderQueue = 2990;
+        return swirlMat;
+    }
+
+    public static Texture2D RingTex()
+    {
         if (ringTex == null)
         {
             const int S = 128; ringTex = new Texture2D(S, S, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
@@ -126,8 +170,7 @@ public static class Art
                 }
             ringTex.SetPixels(px); ringTex.Apply();
         }
-        m = Fade(c); m.mainTexture = ringTex; mats[key] = m;
-        return m;
+        return ringTex;
     }
 
     // soft rounded-rect shadow (dark centre fading out at the edges), for grounding big objects

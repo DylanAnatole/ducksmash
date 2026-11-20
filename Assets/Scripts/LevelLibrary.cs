@@ -18,6 +18,7 @@ public class LevelDef
     public List<DuckDef> ducks = new List<DuckDef>();
     public List<BlockDef> blocks = new List<BlockDef>();
     public List<BumperDef> bumpers = new List<BumperDef>();
+    public List<Vector3> whirls = new List<Vector3>();   // whirlpools: x, y, radius (sim px) - bend passing ducks
 }
 
 // 25 levels: 1-5 onboarding (one new idea each), 6-25 gameplay (boss at 10/15/20/25).
@@ -260,6 +261,8 @@ public static class LevelLibrary
                 break;
         }
         if (n <= 13) d.bumpers.Clear();   // early game: no side bumpers until the player can judge power + angle
+        if (n >= 19 && !IsHard(n)) PlaceWhirl(d, n == 19 || n >= 23 ? 72 : 62);
+        if (n == 19 && d.whirls.Count > 0) d.hint = "Xoáy nước: bẻ cong đường bay!";
         d.boss = false; d.hard = IsHard(n);
         // unlock levels gift one special by transforming a plain duck: make sure there is one
         if (NewSpecialAt(n) != null && !d.ducks.Exists(x => x.kind == "normal") && d.ducks.Count > 0) d.ducks[d.ducks.Count - 1].kind = "normal";
@@ -409,6 +412,22 @@ public static class LevelLibrary
                 }
                 if (on) d.blocks.Add(B(t, 70 + c * 40, y0 + r * 40));
             }
+    }
+
+    // put a whirlpool in the most open stretch of water between the pile and the ducks
+    static void PlaceWhirl(LevelDef d, float r)
+    {
+        Vector2 best = Vector2.zero; float bestGap = 0;
+        for (float y = 520; y <= 690; y += 15)
+            for (float x = 120; x <= 420; x += 15)
+            {
+                float gap = 9999;
+                foreach (var b in d.blocks) { float ext = b.rect ? Mathf.Max(b.w, b.h) * 0.6f : b.r; gap = Mathf.Min(gap, Vector2.Distance(new Vector2(x, y), new Vector2(b.x, b.y)) - ext); }
+                foreach (var k in d.ducks) gap = Mathf.Min(gap, Vector2.Distance(new Vector2(x, y), new Vector2(k.x, k.y)) - 40);
+                gap += -Mathf.Abs(x - 270) * 0.05f;   // slight preference for the middle lane
+                if (gap > bestGap) { bestGap = gap; best = new Vector2(x, y); }
+            }
+        if (bestGap >= r * 0.75f) d.whirls.Add(new Vector3(best.x, best.y, Mathf.Min(r, bestGap + 10)));
     }
 
     static LevelDef Procedural(int n)
