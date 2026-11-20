@@ -46,7 +46,7 @@ public class GameController : MonoBehaviour
         public float hit, falling; public Block under, plankRef; public List<Block> screws; public string dir; public Color color;
         public float mvCx, mvAmp, mvSp; public int pid; public Transform view; public Vector3 baseScale = Vector3.one;
         public Renderer[] rends; public bool flashing, scaled; public Transform pips; public RectTransform tag; public float appear = 1, delay; public Vector2 hitDir;
-        public bool shelf; public Vector2 vel;   // vel: float rings skate across the tub after a knock
+        public bool shelf; public Vector2 vel; public float mvPhase;   // vel: float rings skate across the tub after a knock
         public bool Prop => type == "glass" || type == "vase" || type == "soap" || type == "plates";
         public bool Goal => !Hard;   // single objective: smash EVERYTHING breakable in the tub (only stone + shelf boards stay)
         public bool Hard => type == "stone" || type == "plank";
@@ -523,7 +523,7 @@ public class GameController : MonoBehaviour
         {
             new Block { type = "glass", r = 16 }, new Block { type = "soap", r = 16 }, new Block { type = "vase", r = 17 },
             new Block { type = "plates", r = 17 }, new Block { type = "bathbomb", r = 17 }, new Block { type = "gold", r = 16 },
-            new Block { type = "tnt", r = 17 }, new Block { type = "screw", r = 12 }, new Block { type = "ring", r = 20 },
+            new Block { type = "tnt", r = 17 }, new Block { type = "screw", r = 12 }, new Block { type = "ring", r = 20 }, new Block { type = "ice", r = 16 },
             new Block { type = "stone", rect = true, w = 36, h = 36 }, new Block { type = "chest", rect = true, w = 50, h = 40 },
             new Block { type = "domino", rect = true, w = 10, h = 32 }, new Block { type = "domino", rect = true, w = 32, h = 10 },
             new Block { type = "laser", r = 16, dir = "h" }, new Block { type = "laser", r = 16, dir = "v" },
@@ -691,7 +691,7 @@ public class GameController : MonoBehaviour
             foreach (var b in blocks)
             {
                 if (b.falling > 0) b.falling += dt;
-                if (b.mvAmp > 0 && b.alive) b.p.x = b.mvCx + Mathf.Sin(t * b.mvSp) * b.mvAmp;
+                if (b.mvAmp > 0 && b.alive) { b.mvPhase += dt * b.mvSp; b.p.x = b.mvCx + Mathf.Sin(b.mvPhase) * b.mvAmp; }   // phase accumulates: speed can change without a jump
             }
             foreach (var d in ducks) { d.zapCd = Mathf.Max(0, d.zapCd - dt); d.bankCd = Mathf.Max(0, d.bankCd - dt); }
             if (moves > 1) lastWarned = false;
@@ -937,6 +937,11 @@ public class GameController : MonoBehaviour
     {
         if (!b.alive || Covered(b)) return false;
         if (b.Hard) { b.hit = 0.12f; return false; }
+        if (b.type == "boss" && b.hp > b.max / 2 && b.hp - Mathf.Min(dmg, 4) <= b.max / 2)
+        {   // half health: the king gets angry and moves faster
+            b.mvSp *= 1.7f; BigText("VUA NỔI GIẬN!", new Color(1f, 0.3f, 0.25f)); Flash(0.4f); Shake(0.4f);
+            Sfx.Play("boom", 0.6f, 0.7f); FxKit.Smoke(W(b.p, 1.2f), 0.8f, 10); b.hit = 0.4f;
+        }
         if (b.type == "boss") { dmg = Mathf.Min(dmg, 4); PopText("-" + dmg, b.p + new Vector2(UnityEngine.Random.Range(-40, 40), -60), new Color(1f, 0.35f, 0.2f), 56); Shake(0.2f); Sfx.Play("push", 1, 0.7f); }
         b.hp -= dmg; b.hit = 0.15f; UpdatePips(b);
         if (b.hp <= 0) { DestroyBlock(b); return true; }
@@ -1896,7 +1901,16 @@ public class GameController : MonoBehaviour
             if (!stop)
                 foreach (var b in blocks)
                 {
-                    if (!b.alive || Covered(b) || b.falling > 0 || aimHits.Contains(b) || !Collide(gp, drag.r, b, out _)) continue;
+                    if (!b.alive || Covered(b) || b.falling > 0 || aimHits.Contains(b)) continue;
+                    bool hitIt;
+                    if (b.mvAmp > 0)
+                    {   // moving target: test where it WILL be when the duck gets this far (honest preview = timing shot)
+                        var saved = b.p; float tAhead = s / Mathf.Max(200f, aimSpeed * 0.85f);
+                        b.p.x = b.mvCx + Mathf.Sin(b.mvPhase + tAhead * b.mvSp) * b.mvAmp;
+                        hitIt = Collide(gp, drag.r, b, out _); b.p = saved;
+                    }
+                    else hitIt = Collide(gp, drag.r, b, out _);
+                    if (!hitIt) continue;
                     bool breaks = !b.Hard && b.type != "boss" && (b.type != "chest" || dmg >= 3) && (pierce ? b.hp <= 2 : b.hp <= dmg);
                     if (firstContact == null) firstContact = gp;
                     if (b.type == "ring" && b.hp > 1 && drag.kind != "rocket" && !pierce) { hitRing = b; stop = true; break; }
@@ -2612,7 +2626,7 @@ public class GameController : MonoBehaviour
         introTimer = 0; introRoot.gameObject.SetActive(false); popupRoot.SetAsLastSibling();
         if (win)
         {
-            popTitle.text = hardLevel ? "VƯỢT MÀN KHÓ!" : (stars >= 3 ? "Xuất sắc!" : level <= LevelLibrary.Onboarding ? "Giỏi lắm!" : "Hoàn thành!");
+            popTitle.text = level == LevelLibrary.Count ? "PHÁ ĐẢO!" : hardLevel ? "VƯỢT MÀN KHÓ!" : (stars >= 3 ? "Xuất sắc!" : level <= LevelLibrary.Onboarding ? "Giỏi lắm!" : "Hoàn thành!");
             popStars.text = "";
             popArtBg.SetActive(newArt);
             if (newArt) popArt.texture = LevelLibrary.ArtTexture(levelArt, false);
