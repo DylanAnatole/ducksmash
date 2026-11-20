@@ -76,6 +76,68 @@ public class MapScreen : MonoBehaviour
         // sandbox level for testing new mechanics (kept apart from the 25-level path)
         var test = UIKit.Btn(root, "MÀN\nTHỬ", Red, Color.white, 40, () => { Sfx.Play("click"); App.StartLevel(LevelLibrary.TestLevel); }, "TestLevel");
         UIKit.Place((RectTransform)test.transform, 1, 0, -120, 130, 200, 200);
+        var smash = UIKit.Btn(root, "PHÁ\nĐỒ", new Color(0.55f, 0.4f, 0.95f), Color.white, 40, () => { Sfx.Play("click"); App.StartLevel(LevelLibrary.SmashLevel); }, "SmashLevels");
+        UIKit.Place((RectTransform)smash.transform, 1, 0, -120, 350, 200, 200);
+
+        // album of smashed pixel pictures
+        var album = UIKit.Btn(root, "ALBUM", Teal, Color.white, 38, OpenAlbum, "Album");
+        UIKit.Place((RectTransform)album.transform, 0, 0, 120, 130, 200, 200);
+
+        // piggy bank: fills with 1 coin per smashed block, break it when full
+        var pig = UIKit.Panel(root, PurpleDark, "Piggy").rectTransform; UIKit.Place(pig, 0.5f, 0, 0, 115, 500, 150);
+        var pigIn = UIKit.Panel(pig, new Color(1f, 0.72f, 0.82f), "Inner").rectTransform; UIKit.Stretch(pigIn, 8, 8, 8, 8);
+        var bar = UIKit.Panel(pigIn, new Color(0.23f, 0.18f, 0.42f, 0.35f), "Bar").rectTransform; UIKit.Place(bar, 0.5f, 0, 0, 30, 440, 34);
+        piggyFill = UIKit.Panel(bar, Yellow, "Fill").rectTransform;
+        piggyFill.anchorMin = Vector2.zero; piggyFill.anchorMax = new Vector2(0, 1); piggyFill.offsetMin = piggyFill.offsetMax = Vector2.zero;
+        piggyTxt = UIKit.Outlined(UIKit.Label(pigIn, "", 36, Color.white), Ink, 3); UIKit.Place(piggyTxt.rectTransform, 0.5f, 1, 0, -38, 480, 60);
+        piggyBtn = pig.gameObject.AddComponent<Button>(); piggyBtn.onClick.AddListener(BreakPiggy);
+
+        BuildAlbum();
+    }
+
+    RectTransform piggyFill, albumRoot; Text piggyTxt; Button piggyBtn; readonly List<RawImage> albumImgs = new List<RawImage>(); readonly List<Text> albumNames = new List<Text>();
+    Text albumTitle;
+
+    void BreakPiggy()
+    {
+        if (SaveData.Piggy < SaveData.PiggyMax) { Sfx.Play("click", 0.6f, 0.8f); return; }
+        SaveData.Coins += SaveData.PiggyMax; SaveData.Piggy = 0;
+        Sfx.Play("crash", 0.8f, 1.4f); Sfx.Play("coin", 1f, 1f); Sfx.Play("win", 0.6f, 1.2f);
+        Refresh();
+    }
+
+    void BuildAlbum()
+    {
+        albumRoot = UIKit.Stretch(UIKit.Rect("AlbumPopup", root));
+        var dim = albumRoot.gameObject.AddComponent<Image>(); dim.color = new Color(0.11f, 0.08f, 0.25f, 0.8f);
+        var card = UIKit.Panel(albumRoot, Purple, "Card").rectTransform; UIKit.Place(card, 0.5f, 0.5f, 0, 0, 920, 1150);
+        albumTitle = UIKit.Outlined(UIKit.Label(card, "", 70, Color.white), Ink, 4); UIKit.Place(albumTitle.rectTransform, 0.5f, 1, 0, -90, 860, 110);
+        var ids = LevelLibrary.ArtIds;
+        for (int i = 0; i < ids.Length; i++)
+        {
+            int col = i % 2, row = i / 2;
+            var cell = UIKit.Panel(card, new Color(1f, 0.97f, 0.94f), "Art" + i).rectTransform; UIKit.Place(cell, 0.5f, 1, col == 0 ? -215 : 215, -360 - row * 430, 390, 390);
+            var img = UIKit.Rect("Pic", cell).gameObject.AddComponent<RawImage>(); UIKit.Place(img.rectTransform, 0.5f, 0.5f, 0, 25, 300, 280);
+            albumImgs.Add(img);
+            var nm = UIKit.Label(cell, "", 34, Ink); UIKit.Place(nm.rectTransform, 0.5f, 0, 0, 35, 380, 50); albumNames.Add(nm);
+        }
+        var close = UIKit.Btn(card, "ĐÓNG", Yellow, Ink, 44, () => { Sfx.Play("click"); albumRoot.gameObject.SetActive(false); }, "Close");
+        UIKit.Place((RectTransform)close.transform, 0.5f, 0, 0, 90, 400, 120);
+        albumRoot.gameObject.SetActive(false);
+    }
+
+    void OpenAlbum()
+    {
+        Sfx.Play("click");
+        var ids = LevelLibrary.ArtIds; int have = 0;
+        for (int i = 0; i < ids.Length; i++)
+        {
+            bool got = SaveData.HasArt(ids[i]); if (got) have++;
+            albumImgs[i].texture = LevelLibrary.ArtTexture(ids[i], !got);
+            albumNames[i].text = got ? LevelLibrary.ArtName(ids[i]) : "???";
+        }
+        albumTitle.text = "ALBUM  " + have + "/" + ids.Length;
+        albumRoot.gameObject.SetActive(true); albumRoot.SetAsLastSibling();
     }
 
     void Banner(string text, float x, float y, Color c)
@@ -123,12 +185,17 @@ public class MapScreen : MonoBehaviour
         }
         coinsTxt.text = SaveData.Coins + " xu";
         starsTxt.text = "Sao " + totalStars + "/" + LevelLibrary.Count * 3;
+        int pg = SaveData.Piggy; bool full = pg >= SaveData.PiggyMax;
+        piggyFill.anchorMax = new Vector2(pg / (float)SaveData.PiggyMax, 1);
+        piggyTxt.text = full ? "ĐẬP ỐNG HEO! +" + SaveData.PiggyMax + " xu" : "Ống heo " + pg + "/" + SaveData.PiggyMax;
         boostTxt.text = "Búa " + SaveData.GetBoost("hammer") + " · Bom " + SaveData.GetBoost("bomb") + " · +3 lượt " + SaveData.GetBoost("moves");
     }
 
     void Update()
     {
         if (!root.gameObject.activeSelf) return;
+        // full piggy bank wiggles to beg for a smash
+        if (piggyBtn != null) piggyBtn.transform.localEulerAngles = new Vector3(0, 0, SaveData.Piggy >= SaveData.PiggyMax ? Mathf.Sin(Time.time * 18) * 4 : 0);
         // bob the current node
         foreach (var nd in nodes)
             if (nd.n == SaveData.MaxLevel) nd.img.transform.parent.localScale = Vector3.one * (1.12f + Mathf.Sin(Time.time * 4) * 0.04f);

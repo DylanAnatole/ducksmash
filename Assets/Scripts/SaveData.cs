@@ -17,6 +17,18 @@ public static class SaveData
         set { PlayerPrefs.SetInt(P + "coins", value); PlayerPrefs.Save(); }
     }
 
+    // piggy bank: every smashed block drops 1 coin in; when full the player breaks it for the whole stash
+    public const int PiggyMax = 300;
+    public static int Piggy
+    {
+        get => PlayerPrefs.GetInt(P + "piggy", 0);
+        set { PlayerPrefs.SetInt(P + "piggy", Mathf.Clamp(value, 0, PiggyMax)); PlayerPrefs.Save(); }
+    }
+
+    // pixel-art album
+    public static bool HasArt(string id) => PlayerPrefs.GetInt(P + "art_" + id, 0) == 1;
+    public static void SetArt(string id) { PlayerPrefs.SetInt(P + "art_" + id, 1); PlayerPrefs.Save(); }
+
     public static int GetStars(int level) => PlayerPrefs.GetInt(P + "star_" + level, 0);
 
     public static void SetStars(int level, int stars)
@@ -45,6 +57,8 @@ public static class SaveData
         PlayerPrefs.DeleteKey(P + "coins");
         for (int i = 1; i <= LevelLibrary.Count; i++) PlayerPrefs.DeleteKey(P + "star_" + i);
         foreach (var k in new[] { "hammer", "bomb", "moves" }) PlayerPrefs.DeleteKey(P + "b_" + k);
+        PlayerPrefs.DeleteKey(P + "piggy");
+        foreach (var a in LevelLibrary.ArtIds) PlayerPrefs.DeleteKey(P + "art_" + a);
         PlayerPrefs.Save();
     }
 }

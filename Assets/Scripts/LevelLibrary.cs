@@ -6,12 +6,14 @@ public class BlockDef
     public string type; public float x, y, w, h, r; public bool rect;
     public string dir; public int pid = -1; public Color color = Color.white;
     public int hp = -1; public float mvAmp, mvSpeed;
+    public bool shelf;   // plank drawn as a shelf: things it covers stand ON it and crash down when its legs go
 }
 public class DuckDef { public float x, y; public string kind; public DuckDef(float x, float y, string kind = "normal") { this.x = x; this.y = y; this.kind = kind; } }
 public class BumperDef { public float x, y, w, h; }
 public class LevelDef
 {
     public int moves; public string hint = ""; public bool boss;
+    public string art;   // pixel picture smashed in this level (goes into the album on a win)
     public List<DuckDef> ducks = new List<DuckDef>();
     public List<BlockDef> blocks = new List<BlockDef>();
     public List<BumperDef> bumpers = new List<BumperDef>();
@@ -23,6 +25,27 @@ public static class LevelLibrary
 {
     public const int Count = 25, Onboarding = 5;
     public const int TestLevel = 99;   // sandbox level for trying new mechanics (not on the 25-level path, saves nothing)
+    public const int SmashLevel = 101, SmashCount = 3;   // "phá đồ" destruction test levels 101..103
+    public static bool IsSandbox(int n) => n >= TestLevel;
+    public static string Title(int n) => n == TestLevel ? "Màn thử" : n >= SmashLevel ? "Phá đồ " + (n - SmashLevel + 1) : (n <= Onboarding ? "Hướng dẫn " : "Màn ") + n;
+
+    // ---------- pixel-art album ----------
+    public static readonly string[] ArtIds = { "duck", "heart", "straw", "fish" };
+    public static string ArtName(string id) => id == "duck" ? "Vịt vàng" : id == "heart" ? "Trái tim" : id == "straw" ? "Dâu tây" : "Cá xanh";
+    static string[] ArtRows(string id) => id == "duck" ? ART_DUCK : id == "heart" ? ART_HEART : id == "straw" ? ART_STRAW : ART_FISH;
+    public static Texture2D ArtTexture(string id, bool locked)
+    {
+        var rows = ArtRows(id); int h = rows.Length, w = 0; foreach (var r in rows) w = Mathf.Max(w, r.Length);
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                Color c = new Color(0, 0, 0, 0);
+                if (x < rows[y].Length && PAL.TryGetValue(rows[y][x], out var pc)) c = locked ? new Color(0.62f, 0.58f, 0.72f, 0.55f) : pc;
+                tex.SetPixel(x, h - 1 - y, c);
+            }
+        tex.Apply(); return tex;
+    }
 
     // Combo special ducks are introduced one at a time, after the player has learned the basics.
     // On its unlock level the player gets a card explaining how to earn + use it, and one free copy to try.
@@ -36,7 +59,7 @@ public static class LevelLibrary
     };
     public static bool Unlocked(string kind, int n)
     {
-        if (n == TestLevel) return true;
+        if (IsSandbox(n)) return true;
         foreach (var s in Specials) if (s.kind == kind) return n >= s.level;
         return true;
     }
@@ -52,7 +75,7 @@ public static class LevelLibrary
     {
         var b = new BlockDef { type = t, x = x, y = y };
         if (t == "crate" || t == "chest" || t == "stone") { b.rect = true; b.w = t == "chest" ? 50 : 36; b.h = t == "chest" ? 40 : 36; }
-        else b.r = t == "tnt" ? 17 : 16;
+        else b.r = t == "tnt" || t == "bathbomb" || t == "vase" || t == "plates" ? 17 : 16;
         return b;
     }
     static IEnumerable<BlockDef> Row(string t, float x0, float y, int n, float dx) { for (int i = 0; i < n; i++) yield return B(t, x0 + i * dx, y); }
@@ -108,6 +131,7 @@ public static class LevelLibrary
     {
         rng = new System.Random(n * 7919 + 3); pidCounter = 0;
         if (n == TestLevel) return Test();
+        if (n >= SmashLevel) return Smash(n - SmashLevel + 1);
         LevelDef d;
         switch (n)
         {
@@ -147,7 +171,7 @@ public static class LevelLibrary
             // ======== GAMEPLAY ========
             case 6:
                 d = L(8, "Phá nhiều trong 1 phát → đầy thanh FRENZY!", (200, 800, null), (340, 800, null), (270, 710, null));
-                d.blocks.AddRange(PixelArt(ART_DUCK, 270, 345, 26)); d.bumpers.Add(BumperL(560, 160)); d.bumpers.Add(BumperR(560, 160));
+                d.blocks.AddRange(PixelArt(ART_DUCK, 270, 345, 26)); d.art = "duck"; d.bumpers.Add(BumperL(560, 160)); d.bumpers.Add(BumperR(560, 160));
                 break;
             case 7:
                 d = L(13, "Bắn rơi hết ốc → ván gỗ đè nát mọi thứ!", (150, 810, null), (270, 810, null), (390, 810, null));
@@ -165,7 +189,7 @@ public static class LevelLibrary
                 break;
             case 9:
                 d = L(8, "Vịt Bom: nổ tung ở cú va chạm đầu tiên!", (150, 810, null), (270, 810, "bomb"), (390, 810, null));
-                d.blocks.AddRange(PixelArt(ART_HEART, 270, 330, 34)); d.blocks.Add(LZ(60, 330, "h")); d.blocks.Add(LZ(480, 262, "h")); d.blocks.Add(LZ(270, 520, "v"));
+                d.blocks.AddRange(PixelArt(ART_HEART, 270, 330, 34)); d.art = "heart"; d.blocks.Add(LZ(60, 330, "h")); d.blocks.Add(LZ(480, 262, "h")); d.blocks.Add(LZ(270, 520, "v"));
                 d.blocks.AddRange(Plank(270, 600, 300)); d.blocks.AddRange(Row("cookie", 130, 600, 8, 40));
                 break;
             case 10:
@@ -183,13 +207,13 @@ public static class LevelLibrary
                 break;
             case 12:
                 d = L(10, "", (150, 810, null), (270, 810, "heavy"), (390, 810, null));
-                d.blocks.AddRange(PixelArt(ART_STRAW, 270, 320, 32)); d.blocks.Add(LZ(270, 480, "h"));
+                d.blocks.AddRange(PixelArt(ART_STRAW, 270, 320, 32)); d.art = "straw"; d.blocks.Add(LZ(270, 480, "h"));
                 d.blocks.AddRange(Plank(270, 560, 320)); d.blocks.AddRange(Row("crate", 110, 560, 9, 40));
                 d.blocks.AddRange(Plank(270, 640, 320)); d.blocks.AddRange(Row("cookie", 110, 640, 9, 40));
                 break;
             case 13:
                 d = L(9, "", (150, 810, "zap"), (270, 810, null), (390, 810, "bomb"));
-                d.blocks.AddRange(PixelArt(ART_FISH, 270, 300, 30)); d.blocks.AddRange(Row("ice", 72, 470, 11, 40)); d.blocks.Add(LZ(70, 530, "h")); d.blocks.AddRange(Row("cookie", 110, 530, 10, 40));
+                d.blocks.AddRange(PixelArt(ART_FISH, 270, 300, 30)); d.art = "fish"; d.blocks.AddRange(Row("ice", 72, 470, 11, 40)); d.blocks.Add(LZ(70, 530, "h")); d.blocks.AddRange(Row("cookie", 110, 530, 10, 40));
                 d.bumpers.Add(BumperL(620)); d.bumpers.Add(BumperR(620));
                 break;
             default:
@@ -220,6 +244,60 @@ public static class LevelLibrary
         return d;
     }
 
+    // ================= "PHÁ ĐỒ" destruction levels =================
+    // breakables: glass (shatters), vase (2 hits), soap (bubbles), plates (stack, 3 hits), bathbomb (fizz blast),
+    // domino (topples its whole chain), shelf (break both legs -> everything on it crashes down)
+    static BlockDef Dom(float x, float y, bool vertical, int chain) =>
+        new BlockDef { type = "domino", x = x, y = y, rect = true, w = vertical ? 10 : 32, h = vertical ? 32 : 10, pid = 1000 + chain };
+    static IEnumerable<BlockDef> Shelf(float x, float y, float w, params string[] items)
+    {
+        int pid = pidCounter++;
+        yield return new BlockDef { type = "plank", x = x, y = y, rect = true, w = w, h = 40, pid = pid, shelf = true };
+        yield return new BlockDef { type = "screw", x = x - w / 2 + 16, y = y, r = 12, pid = pid };
+        yield return new BlockDef { type = "screw", x = x + w / 2 - 16, y = y, r = 12, pid = pid };
+        float x0 = x - w / 2 + 60, step = (w - 120) / Mathf.Max(1, items.Length - 1);
+        for (int i = 0; i < items.Length; i++) yield return B(items[i], x0 + i * step, y);
+    }
+
+    static LevelDef Smash(int k)
+    {
+        LevelDef d;
+        switch (k)
+        {
+            case 1:
+                d = L(10, "Bắn gãy 2 chân kệ → cả kệ đổ vỡ tan tành! Phá hết 1 hàng = CLEAR!", (150, 810, null), (270, 810, null), (390, 810, null));
+                d.blocks.AddRange(Shelf(270, 230, 420, "glass", "vase", "glass", "vase", "glass", "vase", "glass", "vase"));
+                d.blocks.AddRange(Row("soap", 70, 320, 11, 40)); d.blocks.AddRange(Row("soap", 70, 360, 11, 40));
+                foreach (var x in new[] { 110, 190, 270, 350, 430 }) d.blocks.Add(B("plates", x, 440));
+                d.blocks.Add(B("bathbomb", 150, 520)); d.blocks.Add(B("bathbomb", 390, 520));
+                d.blocks.AddRange(Row("glass", 190, 520, 4, 54));
+                d.bumpers.Add(BumperL(600)); d.bumpers.Add(BumperR(600));
+                break;
+            case 2:
+                d = L(8, "Đẩy đổ 1 quân domino → cả dây đổ theo!", (150, 810, null), (270, 810, null), (390, 810, null));
+                d.blocks.AddRange(Cluster("glass", 270, 215, 2, 10, 40));
+                for (int i = 0; i < 20; i++) d.blocks.Add(Dom(60 + i * 22, 300, true, 0));
+                for (int i = 1; i <= 5; i++) d.blocks.Add(Dom(482, 300 + i * 22, false, 0));
+                for (int i = 0; i < 19; i++) d.blocks.Add(Dom(460 - i * 22, 430, true, 0));
+                d.blocks.AddRange(Row("vase", 70, 365, 10, 40));
+                d.blocks.Add(B("bathbomb", 62, 478));
+                d.blocks.AddRange(Row("soap", 110, 500, 10, 40)); d.blocks.AddRange(Row("soap", 110, 540, 10, 40));
+                break;
+            default:
+                d = L(11, "Tổng vệ sinh! Kệ, domino, chồng đĩa, bom tắm — phá sạch!", (130, 815, null), (230, 815, "heavy"), (330, 815, null), (430, 815, null));
+                d.blocks.AddRange(Shelf(270, 210, 440, "vase", "glass", "glass", "vase", "glass", "glass", "vase", "glass"));
+                for (int i = 0; i < 7; i++) d.blocks.Add(B("plates", 90 + i * 60, 295));
+                for (int i = 0; i < 20; i++) d.blocks.Add(Dom(60 + i * 22, 355, true, 1));
+                d.blocks.AddRange(Cluster("soap", 270, 450, 3, 11, 40));
+                foreach (var x in new[] { 110, 270, 430 }) d.blocks.Add(B("bathbomb", x, 545));
+                d.blocks.AddRange(Row("glass", 150, 545, 2, 60)); d.blocks.AddRange(Row("glass", 330, 545, 2, 60));
+                d.blocks.AddRange(Row("glass", 110, 600, 9, 40));
+                d.bumpers.Add(BumperL(640)); d.bumpers.Add(BumperR(640));
+                break;
+        }
+        return d;
+    }
+
     static LevelDef Procedural(int n)
     {
         var d = new LevelDef { moves = 7 + n / 10 };
@@ -235,7 +313,7 @@ public static class LevelLibrary
             }
         }
         if (R() < 0.5f) d.blocks.AddRange(Plank(270, 240, 340));
-        if (R() < 0.4f) { d.blocks.AddRange(PixelArt(R() < 0.5f ? ART_HEART : ART_STRAW, 270, 560, 22)); d.moves -= 1; }
+        if (R() < 0.4f) { bool heart = R() < 0.5f; d.blocks.AddRange(PixelArt(heart ? ART_HEART : ART_STRAW, 270, 560, 22)); d.art = heart ? "heart" : "straw"; d.moves -= 1; }
         int chests = RI(1, 2); for (int i = 0; i < chests; i++) d.blocks.Add(B("chest", RI(120, 420), 200 + rows * 40 + 30));
         int tnts = RI(2, 4); for (int i = 0; i < tnts; i++) d.blocks.Add(B("tnt", RI(70, 470), RI(500, 600)));
         int nd = RI(3, 4);

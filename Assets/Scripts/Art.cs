@@ -303,6 +303,85 @@ public static class Art
         return root;
     }
 
+    // ---------------- breakable bathroom props ----------------
+    public static Transform Glass(Transform parent, float d)
+    {
+        var root = Root("Glass", parent);
+        var g = Mat(Hex("bfeaff"), 1f, 0, 0.2f, 0.003f);
+        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.3f, 0), new Vector3(d * 0.72f, 0.28f, d * 0.72f), g);
+        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.58f, 0), new Vector3(d * 0.72f, 0.22f, d * 0.72f), g);
+        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.76f, 0), new Vector3(d * 0.28f, 0.12f, d * 0.28f), g);
+        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.9f, 0), new Vector3(d * 0.33f, 0.04f, d * 0.33f), Mat(Hex("ff8fb0"), 0.7f));
+        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.22f, 0), new Vector3(d * 0.74f, 0.1f, d * 0.74f), Mat(Hex("6fc8ff"), 0.9f, 0, 0.15f)); // bath oil
+        Prim(PrimitiveType.Cube, root, new Vector3(d * 0.16f, 0.42f, -d * 0.34f), new Vector3(0.035f, 0.3f, 0.02f), Mat(Color.white, 1f, 0, 0.9f));   // glint
+        return root;
+    }
+
+    public static Transform Vase(Transform parent, float d)
+    {
+        var root = Root("Vase", parent);
+        var body = Mat(Hex("7fd8c8"), 0.85f, 0, 0, 0.003f);
+        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.32f, 0), new Vector3(d * 0.86f, 0.56f, d * 0.86f), body);
+        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.34f, 0), new Vector3(d * 0.88f, 0.035f, d * 0.88f), Mat(Color.white, 0.6f));
+        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.22f, 0), new Vector3(d * 0.8f, 0.02f, d * 0.8f), Mat(Hex("ffd34d"), 0.6f));
+        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.66f, 0), new Vector3(d * 0.36f, 0.1f, d * 0.36f), body);
+        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.77f, 0), new Vector3(d * 0.5f, 0.025f, d * 0.5f), body);
+        return root;
+    }
+
+    public static Transform Soap(Transform parent, float d)
+    {
+        var root = Root("Soap", parent);
+        var pink = Mat(Hex("ffa8c8"), 0.95f, 0, 0, 0.003f);
+        Prim(PrimitiveType.Cube, root, new Vector3(0, 0.12f, 0), new Vector3(d * 0.92f, 0.18f, d * 0.64f), pink);
+        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.21f, 0), new Vector3(d * 0.9f, 0.08f, d * 0.62f), Mat(Hex("ffc6dc"), 0.95f));
+        var foam = Mat(Color.white, 0.9f);
+        Prim(PrimitiveType.Sphere, root, new Vector3(-d * 0.18f, 0.27f, 0.02f), Vector3.one * d * 0.24f, foam);
+        Prim(PrimitiveType.Sphere, root, new Vector3(d * 0.1f, 0.28f, -0.03f), Vector3.one * d * 0.3f, foam);
+        Prim(PrimitiveType.Sphere, root, new Vector3(d * 0.26f, 0.26f, 0.05f), Vector3.one * d * 0.18f, foam);
+        return root;
+    }
+
+    // stack of 3 plates; children Plate1..Plate3 (top) are knocked off one per hit
+    public static Transform Plates(Transform parent, float d)
+    {
+        var root = Root("Plates", parent);
+        var white = Mat(Hex("fbfbff"), 0.95f, 0, 0, 0.003f); var rim = Mat(Hex("5aa8ff"), 0.8f);
+        for (int i = 1; i <= 3; i++)
+        {
+            var p = Root("Plate" + i, root); p.localPosition = new Vector3(0, 0.02f + i * 0.1f, 0);
+            Prim(PrimitiveType.Cylinder, p, Vector3.zero, new Vector3(d * 0.98f, 0.035f, d * 0.98f), white);
+            Prim(PrimitiveType.Cylinder, p, new Vector3(0, 0.03f, 0), new Vector3(d * 0.7f, 0.012f, d * 0.7f), rim);
+        }
+        return root;
+    }
+
+    public static Transform BathBomb(Transform parent, float d)
+    {
+        var root = Root("BathBomb", parent);
+        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.3f, 0), new Vector3(d * 0.92f, d * 0.85f, d * 0.92f), Mat(Hex("c9a7ff"), 0.4f, 0, 0, 0.003f));
+        string[] dots = { "ff8fb0", "ffe066", "7fe0a0", "ffffff" };
+        for (int i = 0; i < 8; i++)
+        {
+            float a = i / 8f * Mathf.PI * 2, yy = 0.32f + Mathf.Sin(i * 1.7f) * 0.12f;
+            Prim(PrimitiveType.Sphere, root, new Vector3(Mathf.Cos(a) * d * 0.4f, yy, Mathf.Sin(a) * d * 0.4f), Vector3.one * d * 0.14f, Mat(Hex(dots[i % 4]), 0.5f));
+        }
+        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.62f, 0), Vector3.one * d * 0.2f, Mat(Color.white, 1f, 0, 2f, 0f)).name = "Spark";
+        return root;
+    }
+
+    public static Transform Domino(Transform parent, float w, float h)
+    {
+        var root = Root("Domino", parent);
+        Prim(PrimitiveType.Cube, root, new Vector3(0, 0.36f, 0), new Vector3(w, 0.7f, h), Mat(Hex("fff8ea"), 0.8f, 0, 0, 0.003f));
+        var ink = Mat(Hex("2b2b3b"), 0.4f);
+        bool vert = h > w; float L = Mathf.Max(w, h);
+        Prim(PrimitiveType.Cube, root, new Vector3(0, 0.715f, 0), vert ? new Vector3(w * 0.9f, 0.01f, 0.02f) : new Vector3(0.02f, 0.01f, h * 0.9f), ink);
+        foreach (float s in new[] { -0.25f, 0.25f })
+            Prim(PrimitiveType.Sphere, root, vert ? new Vector3(0, 0.715f, s * L) : new Vector3(s * L, 0.715f, 0), new Vector3(0.07f, 0.02f, 0.07f), ink);
+        return root;
+    }
+
     // bonus cookie: shiny gold with a star stamp (+1 move when smashed)
     public static Transform GoldCookie(Transform parent, float d)
     {
