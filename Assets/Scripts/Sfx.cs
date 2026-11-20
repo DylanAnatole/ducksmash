@@ -29,6 +29,13 @@ public class Sfx : MonoBehaviour
         I.music.mute = !SaveData.Music;
     }
 
+    // music tempo follows the tension: a touch faster on FRENZY / last move, eased so it never jumps
+    public static void MusicMood(float targetPitch)
+    {
+        if (I == null || I.music == null) return;
+        I.music.pitch = Mathf.MoveTowards(I.music.pitch, targetPitch, Time.unscaledDeltaTime * 0.15f);
+    }
+
     public static void Play(string name, float volume = 1f, float pitch = 1f)
     {
         if (I == null || !SaveData.Sound || !I.clips.TryGetValue(name, out var clip)) return;
@@ -42,10 +49,20 @@ public class Sfx : MonoBehaviour
         I.sfx.PlayOneShot(clip, volume);
     }
 
-    public static void Vibrate()
+#if UNITY_WEBGL && !UNITY_EDITOR
+    [System.Runtime.InteropServices.DllImport("__Internal")] static extern void DS_Vibrate(int ms);
+#endif
+    static float lastBuzz = -9f;
+    public static void Vibrate() => Buzz(40);
+    // short haptic tick (Android browsers support navigator.vibrate; iOS ignores it). Rate-limited so chains don't buzz nonstop.
+    public static void Buzz(int ms)
     {
-#if UNITY_ANDROID || UNITY_IOS
-        if (SaveData.Vibration) Handheld.Vibrate();
+        if (!SaveData.Vibration || Time.unscaledTime - lastBuzz < 0.09f) return;
+        lastBuzz = Time.unscaledTime;
+#if UNITY_WEBGL && !UNITY_EDITOR
+        if (Application.isMobilePlatform) DS_Vibrate(ms);
+#elif UNITY_ANDROID || UNITY_IOS
+        if (ms >= 30) Handheld.Vibrate();
 #endif
     }
 

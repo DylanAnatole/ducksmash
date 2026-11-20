@@ -55,6 +55,7 @@ public class MapScreen : MonoBehaviour
         // section banners
         Banner("HƯỚNG DẪN  ·  MÀN 1–5", 150, NodePos(1).y - 20, Teal);
         Banner("THỬ THÁCH  ·  MÀN 6–25", -200, NodePos(6).y - 90, PurpleDark);
+        Banner("SẮP CÓ THÊM MÀN MỚI!", 0, NodePos(LevelLibrary.Count).y + 340, new Color(1f, 0.55f, 0.3f));   // end of the road, not a blank wall
 
         for (int n = 1; n <= LevelLibrary.Count; n++)
         {
@@ -89,6 +90,8 @@ public class MapScreen : MonoBehaviour
         duckMark.texture = LevelLibrary.ArtTexture("duck", false);
         var dm = duckMark.rectTransform; dm.anchorMin = dm.anchorMax = new Vector2(0.5f, 0); dm.sizeDelta = new Vector2(104, 88);
         var shadowDot = UIKit.Dot(dm, new Color(0.23f, 0.18f, 0.42f, 0.25f), "Shadow"); shadowDot.raycastTarget = false;
+        markHat = UIKit.Rect("Hat", dm).gameObject.AddComponent<RawImage>(); markHat.raycastTarget = false;
+        markHat.rectTransform.anchorMin = markHat.rectTransform.anchorMax = new Vector2(0.5f, 1f); markHat.rectTransform.pivot = new Vector2(0.5f, 0f);
         shadowDot.rectTransform.anchorMin = shadowDot.rectTransform.anchorMax = new Vector2(0.5f, 0); shadowDot.rectTransform.sizeDelta = new Vector2(70, 16);
         shadowDot.rectTransform.anchoredPosition = new Vector2(0, -6); shadowDot.transform.SetAsFirstSibling();
         // header
@@ -104,13 +107,13 @@ public class MapScreen : MonoBehaviour
 
         // sandbox level for testing new mechanics (kept apart from the 25-level path)
         var test = UIKit.Btn(root, "MÀN\nTHỬ", Red, Color.white, 40, () => { Sfx.Play("click"); App.StartLevel(LevelLibrary.TestLevel); }, "TestLevel");
-        UIKit.Place((RectTransform)test.transform, 1, 0, -120, 130, 200, 200);
+        UIKit.Place((RectTransform)test.transform, 1, 0, -100, 115, 170, 170);
         var smash = UIKit.Btn(root, "PHÁ\nĐỒ", new Color(0.55f, 0.4f, 0.95f), Color.white, 40, () => { Sfx.Play("click"); App.StartLevel(LevelLibrary.SmashLevel); }, "SmashLevels");
-        UIKit.Place((RectTransform)smash.transform, 1, 0, -120, 350, 200, 200);
+        UIKit.Place((RectTransform)smash.transform, 1, 0, -100, 310, 170, 170);
 
         // album of smashed pixel pictures
         var album = UIKit.Btn(root, "ALBUM", Teal, Color.white, 38, OpenAlbum, "Album");
-        UIKit.Place((RectTransform)album.transform, 0, 0, 120, 130, 200, 200);
+        UIKit.Place((RectTransform)album.transform, 0, 0, 100, 115, 170, 170);
 
         // piggy bank: fills with 1 coin per smashed block, break it when full
         var pig = UIKit.Panel(root, PurpleDark, "Piggy").rectTransform; UIKit.Place(pig, 0.5f, 0, 0, 115, 500, 150);
@@ -121,8 +124,46 @@ public class MapScreen : MonoBehaviour
         piggyTxt = UIKit.Outlined(UIKit.Label(pigIn, "", 36, Color.white), Ink, 3); UIKit.Place(piggyTxt.rectTransform, 0.5f, 1, 0, -38, 480, 60);
         piggyBtn = pig.gameObject.AddComponent<Button>(); piggyBtn.onClick.AddListener(BreakPiggy);
 
+        // daily gift: one small present per calendar day (coins / hammer / bomb in rotation)
+        giftBtn = UIKit.Btn(root, "QUÀ\nNGÀY", new Color(1f, 0.55f, 0.3f), Color.white, 38, ClaimGift, "DailyGift");
+        UIKit.Place((RectTransform)giftBtn.transform, 0, 0, 100, 335, 170, 170);
+        giftBadge = UIKit.Dot(giftBtn.transform, new Color(1f, 0.25f, 0.3f), "Badge"); giftBadge.raycastTarget = false;
+        UIKit.Place(giftBadge.rectTransform, 1, 1, -8, -8, 50, 50);
+        var bx = UIKit.Label(giftBadge.transform, "!", 36, Color.white); bx.raycastTarget = false;
+        questTxt = UIKit.Outlined(UIKit.Label(root, "", 26, Color.white), Ink, 3); questTxt.raycastTarget = false;
+        UIKit.Place(questTxt.rectTransform, 0, 0, 110, 226, 220, 40);
+        toast = UIKit.Outlined(UIKit.Label(root, "", 46, Yellow), Ink, 4); UIKit.Place(toast.rectTransform, 0.5f, 0.5f, 0, 120, 1000, 140);
+        toast.raycastTarget = false; toast.gameObject.SetActive(false);
+
+        // hat shop: a coin sink (cosmetic only)
+        var hat = UIKit.Btn(root, "MŨ\nVỊT", new Color(0.3f, 0.65f, 1f), Color.white, 38, () => Hats.OpenShop(), "HatShop");
+        UIKit.Place((RectTransform)hat.transform, 0, 0, 100, 530, 170, 170);
         BuildAlbum();
+        Hats.BuildShop(root, Refresh);
     }
+
+    Button giftBtn; Image giftBadge; Text toast, questTxt; float toastT;
+    static string Today => System.DateTime.Now.ToString("yyyyMMdd");
+    static bool GiftReady => PlayerPrefs.GetString("ds_daily", "") != Today;
+    void ClaimGift()
+    {
+        if (!GiftReady) { Sfx.Play("click", 0.6f, 0.8f); ShowToast("Mai quay lại nhận quà nhé!"); return; }
+        // login streak: claimed yesterday too -> streak grows (caps at 7), otherwise back to day 1
+        string yesterday = System.DateTime.Now.AddDays(-1).ToString("yyyyMMdd");
+        int streak = PlayerPrefs.GetString("ds_daily", "") == yesterday ? Mathf.Min(7, PlayerPrefs.GetInt("ds_daily_streak", 0) + 1) : 1;
+        PlayerPrefs.SetInt("ds_daily_streak", streak);
+        PlayerPrefs.SetString("ds_daily", Today); PlayerPrefs.Save();
+        int k = System.DateTime.Now.DayOfYear % 3;
+        int coins = 40 + streak * 20;   // every day pays coins, growing with the streak; plus a booster on 2 of 3 days
+        SaveData.Coins += coins;
+        string msg = "+" + coins + " xu";
+        if (k == 1) { SaveData.SetBoost("hammer", SaveData.GetBoost("hammer") + 1); msg += ", +1 Búa"; }
+        else if (k == 2) { SaveData.SetBoost("bomb", SaveData.GetBoost("bomb") + 1); msg += ", +1 Bom nước"; }
+        Sfx.Play("coin", 1f, 1f); Sfx.Play("win", 0.6f, 1.3f);
+        ShowToast((streak > 1 ? "Ngày " + streak + " liên tiếp! " : "Quà hôm nay: ") + msg);
+        Refresh();
+    }
+    void ShowToast(string s) { toast.text = s; toastT = 1.8f; toast.gameObject.SetActive(true); toast.transform.SetAsLastSibling(); }
 
     readonly Dictionary<int, (RawImage img, string id)> artBadges = new Dictionary<int, (RawImage, string)>();
     static readonly Dictionary<string, Texture2D> badgeTex = new Dictionary<string, Texture2D>();
@@ -132,7 +173,7 @@ public class MapScreen : MonoBehaviour
         if (!badgeTex.TryGetValue(k, out var t) || t == null) badgeTex[k] = t = LevelLibrary.ArtTexture(id, locked);
         return t;
     }
-    RawImage duckMark; readonly List<(RectTransform rt, float speed, float phase)> bubbles = new List<(RectTransform, float, float)>();
+    RawImage duckMark, markHat; string markHatId = "?"; readonly List<(RectTransform rt, float speed, float phase)> bubbles = new List<(RectTransform, float, float)>();
     RectTransform piggyFill, albumRoot; Text piggyTxt; Button piggyBtn; readonly List<RawImage> albumImgs = new List<RawImage>(); readonly List<Text> albumNames = new List<Text>();
     Text albumTitle;
 
@@ -194,8 +235,12 @@ public class MapScreen : MonoBehaviour
         return new Vector2(xs[col], y);
     }
 
+    int lastShownMax = -1; float unlockT;
     public void Show()
     {
+        // a level unlocked since the map was last shown pops in
+        if (lastShownMax > 0 && SaveData.MaxLevel > lastShownMax) { unlockT = 0.01f; Sfx.Play("star", 0.8f, 1.2f); }
+        lastShownMax = SaveData.MaxLevel;
         root.gameObject.SetActive(true);
         Refresh();
         Canvas.ForceUpdateCanvases();
@@ -223,7 +268,20 @@ public class MapScreen : MonoBehaviour
             nd.img.transform.parent.localScale = Vector3.one * (n == max ? 1.12f : 1f);
         }
         coinsTxt.text = SaveData.Coins + " xu";
-        starsTxt.text = "Sao " + totalStars + "/" + LevelLibrary.Count * 3;
+        if (questTxt != null) questTxt.text = DailyQuest.Done ? "Nhiệm vụ: xong!" : "Phá " + DailyQuest.Progress + "/" + DailyQuest.Target;
+        if (markHat != null && markHatId != Hats.Current)
+        {   // the map duck wears the hat bought in the shop
+            markHatId = Hats.Current; var rows = Hats.PixelRows(markHatId);
+            markHat.gameObject.SetActive(rows != null);
+            if (rows != null)
+            {
+                int w = 0; foreach (var r in rows) w = Mathf.Max(w, r.Length);
+                markHat.texture = UIKit.PixelIcon(rows, Hats.PixelPal);
+                markHat.rectTransform.sizeDelta = new Vector2(w * 7.4f, rows.Length * 7.4f); markHat.rectTransform.anchoredPosition = new Vector2(0, -3);
+            }
+        }
+        int nextMs = (totalStars / 15 + 1) * 15;
+        starsTxt.text = "Sao " + totalStars + "/" + LevelLibrary.Count * 3 + (nextMs <= LevelLibrary.Count * 3 ? " · quà ở " + nextMs : "");
         int pg = SaveData.Piggy; bool full = pg >= SaveData.PiggyMax;
         piggyFill.anchorMax = new Vector2(pg / (float)SaveData.PiggyMax, 1);
         piggyTxt.text = full ? "ĐẬP ỐNG HEO! +" + SaveData.PiggyMax + " xu" : "Ống heo " + pg + "/" + SaveData.PiggyMax;
@@ -233,6 +291,22 @@ public class MapScreen : MonoBehaviour
     void Update()
     {
         if (!root.gameObject.activeSelf) return;
+        Sfx.MusicMood(1f);
+        if (giftBtn != null)
+        {   // ready gift bounces and glows; claimed one rests greyed out
+            bool rdy = GiftReady;
+            giftBtn.transform.localScale = Vector3.one * (rdy ? 1f + Mathf.Abs(Mathf.Sin(Time.time * 4f)) * 0.08f : 1f);
+            giftBtn.transform.localEulerAngles = new Vector3(0, 0, rdy ? Mathf.Sin(Time.time * 9f) * 5f : 0);
+            var gi = giftBtn.GetComponent<Image>(); if (gi) gi.color = rdy ? new Color(1f, 0.55f, 0.3f) : new Color(0.7f, 0.66f, 0.78f);
+            if (giftBadge != null && giftBadge.gameObject.activeSelf != rdy) giftBadge.gameObject.SetActive(rdy);
+        }
+        if (toastT > 0)
+        {
+            toastT -= Time.deltaTime;
+            float a = Mathf.Clamp01(toastT * 2f), e = Mathf.Clamp01((1.8f - toastT) / 0.2f);
+            toast.color = new Color(1f, 0.88f, 0.3f, a); toast.transform.localScale = Vector3.one * (0.6f + 0.4f * e);
+            if (toastT <= 0) toast.gameObject.SetActive(false);
+        }
         // full piggy bank wiggles to beg for a smash
         if (piggyBtn != null) piggyBtn.transform.localEulerAngles = new Vector3(0, 0, SaveData.Piggy >= SaveData.PiggyMax ? Mathf.Sin(Time.time * 18) * 4 : 0);
         // duck hops on the current node
@@ -240,7 +314,7 @@ public class MapScreen : MonoBehaviour
         {
             var np = NodePos(Mathf.Min(SaveData.MaxLevel, LevelLibrary.Count));
             float hop = Mathf.Abs(Mathf.Sin(Time.time * 3.2f)) * 26f;
-            duckMark.rectTransform.anchoredPosition = np + new Vector2(-6, 168 + hop);   // above the star row
+            duckMark.rectTransform.anchoredPosition = np + new Vector2(-6, 212 + hop);   // above the star row
             duckMark.rectTransform.localScale = new Vector3(1f + (hop < 3f ? 0.12f : 0f), 1f - (hop < 3f ? 0.1f : 0f), 1f);   // squash on landing
         }
         // bubbles rise and sway, then wrap to the bottom
@@ -253,6 +327,16 @@ public class MapScreen : MonoBehaviour
         }
         // bob the current node
         foreach (var nd in nodes)
-            if (nd.n == SaveData.MaxLevel) nd.img.transform.parent.localScale = Vector3.one * (1.12f + Mathf.Sin(Time.time * 4) * 0.04f);
+            if (nd.n == SaveData.MaxLevel)
+            {
+                float pop = 1f;
+                if (unlockT > 0)
+                {   // back-out pop for the freshly unlocked node
+                    unlockT += Time.deltaTime; float x = Mathf.Clamp01((unlockT - 0.25f) / 0.45f), m = x - 1f;
+                    pop = x <= 0 ? 0.01f : 1f + 3.2f * m * m * m + 2.2f * m * m;
+                    if (unlockT > 0.75f) unlockT = 0;
+                }
+                nd.img.transform.parent.localScale = Vector3.one * (1.12f + Mathf.Sin(Time.time * 4) * 0.04f) * pop;
+            }
     }
 }
