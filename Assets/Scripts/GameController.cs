@@ -43,7 +43,7 @@ public class GameController : MonoBehaviour
         public string type; public Vector2 p; public float w, h, r; public bool rect; public int hp, max; public bool alive = true;
         public float hit, falling; public Block under, plankRef; public List<Block> screws; public string dir; public Color color;
         public float mvCx, mvAmp, mvSp; public int pid; public Transform view; public Vector3 baseScale = Vector3.one;
-        public Renderer[] rends; public bool flashing; public float appear = 1, delay;
+        public Renderer[] rends; public bool flashing; public float appear = 1, delay; public Vector2 hitDir;
         public bool shelf;
         public bool Prop => type == "glass" || type == "vase" || type == "soap" || type == "plates";
         public bool Goal => type == "cookie" || type == "chest" || type == "pixel" || type == "ice" || type == "boss" || Prop;
@@ -72,11 +72,11 @@ public class GameController : MonoBehaviour
     static float fever; static bool frenzyReady;
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() { fever = 0; frenzyReady = false; trailMat = null; }
-    bool moving, frenzyShot, bossKilled, rewarded;
+    bool moving, frenzyShot, bossKilled, rewarded, hardLevel;
     string state = "play", target, hint;
     float freeze, shake, comboPulse, t, lastW, lastH;
     Duck drag; Vector2 dragPt, dragSm; int powerStep, shotBanks; bool lastWarned;
-    bool aimVisible = true;
+    bool aimVisible = true; RectTransform dynLayer;
     float swoop, flashA, hudTick; Image flashImg; int comboShown = -1; Block bossBlock;
     int piggyGain, dominoFalls, shotClears, piggyAdded; string levelArt; bool newArt;
     bool HasNext => level < LevelLibrary.Count || (level >= LevelLibrary.SmashLevel && level < LevelLibrary.SmashLevel + LevelLibrary.SmashCount - 1);
@@ -163,7 +163,7 @@ public class GameController : MonoBehaviour
     float introMax = 1.8f;
     float slowTimer, camZoom, introTimer, rushTimer, popAnim, displayScore, scorePulse, bubbleTimer;
     int rushLeft, rushCoins, movesAtClear = -1;
-    class Dying { public Transform t; public float life; public Vector3 s0; }
+    class Dying { public Transform t; public float life, max = 0.12f; public Vector3 s0, p0, dir, axis; public Quaternion r0; public bool topple; }
     readonly List<Dying> dying = new List<Dying>();
     class Coin { public RectTransform rt; public Vector2 from; public float life; }
     readonly List<Coin> coins = new List<Coin>();
@@ -217,7 +217,7 @@ public class GameController : MonoBehaviour
         foreach (var p in pops) if (p.t) Destroy(p.t.gameObject);
         pops.Clear();
         moves = startMoves = L.moves; state = "play"; moving = false; shotSmash = streak = pushes = score = 0;
-        frenzyShot = bossKilled = rewarded = false; target = null; hint = L.hint; freeze = shake = 0; drag = null;
+        frenzyShot = bossKilled = rewarded = false; hardLevel = L.hard; target = null; hint = L.hint; freeze = shake = 0; drag = null;
 
         FxKit.Clear();
         BuildTub();
@@ -433,6 +433,8 @@ public class GameController : MonoBehaviour
         float outline = b.type == "stone" || b.type == "screw" ? 0.003f : 0f;
         float gloss = b.type == "screw" ? 0.9f : b.type == "chest" ? 0.7f : 0.4f;
         Art.Bake(b.view, key, gloss, outline, "Spark", "IceShell", "Arrow", "Glow", "Plate1", "Plate2", "Plate3");
+        if (b.type == "plates")   // each plate becomes one baked, instanced mesh (3 draws per stack instead of 6)
+            for (int i = 1; i <= 3; i++) { var pc = b.view.Find("Plate" + i); if (pc) Art.Bake(pc, "plate_" + Mathf.RoundToInt(b.r * 2), 0.9f, 0.003f); }
         b.view.position = W(b.p);
         b.baseScale = b.view.localScale;
         b.rends = b.view.GetComponentsInChildren<Renderer>().Where(r => r.gameObject.activeSelf && r.sharedMaterial != null && r.sharedMaterial.HasProperty("_Emission")).ToArray();
@@ -541,7 +543,7 @@ public class GameController : MonoBehaviour
         cam.transform.position = camBase + (shake > 0 ? UnityEngine.Random.insideUnitSphere * shake * 0.45f : Vector3.zero);
     }
 
-    int GoalsLeft() => blocks.Count(b => b.alive && b.Goal);
+    int GoalsLeft() { int c = 0; for (int i = 0; i < blocks.Count; i++) { var b = blocks[i]; if (b.alive && b.Goal) c++; } return c; }
     void Later(float t, Action fn) => timers.Add(new Timer { t = t, fn = fn });
     static bool Covered(Block b) => b.under != null && b.under.alive;
     void Shake(float a) => shake = Mathf.Max(shake, a);
@@ -634,6 +636,7 @@ public class GameController : MonoBehaviour
             {
                 if (!b.alive || b.falling > 0 || Covered(b)) continue;
                 if (!Collide(d.p, d.r, b, out var hit)) continue;
+                b.hitDir = d.v.sqrMagnitude > 1 ? d.v : -hit.n;
                 if (b.type == "plank" && fast) foreach (var s in b.screws) if (s.alive && Vector2.Distance(s.p, d.p) < d.r + s.r + 16) Damage(s, 99);
                 if (fast && d.kind == "bomb" && d.charged) { d.charged = false; d.spent = true; Explode(d.p, d.special ? 120 : 100, 3); PopText("BÙM!", d.p, new Color(1f, 0.35f, 0.2f), 70); }
                 if (fast && d.kind == "zap" && d.zapCd <= 0 && !b.Hard) { d.zapCd = 0.15f; d.spent = true; ZapFrom(b); }
@@ -720,7 +723,17 @@ public class GameController : MonoBehaviour
         else Sfx.Play("crunch", 0.7f, pitch);
         Sfx.Play("pop", 0.35f, pitch);
         Debris(b.p, BlockColor(b), b.type == "pixel" ? 4 : b.type == "boss" ? 40 : 9, b.type == "boss" ? 1.6f : 1f);
-        if (b.view) dying.Add(new Dying { t = b.view, life = 0.12f, s0 = b.view.localScale });
+        if (b.view)
+        {
+            bool tall = b.Prop || b.type == "domino" || b.type == "bathbomb" || b.type == "tnt";
+            if (tall)
+            {   // knocked over in the direction it was hit, then sinks into the bath
+                var hd = b.hitDir.sqrMagnitude > 0.01f ? b.hitDir.normalized : UnityEngine.Random.insideUnitCircle.normalized;
+                var wd = new Vector3(hd.x, 0, -hd.y);
+                dying.Add(new Dying { t = b.view, life = 0.32f, max = 0.32f, s0 = b.view.localScale, p0 = b.view.position, dir = wd, axis = Vector3.Cross(Vector3.up, wd), r0 = b.view.rotation, topple = true });
+            }
+            else dying.Add(new Dying { t = b.view, life = 0.12f, s0 = b.view.localScale });
+        }
         if (state == "rush") { rushCoins += 2; SpawnCoin(b.p); }
         else if (shotSmash % 4 == 0 || b.type == "chest" || b.type == "boss") SpawnCoin(b.p);
         if (b.Goal && state == "play" && GoalsLeft() == 0)
@@ -823,7 +836,7 @@ public class GameController : MonoBehaviour
         Sfx.Play("boom", 0.8f, UnityEngine.Random.Range(0.9f, 1.1f)); Sfx.Vibrate();
         Later(0.07f, () =>
         {
-            foreach (var b in blocks.ToArray()) if (b.alive && Vector2.Distance(b.p, p) < R + 20) Damage(b, dmg);
+            foreach (var b in blocks.ToArray()) if (b.alive && Vector2.Distance(b.p, p) < R + 20) { b.hitDir = b.p - p; Damage(b, dmg); }
             PushDucks(p, R + 60, 700);
         });
     }
@@ -1027,10 +1040,10 @@ public class GameController : MonoBehaviour
         {
             rewarded = true;
             bool first = SaveData.GetStars(level) == 0;
-            reward = 20 + stars * 10 + left * 5 + rushCoins + (bossKilled ? 100 : 0) + (first ? 20 : 0);
+            reward = 20 + stars * 10 + left * 5 + rushCoins + (hardLevel ? 80 : 0) + (first ? 20 : 0);
             SaveData.Coins += reward; SaveData.SetStars(level, stars);
             SaveData.MaxLevel = Mathf.Min(LevelLibrary.Count, Mathf.Max(SaveData.MaxLevel, level + 1));
-            if (bossKilled) foreach (var k in PRICE.Keys) SaveData.SetBoost(k, SaveData.GetBoost(k) + 1);
+            if (hardLevel && first) foreach (var k in PRICE.Keys) SaveData.SetBoost(k, SaveData.GetBoost(k) + 1);   // hard level chest
         }
         Sfx.Play("win");
         FxKit.Confetti(new Vector3(0, 0, 0), TW * K, 160);
@@ -1076,7 +1089,8 @@ public class GameController : MonoBehaviour
         if (cookies > 0) g.Add("Phá " + cookies + " bánh");
         if (chests > 0) g.Add("Mở " + chests + " rương");
         if (pixels > 0) g.Add("Phá tranh " + pixels + " ô");
-        introTitle.text = L.boss ? "BOSS · Màn " + level : LevelLibrary.Title(level);
+        introTitle.text = LevelLibrary.Title(level);
+        introTitle.color = hardLevel ? new Color(1f, 0.35f, 0.3f) : new Color(0.6f, 0.53f, 0.93f);
         int props = blocks.Count(b => b.Prop);
         if (props > 0) g.Add("Đập vỡ " + props + " món đồ");
         // reminder of the combo ducks the player has already unlocked
@@ -1167,7 +1181,7 @@ public class GameController : MonoBehaviour
     void SpawnCoin(Vector2 simPos)
     {
         if (coins.Count > 25) return;
-        var img = UIKit.Dot(hud, new Color(1f, 0.82f, 0.25f), "Coin");
+        var img = UIKit.Dot(dynLayer, new Color(1f, 0.82f, 0.25f), "Coin");
         var o = img.gameObject.AddComponent<Outline>(); o.effectColor = new Color(0.75f, 0.45f, 0.05f); o.effectDistance = new Vector2(4, -4);
         img.raycastTarget = false;
         var rt = img.rectTransform; rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f); rt.sizeDelta = new Vector2(56, 56);
@@ -1513,8 +1527,15 @@ public class GameController : MonoBehaviour
         {
             var dd = dying[i]; dd.life -= dt;
             if (dd.t == null || dd.life <= 0) { if (dd.t) Destroy(dd.t.gameObject); dying.RemoveAt(i); continue; }
-            float f = 1 - dd.life / 0.12f;   // quick puff-up then vanish
-            dd.t.localScale = dd.s0 * (f < 0.4f ? Mathf.Lerp(1f, 1.35f, f / 0.4f) : Mathf.Lerp(1.35f, 0f, (f - 0.4f) / 0.6f));
+            float f = 1 - dd.life / dd.max;
+            if (dd.topple)
+            {
+                float e = 1 - (1 - f) * (1 - f);
+                dd.t.rotation = Quaternion.AngleAxis(e * 95f, dd.axis) * dd.r0;
+                dd.t.position = dd.p0 + dd.dir * e * 0.35f + Vector3.down * f * f * 0.6f;
+                dd.t.localScale = dd.s0 * (f < 0.65f ? 1f : Mathf.Lerp(1f, 0f, (f - 0.65f) / 0.35f));
+            }
+            else dd.t.localScale = dd.s0 * (f < 0.4f ? Mathf.Lerp(1f, 1.35f, f / 0.4f) : Mathf.Lerp(1.35f, 0f, (f - 0.4f) / 0.6f));   // quick puff-up then vanish
         }
         foreach (var m in bumpers) { m.pulse = Mathf.Max(0, m.pulse - dt); m.view.localScale = new Vector3(1 + m.pulse * 2, 1, 1); }
     }
@@ -1604,7 +1625,7 @@ public class GameController : MonoBehaviour
     {
         // too many floating labels at once is unreadable and each one is an outlined UI mesh: drop the oldest
         if (pops.Count >= (App.Mobile ? 6 : 10)) { if (pops[0].t) Destroy(pops[0].t.gameObject); pops.RemoveAt(0); }
-        var tx = UIKit.Outlined(UIKit.Label(hud, s, size, c), new Color(0.23f, 0.18f, 0.42f), 4);
+        var tx = UIKit.Outlined(UIKit.Label(dynLayer, s, size, c), new Color(0.23f, 0.18f, 0.42f), 4);
         var rt = tx.rectTransform; rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f); rt.sizeDelta = new Vector2(600, 120);
         pops.Add(new Pop { t = tx, world = W(simPos, 0.6f), life = 0.9f, max = 0.9f });
         if (pops.Count > 30) { Destroy(pops[0].t.gameObject); pops.RemoveAt(0); }
@@ -1650,8 +1671,9 @@ public class GameController : MonoBehaviour
         // soft purple vignette: frames the tub and pulls the eye to the middle
         var vig = UIKit.Stretch(UIKit.Rect("Vignette", hud)).gameObject.AddComponent<RawImage>();
         vig.texture = VignetteTex(); vig.raycastTarget = false; vig.color = new Color(0.35f, 0.2f, 0.45f, 0.55f);
+        if (App.Mobile) vig.gameObject.SetActive(false);   // full-screen alpha overlay = pure overdraw on phones
         flashImg = UIKit.Stretch(UIKit.Rect("Flash", hud)).gameObject.AddComponent<Image>();
-        flashImg.color = new Color(1f, 0.97f, 0.9f, 0); flashImg.raycastTarget = false;
+        flashImg.color = new Color(1f, 0.97f, 0.9f, 0); flashImg.raycastTarget = false; flashImg.canvasRenderer.cullTransparentMesh = true;
         // top bar
         var top = UIKit.Panel(hud, PurpleDark, "TopBar").rectTransform; UIKit.Place(top, 0.5f, 1, 0, -150, 1040, 250);
         var topIn = UIKit.Panel(top, Purple, "Inner").rectTransform; UIKit.Stretch(topIn, 0, 10, 0, 0);
@@ -1725,6 +1747,12 @@ public class GameController : MonoBehaviour
         var ho = hand.gameObject.AddComponent<Outline>(); ho.effectColor = new Color(0.23f, 0.18f, 0.42f, 0.9f); ho.effectDistance = new Vector2(5, -5);
         var hl = UIKit.Label(hand.transform, "KÉO", 26, Ink); hl.rectTransform.offsetMin = new Vector2(0, -110); hl.rectTransform.offsetMax = new Vector2(0, -80);
         handRt.gameObject.SetActive(false);
+        // animated UI lives in a nested canvas: moving labels no longer force a rebuild of the whole HUD
+        dynLayer = UIKit.Stretch(UIKit.Rect("DynamicUI", hud));
+        dynLayer.gameObject.AddComponent<Canvas>();
+        foreach (var g in new Graphic[] { comboTxt, bigTxt, aimCount }) g.transform.SetParent(dynLayer, false);
+        handRt.SetParent(dynLayer, false);
+        introRoot.SetAsLastSibling(); popupRoot.SetAsLastSibling();
         popupRoot.gameObject.SetActive(false);
     }
 
@@ -1808,10 +1836,10 @@ public class GameController : MonoBehaviour
         introTimer = 0; introRoot.gameObject.SetActive(false); popupRoot.SetAsLastSibling();
         if (win)
         {
-            popTitle.text = bossKilled ? "HẠ BOSS!" : (level <= LevelLibrary.Onboarding ? "Giỏi lắm!" : "Well Done!");
+            popTitle.text = hardLevel ? "VƯỢT MÀN KHÓ!" : (level <= LevelLibrary.Onboarding ? "Giỏi lắm!" : "Well Done!");
             popStars.text = "";
             for (int i = 0; i < 3; i++) { popStarImgs[i].gameObject.SetActive(true); popStarImgs[i].color = i < stars ? Yellow : new Color(0.49f, 0.42f, 0.84f); popStarImgs[i].rectTransform.localScale = Vector3.one * (i == 1 ? 1.2f : 1f); }
-            popBody.text = "Điểm " + score.ToString("N0") + (bossKilled ? "\nRương Boss: +1 mỗi booster" : "")
+            popBody.text = "Điểm " + score.ToString("N0") + (hardLevel ? "\nThưởng màn khó: +80 xu" + (SaveData.GetStars(level) > 0 ? "" : "") : "")
                 + (piggyAdded > 0 ? "\n<size=36>Ống heo +" + piggyAdded + "  (" + SaveData.Piggy + "/" + SaveData.PiggyMax + ")</size>" : "")
                 + (newArt ? "\n<size=36><color=#ffe066>Tranh \"" + LevelLibrary.ArtName(levelArt) + "\" vào Album!</color></size>" : "");
             popBody.verticalOverflow = VerticalWrapMode.Overflow;

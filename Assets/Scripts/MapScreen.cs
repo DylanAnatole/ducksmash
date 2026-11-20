@@ -48,7 +48,7 @@ public class MapScreen : MonoBehaviour
 
         for (int n = 1; n <= LevelLibrary.Count; n++)
         {
-            int lvl = n; bool boss = LevelLibrary.IsBoss(n);
+            int lvl = n; bool boss = LevelLibrary.IsHard(n);
             float size = boss ? 190 : 150;
             var img = UIKit.Dot(content, Color.white, "Node" + n);
             var rt = img.rectTransform; rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0); rt.sizeDelta = new Vector2(size, size); rt.anchoredPosition = NodePos(n);
@@ -56,7 +56,7 @@ public class MapScreen : MonoBehaviour
             var btn = img.gameObject.AddComponent<Button>(); btn.onClick.AddListener(() => { if (lvl <= SaveData.MaxLevel) { Sfx.Play("click"); App.StartLevel(lvl); } });
             var inner = UIKit.Dot(img.transform, Color.white, "Inner"); UIKit.Stretch(inner.rectTransform, 12, 12, 12, 12); inner.raycastTarget = false;
             var num = UIKit.Outlined(UIKit.Label(img.transform, n.ToString(), boss ? 64 : 58, Color.white), Ink, 3);
-            var tag = UIKit.Label(img.transform, boss ? "BOSS" : LevelLibrary.NewSpecialAt(n) != null ? "VỊT MỚI" : "", 28, Color.white); tag.rectTransform.offsetMin = new Vector2(0, -size * 0.75f); tag.rectTransform.offsetMax = new Vector2(0, -size * 0.55f);
+            var tag = UIKit.Label(img.transform, boss ? (LevelLibrary.IsSuperHard(n) ? "SIÊU KHÓ" : "KHÓ") : LevelLibrary.NewSpecialAt(n) != null ? "VỊT MỚI" : "", 28, Color.white); tag.rectTransform.offsetMin = new Vector2(0, -size * 0.75f); tag.rectTransform.offsetMax = new Vector2(0, -size * 0.55f);
             var st = UIKit.Outlined(UIKit.Label(img.transform, "", 44, Yellow), Ink, 2); st.rectTransform.offsetMin = new Vector2(0, size * 0.62f); st.rectTransform.offsetMax = new Vector2(0, size * 0.62f);
             nodes.Add((inner, num, st, tag, n));
             nodeStars[n] = UIKit.StarRow(st.transform, 3, 40, 2);
@@ -175,7 +175,7 @@ public class MapScreen : MonoBehaviour
         foreach (var nd in nodes)
         {
             int n = nd.n, s = SaveData.GetStars(n); totalStars += s;
-            bool open = n <= max, boss = LevelLibrary.IsBoss(n);
+            bool open = n <= max, boss = LevelLibrary.IsHard(n);
             nd.img.color = !open ? (boss ? new Color(0.86f, 0.62f, 0.64f) : n <= LevelLibrary.Onboarding ? new Color(0.62f, 0.82f, 0.81f) : Locked) :boss ? Red : n <= LevelLibrary.Onboarding ? Teal : s > 0 ? Green : Yellow;
             nd.num.text = open ? n.ToString() : "?";
             nd.num.color = open ? Color.white : new Color(0.55f, 0.52f, 0.64f);

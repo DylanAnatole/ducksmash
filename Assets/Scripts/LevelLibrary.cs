@@ -14,6 +14,7 @@ public class LevelDef
 {
     public int moves; public string hint = ""; public bool boss;
     public string art;   // pixel picture smashed in this level (goes into the album on a win)
+    public bool hard;
     public List<DuckDef> ducks = new List<DuckDef>();
     public List<BlockDef> blocks = new List<BlockDef>();
     public List<BumperDef> bumpers = new List<BumperDef>();
@@ -27,7 +28,8 @@ public static class LevelLibrary
     public const int TestLevel = 99;   // sandbox level for trying new mechanics (not on the 25-level path, saves nothing)
     public const int SmashLevel = 101, SmashCount = 3;   // "phá đồ" destruction test levels 101..103
     public static bool IsSandbox(int n) => n >= TestLevel;
-    public static string Title(int n) => n == TestLevel ? "Màn thử" : n >= SmashLevel ? "Phá đồ " + (n - SmashLevel + 1) : (n <= Onboarding ? "Hướng dẫn " : "Màn ") + n;
+    public static string Title(int n) => n == TestLevel ? "Màn thử" : n >= SmashLevel ? "Phá đồ " + (n - SmashLevel + 1)
+        : IsSuperHard(n) ? "Siêu khó " + n : IsHard(n) ? "Màn khó " + n : (n <= Onboarding ? "Hướng dẫn " : "Màn ") + n;
 
     // ---------- pixel-art album ----------
     public static readonly string[] ArtIds = { "duck", "heart", "straw", "fish" };
@@ -64,7 +66,10 @@ public static class LevelLibrary
         return true;
     }
     public static SpecialInfo NewSpecialAt(int n) { foreach (var s in Specials) if (s.level == n) return s; return null; }
-    public static bool IsBoss(int n) => n == 10 || n == 15 || n == 20 || n == 25;
+    // no bosses: milestones 10/15/20/25 are "hard levels" (denser layout, tight moves, bigger reward)
+    public static bool IsHard(int n) => n == 10 || n == 15 || n == 20 || n == 25;
+    public static bool IsSuperHard(int n) => n == 25;
+    public static bool IsBoss(int n) => false;
 
     static System.Random rng; static int pidCounter;
     static float R() => (float)rng.NextDouble();
@@ -198,11 +203,15 @@ public static class LevelLibrary
                 d.blocks.AddRange(Row("soap", 70, 590, 11, 40));
                 break;
             case 10:
-                d = L(10, "BOSS! Bánh khổng lồ – dùng Búa nếu bí!", (150, 810, "heavy"), (270, 810, "bomb"), (390, 810, null), (270, 720, null));
-                d.blocks.Add(Boss(270, 290, 30, 150, 0.9f));
-                d.blocks.AddRange(Row("glass", 70, 430, 11, 40)); d.blocks.AddRange(Row("soap", 70, 470, 11, 40));
-                d.blocks.Add(B("bathbomb", 120, 540)); d.blocks.Add(B("bathbomb", 420, 540)); d.blocks.Add(LZ(270, 540, "h"));
-                d.bumpers.Add(BumperL(620)); d.bumpers.Add(BumperR(620));
+                d = L(13, "MÀN KHÓ! Đá chắn đường – ngắm qua khe, tận dụng domino và bom tắm!", (150, 810, "heavy"), (270, 810, null), (390, 810, null));
+                d.blocks.AddRange(Shelf(270, 215, 440, "glass", "vase", "glass", "vase", "glass", "vase", "glass", "vase"));
+                for (int i = 0; i < 11; i++) d.blocks.Add(B(i == 2 || i == 5 || i == 8 ? "stone" : "glass", 70 + i * 40, 290));   // lanes along the walls stay open for bank shots at the shelf legs
+                for (int i = 0; i < 19; i++) d.blocks.Add(Dom(60 + i * 22, 350, true, 0));
+                d.blocks.Add(B("bathbomb", 488, 350));
+                for (int i = 0; i < 7; i++) d.blocks.Add(B("plates", 90 + i * 60, 415));
+                d.blocks.AddRange(Row("vase", 70, 480, 11, 40));
+                for (int i = 0; i < 11; i++) d.blocks.Add(B(i == 2 || i == 8 ? "stone" : "soap", 70 + i * 40, 540));
+                d.blocks.AddRange(Shelf(270, 610, 360, "glass", "vase", "glass", "vase", "glass", "vase"));
                 break;
             case 11:
                 d = L(6, "Vịt Điện: giật điện 3 khối gần nhất!", (150, 810, null), (270, 810, "zap"), (390, 810, null), (270, 720, "zap"));
@@ -225,10 +234,10 @@ public static class LevelLibrary
                 d.bumpers.Add(BumperL(640)); d.bumpers.Add(BumperR(640));
                 break;
             default:
-                d = IsBoss(n) ? BossLevel(n) : Procedural(n);
+                d = IsHard(n) ? HardLevel(n) : Procedural(n);
                 break;
         }
-        d.boss = IsBoss(n);
+        d.boss = false; d.hard = IsHard(n);
         // unlock levels gift one special by transforming a plain duck: make sure there is one
         if (NewSpecialAt(n) != null && !d.ducks.Exists(x => x.kind == "normal") && d.ducks.Count > 0) d.ducks[d.ducks.Count - 1].kind = "normal";
         d.moves = Mathf.Max(3, d.moves);
@@ -319,7 +328,7 @@ public static class LevelLibrary
             return y + 6;
         }
         if (p < 0.46f) { int w = RI(10, 14) * 30; d.blocks.AddRange(Shelf(270, y + 8, w, ShelfItems(w))); return y + 72; }
-        if (p < 0.62f)
+        if (p < 0.62f && !d.blocks.Exists(x => x.type == "domino"))   // at most one domino run per level (more = everything chain-clears)
         {   // domino run ending in a bath bomb
             int ch = RI(1, 999); bool rev = R() < 0.5f;
             for (int i = 0; i < 19; i++) d.blocks.Add(Dom(rev ? 478 - i * 22 : 60 + i * 22, y + 6, true, ch));
@@ -344,7 +353,7 @@ public static class LevelLibrary
 
     static LevelDef Procedural(int n)
     {
-        var d = new LevelDef { moves = 6 + n / 10 };
+        var d = new LevelDef { moves = 7 + n / 10 };
         float y = 205; int guard = 0;
         while (y < 590 && guard++ < 10) y = AddModule(d, y, true);
         foreach (var b in d.blocks) if (b.type == "plank") d.moves++;   // each shelf needs extra shots for its legs
@@ -356,14 +365,21 @@ public static class LevelLibrary
         return d;
     }
 
-    static LevelDef BossLevel(int n)
+    // hard level: the whole tub packed with modules + a stone-studded hazard row, only 3 ducks, tight moves
+    static LevelDef HardLevel(int n)
     {
-        bool final = n == 25;
-        var d = new LevelDef { moves = final ? 13 : 12, hint = final ? "BOSS CUỐI! Hạ gục Vua Bánh!" : "BOSS! Bánh khổng lồ đang trượt qua lại" };
-        d.blocks.Add(Boss(270, 285, final ? 45 : 24 + n / 4, 140 + n * 2, 0.8f + n * 0.02f));
-        float y = 410; int guard = 0;
-        while (y < 600 && guard++ < 6) y = AddModule(d, y, false);
-        var spots = new[] { (150f, 810f), (270f, 810f), (390f, 810f), (270f, 720f) };
+        bool super = IsSuperHard(n);
+        var d = new LevelDef { moves = (super ? 7 : 6) + n / 10, hint = super ? "SIÊU KHÓ! Mỗi phát đều phải tính!" : "MÀN KHÓ! Ngắm kỹ, tận dụng nổ dây chuyền!" };
+        float y = 200; int guard = 0;
+        while (y < 560 && guard++ < 10) y = AddModule(d, y, false);
+        for (int i = 0; i < 11; i++) { float q = R(); d.blocks.Add(B(q < 0.25f ? "stone" : q < 0.4f ? "bathbomb" : PropKind(), 70 + i * 40, Mathf.Max(y + 10, 600))); }
+        foreach (var b in d.blocks)
+        {   // toughen: fragile props become 2-3 hit ones, half the bath bombs become stones (fewer free chain reactions)
+            if ((b.type == "glass" || b.type == "soap") && R() < 0.35f) { bool pl = R() < 0.4f; b.type = pl ? "plates" : "vase"; b.r = 17; }
+            else if (b.type == "bathbomb" && R() < 0.5f) { b.type = "stone"; b.rect = true; b.w = b.h = 36; }
+            if (b.type == "plank") d.moves++;
+        }
+        var spots = new[] { (150f, 810f), (270f, 810f), (390f, 810f) };
         foreach (var sp in spots) d.ducks.Add(new DuckDef(sp.Item1, sp.Item2, RandKind()));
         return d;
     }
