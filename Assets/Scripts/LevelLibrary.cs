@@ -280,7 +280,7 @@ public static class LevelLibrary
     // plus one rocket and one rainbow duck to try right away.
     static LevelDef Test()
     {
-        var d = L(12, "Màn thử: phá 10+ / 16+ / 25+ trong 1 phát để nở vịt đặc biệt!",
+        var d = L(12, "Thử vịt đặc biệt: phá 10/16/25 món!",
             (150, 800, null), (270, 820, "rocket"), (390, 800, null), (200, 700, null), (340, 700, "rainbow"));
         d.blocks.AddRange(Cluster("cookie", 270, 250, 4, 11, 38));
         d.blocks.Add(B("tnt", 110, 345)); d.blocks.Add(B("tnt", 430, 345));
@@ -313,7 +313,7 @@ public static class LevelLibrary
         switch (k)
         {
             case 1:
-                d = L(10, "Bắn gãy 2 chân kệ → cả kệ đổ vỡ tan tành! Phá hết 1 hàng = CLEAR!", (150, 810, null), (270, 810, null), (390, 810, null));
+                d = L(10, "Gãy 2 chân kệ → cả kệ đổ!", (150, 810, null), (270, 810, null), (390, 810, null));
                 d.blocks.AddRange(Shelf(270, 230, 420, "glass", "vase", "glass", "vase", "glass", "vase", "glass", "vase"));
                 d.blocks.AddRange(Row("soap", 70, 320, 11, 40)); d.blocks.AddRange(Row("soap", 70, 360, 11, 40));
                 foreach (var x in new[] { 110, 190, 270, 350, 430 }) d.blocks.Add(B("plates", x, 440));
@@ -322,7 +322,7 @@ public static class LevelLibrary
                 d.bumpers.Add(BumperL(600)); d.bumpers.Add(BumperR(600));
                 break;
             case 2:
-                d = L(8, "Đẩy đổ 1 quân domino → cả dây đổ theo!", (150, 810, null), (270, 810, null), (390, 810, null));
+                d = L(8, "Đổ 1 domino, đổ cả dây!", (150, 810, null), (270, 810, null), (390, 810, null));
                 d.blocks.AddRange(Cluster("glass", 270, 215, 2, 10, 40));
                 for (int i = 0; i < 20; i++) d.blocks.Add(Dom(60 + i * 22, 300, true, 0));
                 for (int i = 1; i <= 5; i++) d.blocks.Add(Dom(482, 300 + i * 22, false, 0));
@@ -332,7 +332,7 @@ public static class LevelLibrary
                 d.blocks.AddRange(Row("soap", 110, 500, 10, 40)); d.blocks.AddRange(Row("soap", 110, 540, 10, 40));
                 break;
             default:
-                d = L(11, "Tổng vệ sinh! Kệ, domino, chồng đĩa, bom tắm — phá sạch!", (130, 815, null), (230, 815, "heavy"), (330, 815, null), (430, 815, null));
+                d = L(11, "Tổng vệ sinh: phá sạch!", (130, 815, null), (230, 815, "heavy"), (330, 815, null), (430, 815, null));
                 d.blocks.AddRange(Shelf(270, 210, 440, "vase", "glass", "glass", "vase", "glass", "glass", "vase", "glass"));
                 for (int i = 0; i < 7; i++) d.blocks.Add(B("plates", 90 + i * 60, 295));
                 for (int i = 0; i < 20; i++) d.blocks.Add(Dom(60 + i * 22, 355, true, 1));
