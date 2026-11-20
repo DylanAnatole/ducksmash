@@ -59,6 +59,18 @@ public class MapScreen : MonoBehaviour
             var tag = UIKit.Label(img.transform, boss ? (LevelLibrary.IsSuperHard(n) ? "SIÊU KHÓ" : "KHÓ") : LevelLibrary.NewSpecialAt(n) != null ? "VỊT MỚI" : "", 28, Color.white); tag.rectTransform.offsetMin = new Vector2(0, -size * 0.75f); tag.rectTransform.offsetMax = new Vector2(0, -size * 0.55f);
             var st = UIKit.Outlined(UIKit.Label(img.transform, "", 44, Yellow), Ink, 2); st.rectTransform.offsetMin = new Vector2(0, size * 0.62f); st.rectTransform.offsetMax = new Vector2(0, size * 0.62f);
             nodes.Add((inner, num, st, tag, n));
+            // picture levels show their pixel picture as a badge (silhouette until collected)
+            var art = LevelLibrary.Get(n).art;
+            if (!string.IsNullOrEmpty(art))
+            {
+                var bdg = UIKit.Dot(img.transform, Color.white, "BadgeBg"); bdg.raycastTarget = false;
+                var bgrt = bdg.rectTransform; bgrt.anchorMin = bgrt.anchorMax = new Vector2(0.5f, 0.5f); bgrt.sizeDelta = new Vector2(86, 86);
+                bgrt.anchoredPosition = new Vector2(size * 0.42f, size * 0.36f);
+                var badge = UIKit.Rect("ArtBadge", img.transform).gameObject.AddComponent<RawImage>(); badge.raycastTarget = false;
+                var brt = badge.rectTransform; brt.anchorMin = brt.anchorMax = new Vector2(0.5f, 0.5f); brt.sizeDelta = new Vector2(60, 60);
+                brt.anchoredPosition = bgrt.anchoredPosition;
+                artBadges[n] = (badge, art);
+            }
             nodeStars[n] = UIKit.StarRow(st.transform, 3, 40, 2);
         }
 
@@ -95,6 +107,14 @@ public class MapScreen : MonoBehaviour
         BuildAlbum();
     }
 
+    readonly Dictionary<int, (RawImage img, string id)> artBadges = new Dictionary<int, (RawImage, string)>();
+    static readonly Dictionary<string, Texture2D> badgeTex = new Dictionary<string, Texture2D>();
+    static Texture2D BadgeTex(string id, bool locked)
+    {
+        string k = id + (locked ? "_l" : "");
+        if (!badgeTex.TryGetValue(k, out var t) || t == null) badgeTex[k] = t = LevelLibrary.ArtTexture(id, locked);
+        return t;
+    }
     RectTransform piggyFill, albumRoot; Text piggyTxt; Button piggyBtn; readonly List<RawImage> albumImgs = new List<RawImage>(); readonly List<Text> albumNames = new List<Text>();
     Text albumTitle;
 
@@ -171,6 +191,7 @@ public class MapScreen : MonoBehaviour
 
     public void Refresh()
     {
+        foreach (var kv in artBadges) kv.Value.img.texture = BadgeTex(kv.Value.id, !SaveData.HasArt(kv.Value.id));
         int max = SaveData.MaxLevel, totalStars = 0;
         foreach (var nd in nodes)
         {

@@ -272,7 +272,7 @@ public class GameController : MonoBehaviour
         // build-in animation: blocks drop onto the water row by row
         foreach (var b in blocks) { b.appear = 0; b.delay = 0.15f + (b.p.y - TY) / TH * 0.7f + UnityEngine.Random.value * 0.08f; }
         foreach (var b in blocks) MakeView(b);
-        swoop = 1f; flashA = 0; piggyGain = 0; goalTotal = GoalsLeft(); shownLeft = -1; halfShown = false; shownMoves = shownScore = shownStreak = -1; levelArt = L.art; hudTick = 0; comboShown = -1;
+        swoop = 1f; flashA = 0; piggyGain = 0; goalTotal = GoalsLeft(); shownLeft = -1; halfShown = false; idleT = 0; hintReady = false; hintSearch = -1; HideHint(); shownMoves = shownScore = shownStreak = -1; levelArt = L.art; hudTick = 0; comboShown = -1;
         bossBlock = blocks.FirstOrDefault(b => b.type == "boss");
         RefreshComboLabels(); comboShownFill = comboShownGhost = -1; if (guideRoot && guideRoot.gameObject.activeSelf) { guideRoot.gameObject.SetActive(false); Time.timeScale = 1f; }
         BuildLines();
@@ -1228,8 +1228,18 @@ public class GameController : MonoBehaviour
             if (introTimer <= 0) introRoot.gameObject.SetActive(false);
         }
         // tutorial hand on the first levels: shows the pull-back gesture
-        bool showHand = level <= 2 && state == "play" && !moving && drag == null && introTimer <= 0 && moves == startMoves && ducks.Count > 0;
-        handRt.gameObject.SetActive(showHand);
+        UpdateHint(rdt);
+        bool showHand = level <= 2 && state == "play" && !moving && drag == null && introTimer <= 0 && moves == startMoves && ducks.Count > 0 && !hintShown;
+        handRt.gameObject.SetActive(showHand || hintShown);
+        if (hintShown && !showHand)
+        {   // hint hand: drag the suggested duck back, opposite to the suggested direction
+            var d = ducks[Mathf.Clamp(hintBestDuck, 0, ducks.Count - 1)];
+            float k = Mathf.Repeat(Time.unscaledTime, 1.6f) / 1.2f;
+            var a = WorldToHud(W(d.p, 0.4f)); var b = WorldToHud(W(d.p - hintBestDir * 120f, 0.4f));
+            handRt.anchoredPosition = Vector2.Lerp(a, b, Mathf.SmoothStep(0, 1, Mathf.Clamp01(k)));
+            handRt.localScale = Vector3.one * (k < 0.1f ? 0.85f : 1f);
+            handRt.GetComponent<CanvasGroup>().alpha = k > 1 ? 0 : 0.95f;
+        }
         if (showHand)
         {
             var d = ducks[ducks.Count - 1];
@@ -1376,9 +1386,95 @@ public class GameController : MonoBehaviour
     static Color PowerColor(float pw) => pw < 0.5f ? Color.Lerp(Color.white, new Color(1f, 0.9f, 0.3f), pw / 0.5f)
                                                    : Color.Lerp(new Color(1f, 0.9f, 0.3f), new Color(1f, 0.38f, 0.25f), (pw - 0.5f) / 0.5f);
 
+    // ===================== idle hint: after a few idle seconds, suggest the shot that smashes the most =====================
+    readonly List<Transform> hintDots = new List<Transform>();
+    readonly List<Vector2> hintPath = new List<Vector2>();
+    readonly HashSet<Block> simHits = new HashSet<Block>();
+    float idleT; int hintSearch = -1, hintBestDuck = -1; float hintBestScore; Vector2 hintBestDir; bool hintReady, hintShown;
+    const int HINT_ANGLES = 18;
+
+    // cheap straight-line prediction (same rules as the aim preview); weights chain-reaction blocks higher
+    float PredictShot(Duck d, Vector2 dir, List<Vector2> path)
+    {
+        Vector2 gp = d.p, gv = dir; float len = 260 + MAX_PULL * 4.5f, score = 0; simHits.Clear();
+        path?.Clear(); path?.Add(gp);
+        int dmg = d.kind == "rocket" ? 3 : d.Dmg; float r2 = 0;
+        for (float st = 0; st < len; st += 6)
+        {
+            gp += gv * 6;
+            if (TubWalls(ref gp, ref gv, d.r, 1f)) path?.Add(gp);
+            gv.Normalize();
+            bool stop = false;
+            for (int i = 0; i < ducks.Count; i++) { var o = ducks[i]; if (o == d) continue; r2 = o.r + d.r; if ((o.p - gp).sqrMagnitude < r2 * r2) { stop = true; score += 2f; break; } }
+            if (!stop)
+                for (int i = 0; i < blocks.Count; i++)
+                {
+                    var b = blocks[i];
+                    if (!b.alive || Covered(b) || b.falling > 0 || simHits.Contains(b) || !Collide(gp, d.r, b, out _)) continue;
+                    if (!b.Hard && b.hp <= dmg) { simHits.Add(b); len -= 10; score += b.type == "bathbomb" || b.type == "tnt" || b.type == "laser" || b.type == "domino" || b.type == "screw" ? 5f : 1f; }
+                    else { stop = true; break; }
+                }
+            if (stop) break;
+        }
+        path?.Add(gp);
+        return score;
+    }
+
+    void HideHint() { hintShown = false; foreach (var h in hintDots) if (h.gameObject.activeSelf) h.gameObject.SetActive(false); }
+
+    void UpdateHint(float rdt)
+    {
+        bool can = state == "play" && !moving && drag == null && introTimer <= 0 && target == null && ducks.Count > 0
+                   && !popupRoot.gameObject.activeSelf && (guideRoot == null || !guideRoot.gameObject.activeSelf) && Time.timeScale > 0;
+        if (!can || Input.GetMouseButton(0)) { idleT = 0; hintReady = false; hintSearch = -1; if (hintShown) HideHint(); return; }
+        idleT += rdt;
+        if (idleT > 3f && hintSearch < 0 && !hintReady) { hintSearch = 0; hintBestScore = 0; hintBestDuck = -1; }
+        if (hintSearch >= 0)
+        {   // a few candidates per frame so the search never causes a hitch
+            int total = ducks.Count * HINT_ANGLES;
+            for (int k = 0; k < 4 && hintSearch < total; k++, hintSearch++)
+            {
+                var d = ducks[hintSearch / HINT_ANGLES]; if (d.clone || d.spawnT > 0) continue;
+                float a = Mathf.Lerp(-165f, -15f, (hintSearch % HINT_ANGLES) / (HINT_ANGLES - 1f)) * Mathf.Deg2Rad;   // upward fan (sim y points down)
+                var dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                float sc = PredictShot(d, dir, null);
+                if (sc > hintBestScore) { hintBestScore = sc; hintBestDir = dir; hintBestDuck = hintSearch / HINT_ANGLES; }
+            }
+            if (hintSearch >= total) { hintSearch = -1; hintReady = hintBestDuck >= 0; if (hintReady) PredictShot(ducks[hintBestDuck], hintBestDir, hintPath); }
+        }
+        if (hintReady && idleT > 6f && hintBestDuck < ducks.Count)
+        {
+            hintShown = true;
+            // marching soft dots along the suggested path
+            float total = 0; for (int i = 1; i < hintPath.Count; i++) total += Vector2.Distance(hintPath[i - 1], hintPath[i]);
+            const float gap = 26f; float at = 30 + Mathf.Repeat(Time.unscaledTime * 60f, gap), walked = 0; int used = 0;
+            for (int i = 1; i < hintPath.Count && used < hintDots.Count; i++)
+            {
+                Vector2 a = hintPath[i - 1], b = hintPath[i]; float seg = Vector2.Distance(a, b);
+                while (at <= walked + seg && used < hintDots.Count)
+                {
+                    var q = Vector2.Lerp(a, b, seg > 0 ? (at - walked) / seg : 0);
+                    var dot = hintDots[used++]; if (!dot.gameObject.activeSelf) dot.gameObject.SetActive(true);
+                    dot.position = W(q, 0.3f); dot.localScale = Vector3.one * (0.16f + 0.04f * Mathf.Sin(Time.unscaledTime * 6 + at * 0.05f));
+                    at += gap;
+                }
+                walked += seg;
+            }
+            for (int i = used; i < hintDots.Count; i++) if (hintDots[i].gameObject.activeSelf) hintDots[i].gameObject.SetActive(false);
+        }
+    }
+
     void BuildAim()
     {
         aimRoot = Art.Root("Aim", tubRoot); aimDots.Clear(); pushDots.Clear(); aimVisible = true;
+        hintDots.Clear();
+        var hm = Art.Mat(new Color(1f, 0.55f, 0.15f), 0.5f, 0, 0.6f);   // warm orange: reads clearly on the bright water
+        for (int i = 0; i < 30; i++)
+        {
+            var hd = Art.Prim(PrimitiveType.Sphere, aimRoot, Vector3.zero, Vector3.one * 0.12f, hm);
+            hd.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            hd.gameObject.SetActive(false); hintDots.Add(hd);
+        }
         if (mpb == null) mpb = new MaterialPropertyBlock();
         var m = Art.Mat(Color.white, 0.5f, 0, 0.6f, 0.0035f);   // outlined so the dots pop on the bright water
         for (int i = 0; i < 48; i++)

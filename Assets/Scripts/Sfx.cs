@@ -19,8 +19,7 @@ public class Sfx : MonoBehaviour
         I.music = host.AddComponent<AudioSource>();
         I.music.loop = true; I.music.volume = 0.16f;
         I.Build();
-        I.music.clip = I.clips["music"];
-        I.music.Play();
+        I.StartCoroutine(I.MusicAsync());   // ~750k samples: synthesized over many frames so boot doesn't freeze
         ApplySettings();
     }
 
@@ -111,7 +110,6 @@ public class Sfx : MonoBehaviour
         var qk = Osc(t => 420 - 160 * (t / 0.2f) + 25 * Mathf.Sin(t * 180), t => Mathf.Min(1, t * 80) * Mathf.Exp(-t * 9), 2);
         float qlp = 0;
         clips["quack"] = Make("quack", 0.22f, t => { qlp = Mathf.Lerp(qlp, qk(t), 0.35f); return qlp * 1.3f; });
-        clips["music"] = Music();
     }
 
     static float Arp(float t, float[] notes, float step)
@@ -132,8 +130,9 @@ public class Sfx : MonoBehaviour
     }
 
     // Bouncy 8-bar loop (~17 s @ 112 BPM): soft kick, plucked bass, ukulele-like arpeggio, pad, shaker.
-    static AudioClip Music()
+    System.Collections.IEnumerator MusicAsync()
     {
+        yield return null;
         float[][] chords = {
             new[] { 261.6f, 329.6f, 392f }, new[] { 220f, 261.6f, 329.6f }, new[] { 174.6f, 220f, 261.6f }, new[] { 196f, 246.9f, 293.7f },
             new[] { 261.6f, 329.6f, 392f }, new[] { 164.8f, 196f, 246.9f }, new[] { 174.6f, 220f, 261.6f }, new[] { 196f, 246.9f, 293.7f } };
@@ -143,6 +142,7 @@ public class Sfx : MonoBehaviour
         var rnd = new System.Random(11); float hp = 0, prevN = 0;
         for (int i = 0; i < n; i++)
         {
+            if (i > 0 && (i & 32767) == 0) yield return null;
             float t = i / (float)SR; int b = (int)(t / bar) % 8; float lt = t - (int)(t / bar) * bar;
             var ch = chords[b];
             float s = 0;
@@ -166,6 +166,6 @@ public class Sfx : MonoBehaviour
         }
         var clip = AudioClip.Create("music", n, 1, SR, false);
         clip.SetData(data, 0);
-        return clip;
+        clips["music"] = clip; music.clip = clip; music.Play();
     }
 }
