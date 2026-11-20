@@ -113,7 +113,7 @@ public static class LevelLibrary
     static readonly Dictionary<char, Color> PAL = new Dictionary<char, Color>
     {
         { 'Y', Hex("ffd84a") }, { 'O', Hex("ff8a1f") }, { 'K', Hex("2b2b3b") }, { 'W', Color.white }, { 'R', Hex("ff4d6d") },
-        { 'P', Hex("ff9ec7") }, { 'G', Hex("5fd35f") }, { 'B', Hex("4fc3f7") }, { 'D', Hex("c7363f") }, { 'N', Hex("9a6233") },
+        { 'P', Hex("ff9ec7") }, { 'G', Hex("5fd35f") }, { 'B', Hex("1f4fbf") }, { 'D', Hex("c7363f") }, { 'N', Hex("9a6233") },
     };
     static Color Hex(string h) { ColorUtility.TryParseHtmlString("#" + h, out var c); return c; }
 
@@ -182,7 +182,7 @@ public static class LevelLibrary
                 d.bumpers.Add(BumperL(600)); d.bumpers.Add(BumperR(600));
                 break;
             case 4:
-                d = L(11, "Chồng đĩa cần 3 cú · Bình gốm 2 cú · Phá rương được thêm 2 vịt!", (150, 800, null), (270, 800, null), (390, 800, null), (270, 690, null));
+                d = L(11, "Đồ có CHẤM ĐEN: mỗi chấm = 1 cú cần đập (bình 2, chồng đĩa 3). Phá rương được thêm 2 vịt!", (150, 800, null), (270, 800, null), (390, 800, null), (270, 690, null));
                 for (int i = 0; i < 7; i++) d.blocks.Add(B("plates", 90 + i * 60, 240));
                 d.blocks.AddRange(Row("vase", 70, 320, 11, 40)); d.blocks.Add(B("chest", 270, 400));
                 d.blocks.AddRange(Cluster("glass", 270, 480, 2, 11, 40));
@@ -211,7 +211,7 @@ public static class LevelLibrary
                 d.bumpers.Add(BumperL(620)); d.bumpers.Add(BumperR(620));
                 break;
             case 8:
-                d = L(7, "Vịt Sắt: hạ cả chồng đĩa chỉ 1 cú!", (150, 800, null), (270, 800, null), (390, 800, null), (210, 700, "heavy"), (330, 700, "heavy"));
+                d = L(9, "Vịt Sắt: hạ cả chồng đĩa chỉ 1 cú!", (150, 800, null), (270, 800, null), (390, 800, null), (210, 700, "heavy"), (330, 700, "heavy"));
                 foreach (var p in new[] { (190, 260), (350, 260), (190, 340), (350, 340) }) d.blocks.Add(B("stone", p.Item1, p.Item2));
                 d.blocks.Add(B("chest", 270, 250)); d.blocks.Add(B("chest", 270, 340));
                 d.blocks.AddRange(Col("plates", 85, 220, 6, 40)); d.blocks.AddRange(Col("plates", 455, 220, 6, 40));

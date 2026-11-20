@@ -43,7 +43,7 @@ public class GameController : MonoBehaviour
         public string type; public Vector2 p; public float w, h, r; public bool rect; public int hp, max; public bool alive = true;
         public float hit, falling; public Block under, plankRef; public List<Block> screws; public string dir; public Color color;
         public float mvCx, mvAmp, mvSp; public int pid; public Transform view; public Vector3 baseScale = Vector3.one;
-        public Renderer[] rends; public bool flashing, scaled; public float appear = 1, delay; public Vector2 hitDir;
+        public Renderer[] rends; public bool flashing, scaled; public Transform pips; public float appear = 1, delay; public Vector2 hitDir;
         public bool shelf;
         public bool Prop => type == "glass" || type == "vase" || type == "soap" || type == "plates";
         public bool Goal => !Hard;   // single objective: smash EVERYTHING breakable in the tub (only stone + shelf boards stay)
@@ -71,7 +71,7 @@ public class GameController : MonoBehaviour
     int level, moves, startMoves, shotSmash, streak, pushes, score, stars, reward;
     static float fever; static bool frenzyReady;
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { fever = 0; frenzyReady = false; trailMat = null; templates.Clear(); tplRoot = null; }
+    static void ResetStatics() { fever = 0; frenzyReady = false; trailMat = null; pipMat = null; templates.Clear(); tplRoot = null; }
 
     // Building a block from primitives + baking it costs ~0.5 ms; cloning a cached template is ~20x cheaper.
     // Every block/duck kind is built ONCE (under an inactive root) and Instantiate()d afterwards.
@@ -517,6 +517,28 @@ public class GameController : MonoBehaviour
         b.view.position = W(b.p);
         b.baseScale = b.view.localScale;
         b.rends = b.view.GetComponentsInChildren<Renderer>().Where(r => r.sharedMaterial != null && r.sharedMaterial.HasProperty("_Emission")).ToArray();
+        AddPips(b);
+    }
+
+    // ---------- hit-count pips: one dark dot per hit still needed, floating above multi-hit blocks ----------
+    static Material pipMat;
+    void AddPips(Block b)
+    {
+        if (b.Hard || b.type == "boss" || b.max <= 1 || b.max > 6) return;
+        if (pipMat == null) pipMat = Art.Mat(new Color(0.16f, 0.12f, 0.33f), 0.6f, 0, 0.05f);
+        float top = b.type == "plates" ? 0.5f : b.type == "chest" ? 1.15f : b.type == "crate" ? 1.0f : 1.02f;
+        var root = Art.Root("Pips", b.view); root.localPosition = new Vector3(0, top, 0);
+        for (int i = 0; i < b.max; i++)
+        {
+            var pip = Art.Prim(PrimitiveType.Sphere, root, new Vector3((i - (b.max - 1) / 2f) * 0.17f, 0, 0), new Vector3(0.14f, 0.07f, 0.14f), pipMat);
+            pip.name = "Pip" + i; var r = pip.GetComponent<Renderer>(); r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
+        }
+        b.pips = root;
+    }
+    static void UpdatePips(Block b)
+    {
+        if (b.pips == null) return;
+        for (int i = 0; i < b.pips.childCount; i++) b.pips.GetChild(i).gameObject.SetActive(i < b.hp);
     }
 
     Duck NewDuck(Vector2 p, string kind)
@@ -774,7 +796,7 @@ public class GameController : MonoBehaviour
         if (!b.alive || Covered(b)) return false;
         if (b.Hard) { b.hit = 0.12f; return false; }
         if (b.type == "boss") { dmg = Mathf.Min(dmg, 4); PopText("-" + dmg, b.p + new Vector2(UnityEngine.Random.Range(-40, 40), -60), new Color(1f, 0.35f, 0.2f), 56); Shake(0.2f); Sfx.Play("push", 1, 0.7f); }
-        b.hp -= dmg; b.hit = 0.15f;
+        b.hp -= dmg; b.hit = 0.15f; UpdatePips(b);
         if (b.hp <= 0) { DestroyBlock(b); return true; }
         if (b.type == "ice")
         {
@@ -793,7 +815,7 @@ public class GameController : MonoBehaviour
         if (b.type == "vase")
         {   // cracks and wobbles
             b.view.localEulerAngles = new Vector3(UnityEngine.Random.Range(-10f, 10f), 0, UnityEngine.Random.Range(-10f, 10f));
-            Debris(b.p, new Color(0.5f, 0.85f, 0.78f), 5, 0.5f); PopText("RẮC!", b.p, new Color(0.6f, 0.95f, 0.85f), 40); Sfx.Play("ice", 0.5f, 0.9f);
+            Debris(b.p, new Color(1f, 0.6f, 0.29f), 5, 0.5f); PopText("RẮC!", b.p, new Color(0.6f, 0.95f, 0.85f), 40); Sfx.Play("ice", 0.5f, 0.9f);
         }
         return false;
     }
@@ -835,12 +857,12 @@ public class GameController : MonoBehaviour
         {
             case "tnt": Explode(b.p, 95, 3); break;
             case "glass":   // shatters into a spray of shards
-                for (int i = 0; i < 5; i++) SpawnBit(W(b.p, 0.5f), new Color(0.75f, 0.92f, 1f), UnityEngine.Random.Range(0.06f, 0.14f), 6f, 0.7f, PrimitiveType.Cube);
+                for (int i = 0; i < 5; i++) SpawnBit(W(b.p, 0.5f), new Color(0.56f, 0.91f, 0.44f), UnityEngine.Random.Range(0.06f, 0.14f), 6f, 0.7f, PrimitiveType.Cube);
                 FxKit.Sparkle(W(b.p, 0.4f), new Color(0.8f, 0.95f, 1f), 8); FxKit.Splash(W(b.p), 6, 1.2f);
                 if (UnityEngine.Random.value < 0.3f) PopText("XOẢNG!", b.p, new Color(0.7f, 0.9f, 1f), 44);
                 break;
             case "vase":
-                for (int i = 0; i < 4; i++) SpawnBit(W(b.p, 0.4f), new Color(0.5f, 0.85f, 0.78f), UnityEngine.Random.Range(0.14f, 0.24f), 5f, 0.8f, PrimitiveType.Sphere);
+                for (int i = 0; i < 4; i++) SpawnBit(W(b.p, 0.4f), new Color(1f, 0.6f, 0.29f), UnityEngine.Random.Range(0.14f, 0.24f), 5f, 0.8f, PrimitiveType.Sphere);
                 if (UnityEngine.Random.value < 0.35f) { SpawnCoin(b.p); PopText("+xu", b.p, new Color(1f, 0.85f, 0.3f), 40); }
                 break;
             case "soap":    // pops into a cloud of bubbles
@@ -904,11 +926,11 @@ public class GameController : MonoBehaviour
             case "cookie": case "ice": case "boss": return new Color(0.94f, 0.63f, 0.29f);
             case "crate": return new Color(0.69f, 0.48f, 0.27f);
             case "chest": case "gold": return new Color(1f, 0.8f, 0.25f);
-            case "glass": return new Color(0.75f, 0.92f, 1f);
-            case "vase": return new Color(0.5f, 0.85f, 0.78f);
-            case "soap": return new Color(1f, 0.66f, 0.78f);
+            case "glass": return new Color(0.56f, 0.91f, 0.44f);
+            case "vase": return new Color(1f, 0.6f, 0.29f);
+            case "soap": return new Color(1f, 0.44f, 0.68f);
             case "plates": return new Color(0.98f, 0.98f, 1f);
-            case "bathbomb": return new Color(0.79f, 0.65f, 1f);
+            case "bathbomb": return new Color(0.65f, 0.42f, 1f);
             case "domino": return new Color(1f, 0.97f, 0.9f);
             case "tnt": return new Color(0.91f, 0.28f, 0.23f);
             case "laser": return new Color(0.7f, 0.53f, 1f);
@@ -1189,6 +1211,19 @@ public class GameController : MonoBehaviour
         introMax = introTimer = 1.6f;
         introRoot.sizeDelta = new Vector2(760, 480);
 
+        // onboarding: level 1 = how to play in 3 steps; levels 2-5 = the one new thing this level teaches
+        if (level == 1)
+        {
+            introTitle.text = "CÁCH CHƠI";
+            introBody.text = "<size=44><b>1.</b> Chạm vào vịt, <b>kéo ra sau</b>\n<b>2.</b> <b>Thả tay</b> để bắn\n<b>3.</b> <b>Phá sạch</b> mọi món trong bồn</size>\n\n<size=32>" + moves + " lượt bắn · chạm để bắt đầu</size>";
+            introRoot.sizeDelta = new Vector2(820, 560); introMax = introTimer = 6f;
+        }
+        else if (level <= LevelLibrary.Onboarding && !string.IsNullOrEmpty(L.hint))
+        {
+            introBody.text = "<size=38><color=#7a4dd8><b>MỚI:</b></color> " + L.hint + "</size>\n\n<b>PHÁ SẠCH BỒN</b> · " + moves + " lượt";
+            introRoot.sizeDelta = new Vector2(820, 520); introMax = introTimer = 4f;
+        }
+
         // unlock level: teach how to earn the new duck and how it works, and give one free copy to try
         var nw = LevelLibrary.NewSpecialAt(level);
         if (nw != null)
@@ -1204,7 +1239,7 @@ public class GameController : MonoBehaviour
             if (pool.Count > 0) SetKind(pool[UnityEngine.Random.Range(0, pool.Count)], nw.kind, true);
             hint = "Bắn con " + Cap(nw.name) + " (vòng vàng) để xem sức mạnh! " + nw.how + " để có thêm.";
         }
-        introBody.verticalOverflow = VerticalWrapMode.Overflow;
+        introBody.verticalOverflow = VerticalWrapMode.Overflow; introBody.horizontalOverflow = HorizontalWrapMode.Wrap;
         introRoot.gameObject.SetActive(true);
     }
 
