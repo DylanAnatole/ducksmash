@@ -374,6 +374,43 @@ public static class LevelLibrary
         return y + 44;
     }
 
+    // ---------- shape layouts: each level gets a recognisable silhouette on an 11-column grid ----------
+    // outer layer = tougher props (vases), core = bath bomb payoff, fortress = stone walls with one gap
+    static readonly string[] SHAPES = { "diamond", "columns", "ring", "checker", "arrow", "xcross", "fortress" };
+    static void ShapeLayout(LevelDef d, string shape, float y0, int rows)
+    {
+        float cr = (rows - 1) / 2f;
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < 11; c++)
+            {
+                float dx = Mathf.Abs(c - 5) / 5f, dy = rows > 1 ? Mathf.Abs(r - cr) / Mathf.Max(0.5f, cr) : 0;
+                bool on; string t;
+                switch (shape)
+                {
+                    case "diamond": on = dx + dy <= 1.05f; t = dx + dy > 0.72f ? "vase" : dx + dy < 0.22f ? "bathbomb" : PropKind(); break;
+                    case "ring": { float e = dx * dx + dy * dy; on = e <= 1.08f && e >= 0.28f; t = e > 0.72f ? "vase" : PropKind(); break; }
+                    case "checker": on = (c + r) % 2 == 0; t = r % 2 == 0 ? "soap" : "glass"; break;
+                    case "columns": on = c % 3 != 1; t = r == rows - 1 ? "plates" : c % 3 == 0 ? "glass" : "soap"; break;
+                    case "arrow": on = dx <= 1.02f - r / (float)Mathf.Max(1, rows - 1) * 0.92f; t = r == 0 ? "vase" : r == rows - 1 ? "bathbomb" : PropKind(); break;
+                    case "xcross":
+                    {
+                        float k = Mathf.Abs(Mathf.Abs(c - 5) - Mathf.Abs(r - cr) * 5f / Mathf.Max(1f, cr));
+                        on = k <= 0.8f; t = Mathf.Abs(c - 5) < 0.5f && Mathf.Abs(r - cr) < 0.6f ? "bathbomb" : "glass"; break;
+                    }
+                    default:   // fortress
+                    {
+                        bool edge = c >= 1 && c <= 9 && (r == 0 || r == rows - 1 || c == 1 || c == 9);
+                        bool inside = c > 1 && c < 9 && r > 0 && r < rows - 1;
+                        bool gap = r == rows - 1 && c >= 4 && c <= 6;
+                        on = (edge && !gap) || inside;
+                        t = edge ? "stone" : (c == 5 && Mathf.Abs(r - cr) < 0.6f ? "bathbomb" : PropKind());
+                        break;
+                    }
+                }
+                if (on) d.blocks.Add(B(t, 70 + c * 40, y0 + r * 40));
+            }
+    }
+
     static LevelDef Procedural(int n)
     {
         var d = new LevelDef { moves = 7 + n / 10 };
@@ -387,7 +424,11 @@ public static class LevelLibrary
             d.blocks.AddRange(PixelArt(rows, 270, y + rows.Length * cell / 2f, cell)); d.art = pic;
             y += rows.Length * cell + 24;
         }
-        while (y < 590 && guard++ < 10) y = AddModule(d, y, pic == null);
+        {
+            int rows = Mathf.Clamp((int)((640f - y) / 40f), 3, 9);
+            ShapeLayout(d, SHAPES[n % SHAPES.Length], y + 18, rows); y += rows * 40 + 24;
+        }
+        while (y < 560 && guard++ < 10) y = AddModule(d, y, false);
         foreach (var b in d.blocks) if (b.type == "plank") d.moves++;   // each shelf needs extra shots for its legs
         if (R() < 0.6f) d.blocks.Add(B("chest", RI(130, 410), Mathf.Min(y + 30, 660)));
         if (R() < 0.5f) { d.bumpers.Add(BumperL(680)); d.bumpers.Add(BumperR(680)); }
@@ -403,6 +444,9 @@ public static class LevelLibrary
         bool super = IsSuperHard(n);
         var d = new LevelDef { moves = (super ? 7 : 6) + n / 10, hint = super ? "SIÊU KHÓ! Mỗi phát đều phải tính!" : "MÀN KHÓ! Ngắm kỹ, tận dụng nổ dây chuyền!" };
         float y = 200; int guard = 0;
+        string hs = n == 15 ? "fortress" : n == 20 ? "ring" : n == 10 ? "diamond" : "xcross";
+        ShapeLayout(d, hs, y + 6, 7); y += 7 * 40 + 20;
+        if (hs == "fortress") d.moves += 3;   // the walls only open at one gap: players need a few probing shots
         while (y < 560 && guard++ < 10) y = AddModule(d, y, false);
         for (int i = 0; i < 11; i++) { float q = R(); d.blocks.Add(B(q < 0.25f ? "stone" : q < 0.4f ? "bathbomb" : PropKind(), 70 + i * 40, Mathf.Max(y + 10, 600))); }
         foreach (var b in d.blocks)
