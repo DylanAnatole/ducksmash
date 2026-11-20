@@ -314,6 +314,11 @@ public class GameController : MonoBehaviour
         foreach (var b in blocks) MakeView(b);
         foreach (var cb in blocks) if (cb.type == "chest" && cb.view != null) cb.tag = MakeTag("+2 vịt", new Color(1f, 0.7f, 0.2f), true);
         foreach (var cb in blocks) if (cb.type == "ring" && cb.view != null) cb.tag = MakeTag("ĐẨY TRƯỢT", new Color(1f, 0.42f, 0.4f), false);
+        // water colour by chapter: the bath changes as you progress (blue -> teal -> lavender bubble bath; hard = deeper)
+        if (waterMat != null)
+            waterMat.SetColor("_Shift", LevelLibrary.IsSandbox(level) || level <= 12 ? new Color(1, 1, 1, 0)
+                : hardLevel ? new Color(0.25f, 0.35f, 0.8f, 0.45f)
+                : level <= 18 ? new Color(0.3f, 0.85f, 0.78f, 0.6f) : level <= 25 ? new Color(0.72f, 0.5f, 1f, 0.55f) : new Color(1f, 0.55f, 0.68f, 0.5f));
         boosterBusy = false; if (boosterCo != null) { StopCoroutine(boosterCo); boosterCo = null; }
         swoop = 1f; flashA = 0; curtainA = 1f; goalTotal = GoalsLeft(); shownLeft = -1; halfShown = false; idleT = 0; hintReady = false; hintSearch = -1; HideHint(); shownMoves = shownScore = shownStreak = -1; levelArt = L.art; hudTick = 0; comboShown = -1;
         bossBlock = blocks.FirstOrDefault(b => b.type == "boss");
@@ -694,6 +699,11 @@ public class GameController : MonoBehaviour
                 lastWarned = true; BigText("LƯỢT CUỐI!", new Color(1f, 0.4f, 0.35f)); Sfx.Play("squeak", 0.7f, 0.7f); movesPulse = 0.5f;
             }
             if (state == "play" || state == "rush" || moving) for (int i = 0; i < 6; i++) Step(dt / 6f);
+            if (moving)
+            {   // pacing: once every duck is just drifting, brake harder so the turn ends without a dull wait
+                float mx = 0; for (int i = 0; i < ducks.Count; i++) mx = Mathf.Max(mx, ducks[i].v.sqrMagnitude);
+                if (mx < 70 * 70) { float k = Mathf.Exp(-6f * dt); for (int i = 0; i < ducks.Count; i++) ducks[i].v *= k; }
+            }
             if (moving && timers.Count == 0 && AllStill()) { foreach (var d in ducks) d.v = Vector2.zero; EndShot(); }
             if (state == "play" && !moving && timers.Count == 0)
             {

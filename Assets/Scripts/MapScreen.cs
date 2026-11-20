@@ -54,8 +54,8 @@ public class MapScreen : MonoBehaviour
         }
         // section banners
         Banner("HƯỚNG DẪN  ·  MÀN 1–5", 150, NodePos(1).y - 20, Teal);
-        Banner("THỬ THÁCH  ·  MÀN 6–25", -200, NodePos(6).y - 90, PurpleDark);
-        Banner("SẮP CÓ THÊM MÀN MỚI!", 0, NodePos(LevelLibrary.Count).y + 340, new Color(1f, 0.55f, 0.3f));   // end of the road, not a blank wall
+        Banner("THỬ THÁCH  ·  MÀN 6–" + LevelLibrary.Count, -200, NodePos(6).y - 90, PurpleDark);
+        Banner("ĐÍCH: MÀN " + LevelLibrary.Count + " SIÊU KHÓ", 0, NodePos(LevelLibrary.Count).y + 340, new Color(1f, 0.55f, 0.3f));   // end of the road
 
         for (int n = 1; n <= LevelLibrary.Count; n++)
         {
@@ -185,6 +185,8 @@ public class MapScreen : MonoBehaviour
     {
         // a level unlocked since the map was last shown pops in
         if (lastShownMax > 0 && SaveData.MaxLevel > lastShownMax) { unlockT = 0.01f; Sfx.Play("star", 0.8f, 1.2f); }
+        // saves from the 25-level version: a cleared last level unlocks the new ones
+        if (SaveData.MaxLevel < LevelLibrary.Count && SaveData.GetStars(SaveData.MaxLevel) > 0) SaveData.MaxLevel = SaveData.MaxLevel + 1;
         lastShownMax = SaveData.MaxLevel;
         root.gameObject.SetActive(true);
         Refresh();

@@ -9,6 +9,7 @@ Shader "DuckSmash/Water"
         _MainTex ("Caustics", 2D) = "white" {}
         _Speed ("Speed", Float) = 1
         _Sparkle ("Sparkle", Float) = 0.55
+        _Shift ("Hue shift (rgb = target tint, a = amount)", Color) = (1,1,1,0)
     }
     SubShader
     {
@@ -19,7 +20,7 @@ Shader "DuckSmash/Water"
             #pragma vertex vert
             #pragma fragment frag
             #include "UnityCG.cginc"
-            sampler2D _MainTex; float4 _MainTex_ST; fixed4 _Color; float _Speed, _Sparkle;
+            sampler2D _MainTex; float4 _MainTex_ST; fixed4 _Color; half4 _Shift; float _Speed, _Sparkle;
             struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
             v2f vert (appdata_base v) { v2f o; o.pos = UnityObjectToClipPos(v.vertex); o.uv = TRANSFORM_TEX(v.texcoord, _MainTex); return o; }
             fixed4 frag (v2f i) : SV_Target
@@ -30,7 +31,10 @@ Shader "DuckSmash/Water"
                 fixed3 c = (a.rgb + b.rgb) * 0.5;
                 fixed s = saturate((a.g + b.g) - 1.52) * 4.0;       // both caustic lines bright -> glint
                 c += s * s * _Sparkle;
-                return fixed4(c * _Color.rgb, 1);
+                half3 o = c * _Color.rgb;
+                half l = dot(o, half3(0.3, 0.59, 0.11));
+                o = lerp(o, l * _Shift.rgb * 2.2, _Shift.a);    // re-tint by brightness: keeps the caustics, changes the water colour
+                return fixed4(o, 1);
             }
             ENDCG
         }

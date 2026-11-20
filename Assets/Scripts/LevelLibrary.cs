@@ -25,7 +25,7 @@ public class LevelDef
 // Coordinates are "sim pixels" on a 540x960 board; the tub spans x 28..512, y 150..870.
 public static class LevelLibrary
 {
-    public const int Count = 25, Onboarding = 5;
+    public const int Count = 30, Onboarding = 5;
     public const int TestLevel = 99;   // sandbox level for trying new mechanics (not on the 25-level path, saves nothing)
     public const int SmashLevel = 101, SmashCount = 3;   // "phá đồ" destruction test levels 101..103
     public static bool IsSandbox(int n) => n >= TestLevel;
@@ -81,8 +81,8 @@ public static class LevelLibrary
     }
     public static SpecialInfo NewSpecialAt(int n) { foreach (var s in Specials) if (s.level == n) return s; return null; }
     // no bosses: milestones 10/15/20/25 are "hard levels" (denser layout, tight moves, bigger reward)
-    public static bool IsHard(int n) => n == 10 || n == 15 || n == 20 || n == 25;
-    public static bool IsSuperHard(int n) => n == 25;
+    public static bool IsHard(int n) => n == 10 || n == 15 || n == 20 || n == 25 || n == 30;
+    public static bool IsSuperHard(int n) => n == 30;
     public static bool IsBoss(int n) => false;
 
     static System.Random rng; static int pidCounter;
@@ -427,7 +427,7 @@ public static class LevelLibrary
                 gap += -Mathf.Abs(x - 270) * 0.05f;   // slight preference for the middle lane
                 if (gap > bestGap) { bestGap = gap; best = new Vector2(x, y); }
             }
-        if (bestGap >= r * 0.75f) d.whirls.Add(new Vector3(best.x, best.y, Mathf.Min(r, bestGap + 10)));
+        if (bestGap >= 50) d.whirls.Add(new Vector3(best.x, best.y, Mathf.Min(r, bestGap - 4)));   // never overlaps a block or a duck
     }
 
     static LevelDef Procedural(int n)
@@ -435,7 +435,8 @@ public static class LevelLibrary
         var d = new LevelDef { moves = 6 + n / 10 };   // bot tests: random aim cleared 14-24 in 3-6 shots, 9 moves made 3 stars free
         float y = 205; int guard = 0;
         string pic = n == 14 ? "flower" : n == 16 ? "mush" : n == 17 ? "sun" : n == 18 ? "apple" : n == 19 ? "boat"
-                   : n == 21 ? "cat" : n == 22 ? "rainbow" : n == 23 ? "heart" : n == 24 ? "duck" : null;
+                   : n == 21 ? "cat" : n == 22 ? "rainbow" : n == 23 ? "heart" : n == 24 ? "duck"
+                   : n == 26 ? "star" : n == 27 ? "mush" : n == 28 ? "fish" : n == 29 ? "apple" : null;
         if (pic != null)
         {   // picture on top (looks great + goes into the album), destruction modules underneath
             var rows = ArtRows(pic); int w = 0; foreach (var r in rows) w = Mathf.Max(w, r.Length);
@@ -469,7 +470,7 @@ public static class LevelLibrary
         bool super = IsSuperHard(n);
         var d = new LevelDef { moves = (super ? 7 : 6) + n / 10, hint = super ? "SIÊU KHÓ! Mỗi phát đều phải tính!" : "MÀN KHÓ! Ngắm kỹ, tận dụng nổ dây chuyền!" };
         float y = 200; int guard = 0;
-        string hs = n == 15 ? "fortress" : n == 20 ? "ring" : n == 10 ? "diamond" : "xcross";
+        string hs = n == 15 || n == 30 ? "fortress" : n == 20 ? "ring" : n == 10 ? "diamond" : "xcross";
         ShapeLayout(d, hs, y + 6, 7); y += 7 * 40 + 20;
         if (hs == "fortress") d.moves += 3;   // the walls only open at one gap: players need a few probing shots
         while (y < 560 && guard++ < 10) y = AddModule(d, y, false);
