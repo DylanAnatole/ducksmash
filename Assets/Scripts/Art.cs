@@ -65,8 +65,16 @@ public static class Art
         return m;
     }
 
+    // Big textured surfaces (floor, water). On phones they cover most of the screen, so they use an
+    // unlit texture shader tinted to match the lit toon look (flat surfaces facing the sun are uniformly lit anyway).
     public static Material Toon(Color c, Texture tex, Vector2 tiling, float gloss = 0.2f)
     {
+        if (App.Mobile)
+        {
+            var holder = Resources.Load<Material>("UnlitTexMat");
+            var sh = holder != null ? holder.shader : Shader.Find("DuckSmash/UnlitTex");
+            if (sh != null) return new Material(sh) { color = c * 1.07f, mainTexture = tex, mainTextureScale = tiling };
+        }
         var m = new Material(FlatShader) { color = c, mainTexture = tex, mainTextureScale = tiling };
         m.SetFloat("_Gloss", gloss); m.SetFloat("_Outline", 0f);
         m.SetColor("_ShadowTint", new Color(0.8f, 0.8f, 0.9f));

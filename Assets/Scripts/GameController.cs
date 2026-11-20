@@ -87,6 +87,7 @@ public class GameController : MonoBehaviour
     string state = "play", target, hint;
     float freeze, shake, comboPulse, t, lastW, lastH;
     Duck drag; Vector2 dragPt, dragSm; int powerStep, shotBanks; bool lastWarned;
+    Text powerTxt; int shownPower = -1; bool halfShown;
     bool aimVisible = true; RectTransform dynLayer, objFill; int goalTotal, shownLeft = -1; float goalPulse; int shownMoves = -1, shownScore = -1, shownStreak = -1;
     float swoop, flashA, hudTick; Image flashImg; int comboShown = -1; Block bossBlock;
     int piggyGain, dominoFalls, shotClears, piggyAdded; string levelArt; bool newArt, perfect;
@@ -271,7 +272,7 @@ public class GameController : MonoBehaviour
         // build-in animation: blocks drop onto the water row by row
         foreach (var b in blocks) { b.appear = 0; b.delay = 0.15f + (b.p.y - TY) / TH * 0.7f + UnityEngine.Random.value * 0.08f; }
         foreach (var b in blocks) MakeView(b);
-        swoop = 1f; flashA = 0; piggyGain = 0; goalTotal = GoalsLeft(); shownLeft = -1; shownMoves = shownScore = shownStreak = -1; levelArt = L.art; hudTick = 0; comboShown = -1;
+        swoop = 1f; flashA = 0; piggyGain = 0; goalTotal = GoalsLeft(); shownLeft = -1; halfShown = false; shownMoves = shownScore = shownStreak = -1; levelArt = L.art; hudTick = 0; comboShown = -1;
         bossBlock = blocks.FirstOrDefault(b => b.type == "boss");
         RefreshComboLabels(); comboShownFill = comboShownGhost = -1; if (guideRoot && guideRoot.gameObject.activeSelf) { guideRoot.gameObject.SetActive(false); Time.timeScale = 1f; }
         BuildLines();
@@ -1425,7 +1426,7 @@ public class GameController : MonoBehaviour
         foreach (var d in aimDots) d.gameObject.SetActive(false);
         foreach (var d in pushDots) d.gameObject.SetActive(false);
         aimX.gameObject.SetActive(false); aimTarget.gameObject.SetActive(false); aimGrab.gameObject.SetActive(false);
-        band.enabled = band2.enabled = false; aimCount.gameObject.SetActive(false);
+        band.enabled = band2.enabled = false; aimCount.gameObject.SetActive(false); powerTxt.gameObject.SetActive(false);
         if (drag == null || moving) { powerStep = 0; return; }
         // smoothed finger: the band and the dotted line glide instead of jittering
         float udt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
@@ -1446,11 +1447,15 @@ public class GameController : MonoBehaviour
         var bc = Color.Lerp(new Color(1f, 0.55f, 0.6f), new Color(1f, 0.3f, 0.3f), pw);
         SetBand(band, drag.p + side - dir * 4, grab, bc, bw); SetBand(band2, drag.p - side - dir * 4, grab, bc, bw);
         aimGrab.gameObject.SetActive(true); aimGrab.position = W(grab, 0.32f);
+        int pct = Mathf.RoundToInt(pw * 100f);
+        powerTxt.gameObject.SetActive(true);
+        powerTxt.rectTransform.anchoredPosition = WorldToHud(W(drag.p, 0.4f)) + new Vector2(drag.p.x > 380 ? -150 : 150, 20);   // beside the duck, clear of the band + boosters
+        if (pct != shownPower) { shownPower = pct; powerTxt.text = pct >= 99 ? "LỰC MAX" : "Lực " + pct + "%"; powerTxt.color = PowerColor(pw); }
         aimGrab.localScale = new Vector3(0.32f, 0.12f, 0.32f) * (1 + Mathf.Sin(Time.unscaledTime * 12) * 0.06f * pw);
 
         // trajectory: bounce off the walls, carve through what it will break, stop at the first thing it won't
         aimPath.Clear(); aimPath.Add(drag.p);
-        Vector2 gp = drag.p, gv = dir; float len = 260 + pv.z * 4.5f, stepL = 5; Duck hitDuck = null;
+        Vector2 gp = drag.p, gv = dir; float len = (260 + pv.z * 4.5f) * (level <= 5 ? 1.45f : 1f), stepL = 5; Duck hitDuck = null;
         aimHits.Clear(); int dmg = drag.kind == "rocket" ? 3 : drag.Dmg; bool pierce = frenzyReady;
         for (float s = 0; s < len; s += stepL)
         {
@@ -1570,7 +1575,7 @@ public class GameController : MonoBehaviour
             if (d.rocketT > 0) { FxKit.Flame(W(d.p - d.v.normalized * d.r * 1.2f, 0.3f)); if (UnityEngine.Random.value < 0.3f) FxKit.Smoke(W(d.p - d.v.normalized * d.r * 1.6f), 0.3f, 1); }
             if (d.special && !moving && UnityEngine.Random.value < dt * 4) FxKit.Sparkle(W(d.p, 0.5f), d.kind == "rainbow" ? Color.HSVToRGB(UnityEngine.Random.value, 0.5f, 1f) : new Color(1f, 0.85f, 0.4f), 1);
         }
-        bool fewLeft = state == "play" && !moving && GoalsLeft() <= 3;
+        bool fewLeft = state == "play" && !moving && GoalsLeft() <= 5;
         foreach (var b in blocks)
         {
             if (!b.alive || b.view == null) continue;
@@ -1845,6 +1850,9 @@ public class GameController : MonoBehaviour
         dynLayer = UIKit.Stretch(UIKit.Rect("DynamicUI", hud));
         dynLayer.gameObject.AddComponent<Canvas>();
         foreach (var g in new Graphic[] { comboTxt, bigTxt, aimCount }) g.transform.SetParent(dynLayer, false);
+        powerTxt = UIKit.Outlined(UIKit.Label(dynLayer, "", 40, Color.white), Ink, 3);
+        powerTxt.rectTransform.anchorMin = powerTxt.rectTransform.anchorMax = new Vector2(0.5f, 0.5f); powerTxt.rectTransform.sizeDelta = new Vector2(300, 60);
+        powerTxt.raycastTarget = false; powerTxt.gameObject.SetActive(false);
         handRt.SetParent(dynLayer, false);
         introRoot.SetAsLastSibling(); popupRoot.SetAsLastSibling();
         popupRoot.gameObject.SetActive(false);
@@ -1980,6 +1988,11 @@ public class GameController : MonoBehaviour
             goalsTxt.text = "<size=28>MỤC TIÊU: PHÁ SẠCH BỒN</size>\n<size=66><b>" + (left == 0 ? "XONG!" : "còn " + left) + "</b></size>";
             objFill.anchorMax = new Vector2(goalTotal > 0 ? 1f - left / (float)goalTotal : 1f, 1);
             goalPulse = 0.25f;
+            if (!halfShown && goalTotal >= 10 && left > 0 && left <= goalTotal / 2)
+            {
+                halfShown = true; PopText("ĐÃ PHÁ 50%!", new Vector2(270, 470), new Color(0.45f, 0.95f, 0.5f), 62);
+                Sfx.Play("star", 0.7f, 1.2f);
+            }
         }
         levelTxt.text = LevelLibrary.Title(level);
         foreach (var k in PRICE.Keys)
