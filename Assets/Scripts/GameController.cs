@@ -1974,7 +1974,11 @@ public class GameController : MonoBehaviour
         aimCount.gameObject.SetActive(aimHits.Count > 0 || rbAim);
         if (aimHits.Count > 0 || rbAim)
         {
-            aimCount.text = "x" + aimHits.Count + (drag.kind == "rainbow" && !drag.spent ? " +16" : "");
+            // the combo payoff right on the aim: "x12 -> Vịt Bom" when this shot alone would hatch a special
+            string tierName = null;
+            if (state == "play" && level > LevelLibrary.Onboarding)
+                foreach (var tr in TIERS) if (aimHits.Count >= tr.need && LevelLibrary.Unlocked(tr.kind, level)) { tierName = Cap(tr.name); break; }
+            aimCount.text = "x" + aimHits.Count + (drag.kind == "rainbow" && !drag.spent ? " +16" : "") + (tierName != null ? "\n<size=36>→ " + tierName + "</size>" : "");
             aimCount.rectTransform.anchoredPosition = WorldToHud(W(gp, 0.6f)) + new Vector2(0, 70);
             aimCount.color = aimHits.Count >= 10 ? new Color(0.45f, 0.95f, 0.5f) : Color.white;
         }
@@ -2078,12 +2082,15 @@ public class GameController : MonoBehaviour
             // white flash on hit (property block keeps the shared baked material untouched)
             // last few targets glow softly so the player can find them
             bool aimed = drag != null && !moving && aimHits.Contains(b);   // will break on this shot: light it up while aiming
-            bool glow = (fewLeft && b.Goal && !Covered(b)) || b.type == "gold" || aimed;
+            bool enraged = b.type == "boss" && b.hp <= b.max / 2;
+            bool glow = (fewLeft && b.Goal && !Covered(b)) || b.type == "gold" || aimed || enraged;
+            if (b.type == "gold" && b.mvAmp > 0 && UnityEngine.Random.value < dt * 6f) FxKit.Sparkle(W(b.p, 0.5f), new Color(1f, 0.9f, 0.4f), 1);   // drifting gold leaves glints
             if (b.hit > 0 || b.flashing || glow)
             {
                 b.flashing = b.hit > 0 || glow;
                 var e = b.hit > 0 ? Color.white * Mathf.Min(1f, b.hit * 6f) * 0.55f
                       : aimed ? new Color(1f, 1f, 0.85f) * (0.3f + 0.15f * Mathf.Sin(Time.unscaledTime * 14f))
+                      : enraged ? new Color(1f, 0.2f, 0.15f) * (0.25f + 0.2f * Mathf.Sin(t * 10f))
                       : glow ? new Color(1f, 0.85f, 0.35f) * (0.18f + 0.18f * Mathf.Sin(t * 6f)) : Color.clear;
                 mpb.Clear(); mpb.SetColor("_Emission", e);
                 foreach (var r in b.rends) if (r) r.SetPropertyBlock(b.flashing ? mpb : null);
@@ -2112,6 +2119,7 @@ public class GameController : MonoBehaviour
             {
                 w.view.Rotate(0, 140f * dt, 0, Space.World);   // clockwise on screen, same way it turns the ducks
                 if (UnityEngine.Random.value < dt * 1.2f) FxKit.Ripple(W(w.p + UnityEngine.Random.insideUnitCircle * w.r * 0.5f), 0.5f);
+                if (UnityEngine.Random.value < dt * (App.Mobile ? 0.8f : 2f)) FxKit.Bubble(W(w.p + UnityEngine.Random.insideUnitCircle * 8f));   // bubbles well up from the eye
             }
         foreach (var m in bumpers) { m.pulse = Mathf.Max(0, m.pulse - dt); m.view.localScale = new Vector3(1 + m.pulse * 2, 1, 1); }
     }
@@ -2267,7 +2275,7 @@ public class GameController : MonoBehaviour
         var ml = UIKit.Label(mb, "LƯỢT BẮN", 26, PurpleDark); ml.rectTransform.offsetMax = new Vector2(0, -122);
         var sp = UIKit.Rect("StarPreview", topIn); UIKit.Place(sp, 0, 0.5f, 125, -100, 170, 36);
         starPreview = UIKit.StarRow(sp, 3, 36, 6);
-        aimCount = UIKit.Outlined(UIKit.Label(hud, "", 64, Color.white), Ink, 4);
+        aimCount = UIKit.Outlined(UIKit.Label(hud, "", 64, Color.white), Ink, 4); aimCount.verticalOverflow = VerticalWrapMode.Overflow; aimCount.horizontalOverflow = HorizontalWrapMode.Overflow; aimCount.lineSpacing = 0.85f;
         aimCount.rectTransform.anchorMin = aimCount.rectTransform.anchorMax = new Vector2(0.5f, 0.5f); aimCount.rectTransform.sizeDelta = new Vector2(300, 100);
         aimCount.gameObject.SetActive(false);
         goalsTxt = UIKit.Outlined(UIKit.Label(topIn, "", 40, Color.white, TextAnchor.MiddleLeft), Ink, 3); UIKit.Place(goalsTxt.rectTransform, 0, 0.5f, 480, 22, 420, 150);
