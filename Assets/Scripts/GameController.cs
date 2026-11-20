@@ -87,7 +87,7 @@ public class GameController : MonoBehaviour
     string state = "play", target, hint;
     float freeze, shake, comboPulse, t, lastW, lastH;
     Duck drag; Vector2 dragPt, dragSm; int powerStep, shotBanks; bool lastWarned;
-    Text powerTxt; int shownPower = -1; bool halfShown;
+    Text powerTxt; int shownPower = -1; bool halfShown; RawImage popArt; GameObject popArtBg;
     bool aimVisible = true; RectTransform dynLayer, objFill; int goalTotal, shownLeft = -1; float goalPulse; int shownMoves = -1, shownScore = -1, shownStreak = -1;
     float swoop, flashA, hudTick; Image flashImg; int comboShown = -1; Block bossBlock;
     int piggyGain, dominoFalls, shotClears, piggyAdded; string levelArt; bool newArt, perfect;
@@ -233,7 +233,7 @@ public class GameController : MonoBehaviour
         foreach (var p in pops) if (p.t) Destroy(p.t.gameObject);
         pops.Clear();
         moves = startMoves = L.moves; state = "play"; moving = false; shotSmash = streak = pushes = score = 0;
-        frenzyShot = bossKilled = rewarded = false; hardLevel = L.hard; target = null; hint = L.hint; freeze = shake = 0; drag = null;
+        frenzyShot = bossKilled = rewarded = false; hardLevel = L.hard; target = null; hint = level <= LevelLibrary.Onboarding || LevelLibrary.IsSandbox(level) ? L.hint : ""; freeze = shake = 0; drag = null;
 
         FxKit.Clear();
         cam.cullingMask = ~0;
@@ -1184,10 +1184,10 @@ public class GameController : MonoBehaviour
         introTitle.color = hardLevel ? new Color(1f, 0.35f, 0.3f) : new Color(0.6f, 0.53f, 0.93f);
         // reminder of the combo ducks the player has already unlocked
         var known = LevelLibrary.Specials.Where(s => LevelLibrary.Unlocked(s.kind, level) && LevelLibrary.NewSpecialAt(level) != s).ToList();
-        string combos = known.Count == 0 ? "" : "\n<size=30>" + string.Join("\n", known.Select(s => s.how + " → " + Cap(s.name))) + "</size>";
+        string combos = "";   // no combo recipe reminder on every level (players found it patronising); the COMBO ? guide has it
         introBody.text = string.Join("\n", g) + "\n\n" + moves + " lượt bắn" + combos;
-        introMax = introTimer = known.Count >= 3 ? 2.6f : 1.8f;
-        introRoot.sizeDelta = new Vector2(760, 520 + known.Count * 40);
+        introMax = introTimer = 1.6f;
+        introRoot.sizeDelta = new Vector2(760, 480);
 
         // unlock level: teach how to earn the new duck and how it works, and give one free copy to try
         var nw = LevelLibrary.NewSpecialAt(level);
@@ -1424,11 +1424,11 @@ public class GameController : MonoBehaviour
 
     void UpdateHint(float rdt)
     {
-        bool can = state == "play" && !moving && drag == null && introTimer <= 0 && target == null && ducks.Count > 0
+        bool can = level <= LevelLibrary.Onboarding && state == "play" && !moving && drag == null && introTimer <= 0 && target == null && ducks.Count > 0
                    && !popupRoot.gameObject.activeSelf && (guideRoot == null || !guideRoot.gameObject.activeSelf) && Time.timeScale > 0;
         if (!can || Input.GetMouseButton(0)) { idleT = 0; hintReady = false; hintSearch = -1; if (hintShown) HideHint(); return; }
         idleT += rdt;
-        if (idleT > 3f && hintSearch < 0 && !hintReady) { hintSearch = 0; hintBestScore = 0; hintBestDuck = -1; }
+        if (idleT > 5f && hintSearch < 0 && !hintReady) { hintSearch = 0; hintBestScore = 0; hintBestDuck = -1; }
         if (hintSearch >= 0)
         {   // a few candidates per frame so the search never causes a hitch
             int total = ducks.Count * HINT_ANGLES;
@@ -1442,7 +1442,7 @@ public class GameController : MonoBehaviour
             }
             if (hintSearch >= total) { hintSearch = -1; hintReady = hintBestDuck >= 0; if (hintReady) PredictShot(ducks[hintBestDuck], hintBestDir, hintPath); }
         }
-        if (hintReady && idleT > 6f && hintBestDuck < ducks.Count)
+        if (hintReady && idleT > 8f && hintBestDuck < ducks.Count)
         {
             hintShown = true;
             // marching soft dots along the suggested path
@@ -1544,7 +1544,7 @@ public class GameController : MonoBehaviour
         SetBand(band, drag.p + side - dir * 4, grab, bc, bw); SetBand(band2, drag.p - side - dir * 4, grab, bc, bw);
         aimGrab.gameObject.SetActive(true); aimGrab.position = W(grab, 0.32f);
         int pct = Mathf.RoundToInt(pw * 100f);
-        powerTxt.gameObject.SetActive(true);
+        powerTxt.gameObject.SetActive(level <= LevelLibrary.Onboarding);
         powerTxt.rectTransform.anchoredPosition = WorldToHud(W(drag.p, 0.4f)) + new Vector2(drag.p.x > 380 ? -150 : 150, 20);   // beside the duck, clear of the band + boosters
         if (pct != shownPower) { shownPower = pct; powerTxt.text = pct >= 99 ? "LỰC MAX" : "Lực " + pct + "%"; powerTxt.color = PowerColor(pw); }
         aimGrab.localScale = new Vector3(0.32f, 0.12f, 0.32f) * (1 + Mathf.Sin(Time.unscaledTime * 12) * 0.06f * pw);
@@ -1671,7 +1671,7 @@ public class GameController : MonoBehaviour
             if (d.rocketT > 0) { FxKit.Flame(W(d.p - d.v.normalized * d.r * 1.2f, 0.3f)); if (UnityEngine.Random.value < 0.3f) FxKit.Smoke(W(d.p - d.v.normalized * d.r * 1.6f), 0.3f, 1); }
             if (d.special && !moving && UnityEngine.Random.value < dt * 4) FxKit.Sparkle(W(d.p, 0.5f), d.kind == "rainbow" ? Color.HSVToRGB(UnityEngine.Random.value, 0.5f, 1f) : new Color(1f, 0.85f, 0.4f), 1);
         }
-        bool fewLeft = state == "play" && !moving && GoalsLeft() <= 5;
+        bool fewLeft = state == "play" && !moving && GoalsLeft() <= 3;
         foreach (var b in blocks)
         {
             if (!b.alive || b.view == null) continue;
@@ -1926,6 +1926,9 @@ public class GameController : MonoBehaviour
         popStarImgs = UIKit.StarRow(popStars.transform, 3, 150, 24);
         popBody = UIKit.Label(card, "", 44, Color.white); UIKit.Place(popBody.rectTransform, 0.5f, 1, 0, -440, 860, 120);
         popReward = UIKit.Outlined(UIKit.Label(card, "", 64, Yellow), Ink, 4); UIKit.Place(popReward.rectTransform, 0.5f, 1, 0, -540, 860, 100);
+        var paBg = UIKit.Dot(card, Color.white, "ArtBg"); UIKit.Place(paBg.rectTransform, 0.5f, 1, 335, -300, 150, 150); paBg.raycastTarget = false;
+        popArt = UIKit.Rect("Art", paBg.transform).gameObject.AddComponent<RawImage>(); UIKit.Place(popArt.rectTransform, 0.5f, 0.5f, 0, 0, 104, 104); popArt.raycastTarget = false;
+        popArtBg = paBg.gameObject; popArtBg.SetActive(false);
         popA = UIKit.Btn(card, "", new Color(0.37f, 0.83f, 0.37f), Color.white, 50, OnPopA, "A"); UIKit.Place((RectTransform)popA.transform, 0.5f, 0, 0, 280, 640, 150);
         popB = UIKit.Btn(card, "", Yellow, Ink, 44, OnPopB, "B"); UIKit.Place((RectTransform)popB.transform, 0.5f, 0, 0, 110, 640, 130);
         // level intro card
@@ -2133,6 +2136,8 @@ public class GameController : MonoBehaviour
         {
             popTitle.text = hardLevel ? "VƯỢT MÀN KHÓ!" : (level <= LevelLibrary.Onboarding ? "Giỏi lắm!" : "Well Done!");
             popStars.text = "";
+            popArtBg.SetActive(newArt);
+            if (newArt) popArt.texture = LevelLibrary.ArtTexture(levelArt, false);
             for (int i = 0; i < 3; i++) { popStarImgs[i].gameObject.SetActive(true); popStarImgs[i].color = i < stars ? Yellow : new Color(0.49f, 0.42f, 0.84f); popStarImgs[i].rectTransform.localScale = Vector3.one * (i == 1 ? 1.2f : 1f); }
             popBody.text = "Điểm " + score.ToString("N0") + (perfect ? "\n<color=#7dffa0>PHÁ SẠCH SÀNH SANH! +25 xu</color>" : "") + (hardLevel ? "\nThưởng màn khó: +80 xu" + (SaveData.GetStars(level) > 0 ? "" : "") : "")
                 + (piggyAdded > 0 ? "\n<size=36>Ống heo +" + piggyAdded + "  (" + SaveData.Piggy + "/" + SaveData.PiggyMax + ")</size>" : "")
