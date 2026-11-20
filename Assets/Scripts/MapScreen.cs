@@ -110,16 +110,16 @@ public class MapScreen : MonoBehaviour
     {
         albumRoot = UIKit.Stretch(UIKit.Rect("AlbumPopup", root));
         var dim = albumRoot.gameObject.AddComponent<Image>(); dim.color = new Color(0.11f, 0.08f, 0.25f, 0.8f);
-        var card = UIKit.Panel(albumRoot, Purple, "Card").rectTransform; UIKit.Place(card, 0.5f, 0.5f, 0, 0, 920, 1150);
+        var card = UIKit.Panel(albumRoot, Purple, "Card").rectTransform; UIKit.Place(card, 0.5f, 0.5f, 0, 0, 980, 1500);
         albumTitle = UIKit.Outlined(UIKit.Label(card, "", 70, Color.white), Ink, 4); UIKit.Place(albumTitle.rectTransform, 0.5f, 1, 0, -90, 860, 110);
         var ids = LevelLibrary.ArtIds;
         for (int i = 0; i < ids.Length; i++)
         {
-            int col = i % 2, row = i / 2;
-            var cell = UIKit.Panel(card, new Color(1f, 0.97f, 0.94f), "Art" + i).rectTransform; UIKit.Place(cell, 0.5f, 1, col == 0 ? -215 : 215, -360 - row * 430, 390, 390);
-            var img = UIKit.Rect("Pic", cell).gameObject.AddComponent<RawImage>(); UIKit.Place(img.rectTransform, 0.5f, 0.5f, 0, 25, 300, 280);
+            int col = i % 3, row = i / 3;   // 3 x 4 grid (12 pictures)
+            var cell = UIKit.Panel(card, new Color(1f, 0.97f, 0.94f), "Art" + i).rectTransform; UIKit.Place(cell, 0.5f, 1, (col - 1) * 305, -330 - row * 290, 285, 275);
+            var img = UIKit.Rect("Pic", cell).gameObject.AddComponent<RawImage>(); UIKit.Place(img.rectTransform, 0.5f, 0.5f, 0, 22, 190, 180);
             albumImgs.Add(img);
-            var nm = UIKit.Label(cell, "", 34, Ink); UIKit.Place(nm.rectTransform, 0.5f, 0, 0, 35, 380, 50); albumNames.Add(nm);
+            var nm = UIKit.Label(cell, "", 28, Ink); UIKit.Place(nm.rectTransform, 0.5f, 0, 0, 26, 280, 40); albumNames.Add(nm);
         }
         var close = UIKit.Btn(card, "ĐÓNG", Yellow, Ink, 44, () => { Sfx.Play("click"); albumRoot.gameObject.SetActive(false); }, "Close");
         UIKit.Place((RectTransform)close.transform, 0.5f, 0, 0, 90, 400, 120);

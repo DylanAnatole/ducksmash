@@ -273,6 +273,7 @@ public class GameController : MonoBehaviour
         foreach (var b in blocks) MakeView(b);
         swoop = 1f; flashA = 0; piggyGain = 0; shownMoves = shownScore = shownStreak = -1; levelArt = L.art; hudTick = 0; comboShown = -1;
         bossBlock = blocks.FirstOrDefault(b => b.type == "boss");
+        RefreshComboLabels(); comboShownFill = comboShownGhost = -1; if (guideRoot && guideRoot.gameObject.activeSelf) { guideRoot.gameObject.SetActive(false); Time.timeScale = 1f; }
         BuildLines();
         foreach (var bd in L.bumpers)
         {
@@ -710,7 +711,7 @@ public class GameController : MonoBehaviour
                 {
                     d.bankCd = 0.12f; shotBanks++;
                     d.v *= Mathf.Min(1.1f, MAX_SPEED * 1.1f / Mathf.Max(1, sp));
-                    PopText("NẢY BĂNG x" + (shotBanks + 1), d.p, new Color(0.55f, 0.9f, 1f), 44 + shotBanks * 6);
+                    PopText("NẢY BĂNG! Điểm x" + (shotBanks + 1), d.p, new Color(0.55f, 0.9f, 1f), 44 + shotBanks * 6);
                     Sfx.Play("squeak", 0.5f, 1.2f + shotBanks * 0.15f); FxKit.Sparkle(W(d.p, 0.3f), new Color(0.6f, 0.9f, 1f), 6);
                 }
             }
@@ -759,7 +760,7 @@ public class GameController : MonoBehaviour
                     {
                         a.hot = b.hot = true; a.squash = b.squash = 0.2f; var mid = (a.p + b.p) / 2;
                         Splash(mid, 8); FxKit.Sparkle(W(mid), Color.white, 6); Shake(0.15f); freeze = Mathf.Max(freeze, 0.03f); pushes++; shotSmash++; comboPulse = 0.18f;
-                        PopText(pushes >= 2 ? "CỐC! x" + pushes : "CỐC!", mid, Color.white, 46 + Mathf.Min(20, pushes * 4));
+                        PopText(LevelLibrary.Unlocked("zap", level) && pushes <= ZAP_PUSHES ? "CỐC! " + pushes + "/" + ZAP_PUSHES : "CỐC!", mid, Color.white, 46 + Mathf.Min(20, pushes * 4));
                         Sfx.Play(pushes % 2 == 1 ? "quack" : "squeak", 0.9f, 1f + pushes * 0.08f);
                     }
                 }
@@ -1106,7 +1107,7 @@ public class GameController : MonoBehaviour
             PopText("+" + bonus + " LƯỢT!", new Vector2(130, 175), new Color(0.45f, 0.95f, 0.5f), 72);
             Sfx.Play("star", 1f, 1.2f); FxKit.StarBurst(W(270, 200, 0.5f), 16);
         }
-        if (n >= 6) { streak++; Sfx.Play("combo", 0.8f, 1f + streak * 0.06f); if (streak >= 2) PopText("CHUỖI x" + (streak + 1), new Vector2(270, 620), new Color(1f, 0.7f, 0.28f), 64); }
+        if (n >= 6) { streak++; Sfx.Play("combo", 0.8f, 1f + streak * 0.06f); if (streak >= 1) PopText("Chuỗi " + (streak + 1) + " phát · Điểm x" + (streak + 1), new Vector2(270, 620), new Color(1f, 0.7f, 0.28f), 64); }
         else if (streak > 0) { PopText("Mất chuỗi…", new Vector2(270, 620), new Color(0.8f, 0.84f, 0.9f), 44); streak = 0; }
         if (!frenzyShot && !frenzyReady)
         {
@@ -1795,6 +1796,8 @@ public class GameController : MonoBehaviour
         var bf = UIKit.Panel(bossBar, new Color(1f, 0.35f, 0.2f), "Fill"); bossFill = bf.rectTransform;
         bossFill.anchorMin = Vector2.zero; bossFill.anchorMax = Vector2.one; bossFill.offsetMin = new Vector2(4, 4); bossFill.offsetMax = new Vector2(-4, -4);
         bossTxt = UIKit.Label(bossBar, "BOSS", 26, Color.white);
+        BuildComboBar();
+        BuildComboGuide();
         // combo + big text
         comboTxt = UIKit.Outlined(UIKit.Label(hud, "", 90, Yellow), Ink, 6); UIKit.Place(comboTxt.rectTransform, 0.5f, 0, 0, 540, 1000, 220); comboTxt.lineSpacing = 0.85f; comboTxt.verticalOverflow = VerticalWrapMode.Overflow;
         bigTxt = UIKit.Outlined(UIKit.Label(hud, "", 110, Color.white), new Color(1f, 0.5f, 0.75f), 8); UIKit.Place(bigTxt.rectTransform, 0.5f, 0.5f, 0, 120, 1000, 200);
@@ -1863,9 +1866,100 @@ public class GameController : MonoBehaviour
         tex.SetPixels(px); tex.Apply(); return tex;
     }
 
+    // ===================== combo bar: how many smashes this shot, and which duck each milestone gives =====================
+    RectTransform comboBar, comboFill, comboGhost; Text comboCount; readonly List<(int need, string kind, Image dot, Text label, RectTransform rt)> comboMarks = new List<(int, string, Image, Text, RectTransform)>();
+    RectTransform guideRoot; Text guideBody; const float COMBO_MAX = 25f; float comboShownFill = -1, comboShownGhost = -1;
+
+    void BuildComboBar()
+    {
+        comboBar = UIKit.Panel(hud, new Color(0.23f, 0.18f, 0.42f, 0.55f), "ComboBar").rectTransform; UIKit.Place(comboBar, 0.5f, 1, -70, -372, 820, 52);
+        var track = UIKit.Rect("Track", comboBar); UIKit.Stretch(track, 96, 6, 12, 6);
+        comboGhost = UIKit.Panel(track, new Color(1f, 1f, 1f, 0.35f), "Ghost").rectTransform;
+        comboFill = UIKit.Panel(track, new Color(1f, 0.82f, 0.3f), "Fill").rectTransform;
+        foreach (var r in new[] { comboGhost, comboFill }) { r.anchorMin = Vector2.zero; r.anchorMax = new Vector2(0, 1); r.offsetMin = r.offsetMax = Vector2.zero; r.pivot = new Vector2(0, 0.5f); }
+        comboCount = UIKit.Label(comboBar, "0", 34, Color.white, TextAnchor.MiddleLeft); UIKit.Place(comboCount.rectTransform, 0, 0.5f, 52, 0, 90, 50);
+        // milestone markers, smallest first
+        for (int i = TIERS.Length - 1; i >= 0; i--)
+        {
+            var tr = TIERS[i];
+            var mk = UIKit.Rect("Mark" + tr.need, track); mk.anchorMin = mk.anchorMax = new Vector2(tr.need / COMBO_MAX, 0.5f); mk.sizeDelta = new Vector2(10, 64);
+            var dot = UIKit.Dot(mk, tr.col, "Dot"); dot.rectTransform.sizeDelta = new Vector2(34, 34); dot.raycastTarget = false;
+            var num = UIKit.Label(dot.transform, tr.need.ToString(), 20, Color.white); num.raycastTarget = false;
+            var lbl = UIKit.Outlined(UIKit.Label(mk, "", 24, Ink), Color.white, 2); lbl.rectTransform.anchoredPosition = new Vector2(0, -46); lbl.rectTransform.sizeDelta = new Vector2(200, 30); lbl.raycastTarget = false;
+            comboMarks.Add((tr.need, tr.kind, dot, lbl, mk));
+        }
+        var help = UIKit.Btn(hud, "COMBO ?", Yellow, Ink, 28, OpenComboGuide, "ComboHelp");
+        UIKit.Place((RectTransform)help.transform, 1, 1, -88, -372, 150, 56);
+    }
+
+    void UpdateComboBar()
+    {
+        bool show = level > LevelLibrary.Onboarding && state == "play";
+        if (comboBar.gameObject.activeSelf != show) comboBar.gameObject.SetActive(show);
+        if (!show) return;
+        int now = moving ? shotSmash : 0, ghost = !moving && drag != null && aimVisible ? aimHits.Count : 0;
+        float f = Mathf.Clamp01(now / COMBO_MAX), g = Mathf.Clamp01(ghost / COMBO_MAX);
+        if (f != comboShownFill) { comboShownFill = f; comboFill.anchorMax = new Vector2(f, 1); comboCount.text = (moving ? now : ghost).ToString(); }
+        if (g != comboShownGhost) { comboShownGhost = g; comboGhost.anchorMax = new Vector2(g, 1); if (!moving) comboCount.text = ghost.ToString(); }
+        foreach (var m in comboMarks)
+        {
+            bool unlocked = LevelLibrary.Unlocked(m.kind, level), hit = now >= m.need;
+            m.rt.localScale = Vector3.one * (unlocked && hit ? 1.25f + Mathf.Sin(t * 12) * 0.08f : 1f);
+        }
+    }
+
+    void RefreshComboLabels()
+    {
+        foreach (var m in comboMarks)
+        {
+            var info = LevelLibrary.Specials.FirstOrDefault(x => x.kind == m.kind);
+            bool unlocked = LevelLibrary.Unlocked(m.kind, level);
+            string nm = info != null ? Cap(info.name).Replace("Vịt ", "") : m.kind;
+            m.label.text = unlocked ? nm : "Màn " + (info != null ? info.level : 0);
+            m.dot.color = unlocked ? TIERS.First(x => x.kind == m.kind).col : new Color(0.55f, 0.52f, 0.64f);
+        }
+    }
+
+    void BuildComboGuide()
+    {
+        guideRoot = UIKit.Stretch(UIKit.Rect("ComboGuide", hud));
+        var dim = guideRoot.gameObject.AddComponent<Image>(); dim.color = new Color(0.11f, 0.08f, 0.25f, 0.82f);
+        var card = UIKit.Panel(guideRoot, new Color(1f, 0.97f, 0.94f), "Card").rectTransform; UIKit.Place(card, 0.5f, 0.5f, 0, 0, 960, 1420);
+        var title = UIKit.Outlined(UIKit.Label(card, "CÁCH TẠO VỊT COMBO", 60, Purple), Ink, 3); UIKit.Place(title.rectTransform, 0.5f, 1, 0, -80, 900, 100);
+        guideBody = UIKit.Label(card, "", 31, Ink, TextAnchor.UpperLeft); UIKit.Place(guideBody.rectTransform, 0.5f, 1, 0, -620, 860, 960);
+        guideBody.horizontalOverflow = HorizontalWrapMode.Wrap; guideBody.verticalOverflow = VerticalWrapMode.Overflow; guideBody.lineSpacing = 1.05f;
+        var close = UIKit.Btn(card, "ĐÃ HIỂU", new Color(0.37f, 0.83f, 0.37f), Color.white, 44, CloseComboGuide, "Close");
+        UIKit.Place((RectTransform)close.transform, 0.5f, 0, 0, 95, 440, 120);
+        guideRoot.gameObject.SetActive(false);
+    }
+
+    void OpenComboGuide()
+    {
+        Sfx.Play("click");
+        var sb = new System.Text.StringBuilder();
+        sb.Append("Mỗi phát bắn đếm <b>số món bị phá</b> (thanh combo). Chạm mốc → <b>1 vịt thường hoá vịt đặc biệt</b>, dùng 1 lần:\n\n");
+        foreach (var sp in LevelLibrary.Specials)
+        {
+            bool ok = LevelLibrary.Unlocked(sp.kind, level);
+            string need = sp.kind == "bomb" ? "phá 10 món" : sp.kind == "zap" ? "đẩy trúng 3 vịt" : sp.kind == "rocket" ? "phá 16 món" : "phá 25 món";
+            string use = sp.kind == "bomb" ? "nổ tung khi chạm" : sp.kind == "zap" ? "phóng sét sang khối gần" : sp.kind == "rocket" ? "lao thẳng, xuyên tất cả" : "sét đánh 16 khối";
+            sb.Append(ok ? "• <color=#7a4dd8><b>" + Cap(sp.name) + "</b></color>  (" + need + "): " + use + "\n"
+                         : "• <color=#9a94ad>" + Cap(sp.name) + " — mở ở màn " + sp.level + "</color>\n");
+        }
+        sb.Append("\n<b>Nhân điểm</b> (chỉ tăng điểm):\n");
+        sb.Append("• Nảy băng: đập tường rồi mới phá → điểm x2, x3, x4\n");
+        sb.Append("• Chuỗi: nhiều phát liền, mỗi phát phá từ 6 món → điểm x2, x3…\n");
+        sb.Append("\n<b>Khác</b>:\n• Phá sạch 1 hàng = <b>CLEAR</b>, nổ lan hàng bên\n• Đầy thanh <b>FRENZY</b> = phát sau bắn ra 5 vịt\n• Khi ngắm, vệt trắng trên thanh combo = số món dự kiến phá");
+        guideBody.text = sb.ToString();
+        guideRoot.gameObject.SetActive(true); guideRoot.SetAsLastSibling(); Time.timeScale = 0f;
+    }
+
+    void CloseComboGuide() { Sfx.Play("click"); guideRoot.gameObject.SetActive(false); Time.timeScale = 1f; }
+
     void RefreshHud()
     {
         if (!Active) return;
+        UpdateComboBar();
         flashA = Mathf.Max(0, flashA - Time.unscaledDeltaTime * 2.5f);
         flashImg.color = new Color(1f, 0.97f, 0.9f, flashA);
         if (shownMoves != moves) { shownMoves = moves; movesTxt.text = moves.ToString(); }
@@ -1902,7 +1996,7 @@ public class GameController : MonoBehaviour
         feverFill.anchorMax = new Vector2(fr, 1);
         feverFill.GetComponent<Image>().color = frenzyReady ? Color.HSVToRGB(t * 0.8f % 1, 0.6f, 1f) : new Color(1f, 0.49f, 0.71f);
         feverTxt.text = frenzyReady ? "DUCK FRENZY SẴN SÀNG — BẮN ĐI!" : "FRENZY";
-        if (shownStreak != streak) { shownStreak = streak; streakTxt.text = streak > 0 ? "CHUỖI x" + (streak + 1) : ""; }
+        if (shownStreak != streak) { shownStreak = streak; streakTxt.text = streak > 0 ? "Chuỗi: điểm x" + (streak + 1) : ""; }
         if (boss != null) { bossFill.anchorMax = new Vector2(Mathf.Clamp01((float)boss.hp / boss.max), 1); bossTxt.text = boss.alive ? "VUA BÁNH  " + Mathf.Max(0, boss.hp) + "/" + boss.max : "HẠ GỤC!"; }
         string ht = target == "hammer" ? "Chạm vào một khối để đập vỡ (chạm Búa để huỷ)" : target == "bomb" ? "Chạm chỗ muốn thả bom nước" : moving ? "" : hint;
         hintPanel.gameObject.SetActive(!string.IsNullOrEmpty(ht) && state == "play"); hintTxt.text = ht;
@@ -1915,7 +2009,7 @@ public class GameController : MonoBehaviour
             var nt = NextTier(shotSmash);
             string sub = nt.kind != null ? "\n<size=44>còn " + (nt.need - shotSmash) + " → " + nt.name + "</size>"
                        : nt.maxed ? "\n<size=44>" + nt.name + "!</size>" : "";
-            comboTxt.text = "x" + shotSmash + " SMASH" + sub + (shotBanks > 0 ? "\n<size=40>BĂNG x" + (shotBanks + 1) + " ĐIỂM</size>" : "");
+            comboTxt.text = "PHÁ " + shotSmash + (shotBanks > 0 ? "\n<size=40>Nảy băng: điểm x" + (shotBanks + 1) + "</size>" : "");
             }
             comboTxt.color = shotSmash >= 25 ? Color.HSVToRGB(t * 1.5f % 1f, 0.55f, 1f) : shotSmash >= 16 ? new Color(1f, 0.35f, 0.2f) : shotSmash >= 10 ? new Color(1f, 0.6f, 0.3f) : Yellow;
             comboTxt.rectTransform.localScale = Vector3.one * (1 + comboPulse * 2.5f + Mathf.Min(shotSmash, 30) * 0.006f);

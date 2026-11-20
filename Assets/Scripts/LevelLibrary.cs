@@ -32,9 +32,22 @@ public static class LevelLibrary
         : IsSuperHard(n) ? "Siêu khó " + n : IsHard(n) ? "Màn khó " + n : (n <= Onboarding ? "Hướng dẫn " : "Màn ") + n;
 
     // ---------- pixel-art album ----------
-    public static readonly string[] ArtIds = { "duck", "heart", "straw", "fish" };
-    public static string ArtName(string id) => id == "duck" ? "Vịt vàng" : id == "heart" ? "Trái tim" : id == "straw" ? "Dâu tây" : "Cá xanh";
-    static string[] ArtRows(string id) => id == "duck" ? ART_DUCK : id == "heart" ? ART_HEART : id == "straw" ? ART_STRAW : ART_FISH;
+    public static readonly string[] ArtIds = { "star", "duck", "heart", "straw", "fish", "flower", "mush", "sun", "apple", "boat", "cat", "rainbow" };
+    static readonly Dictionary<string, string> ArtNames = new Dictionary<string, string>
+    {
+        { "star", "Ngôi sao" }, { "duck", "Vịt vàng" }, { "heart", "Trái tim" }, { "straw", "Dâu tây" }, { "fish", "Cá xanh" }, { "flower", "Bông hoa" },
+        { "mush", "Cây nấm" }, { "sun", "Mặt trời" }, { "apple", "Quả táo" }, { "boat", "Thuyền buồm" }, { "cat", "Mèo cam" }, { "rainbow", "Cầu vồng" },
+    };
+    public static string ArtName(string id) => ArtNames.TryGetValue(id, out var nm) ? nm : id;
+    static string[] ArtRows(string id)
+    {
+        switch (id)
+        {
+            case "star": return ART_STAR; case "duck": return ART_DUCK; case "heart": return ART_HEART; case "straw": return ART_STRAW;
+            case "fish": return ART_FISH; case "flower": return ART_FLOWER; case "mush": return ART_MUSH; case "sun": return ART_SUN;
+            case "apple": return ART_APPLE; case "boat": return ART_BOAT; case "cat": return ART_CAT; default: return ART_RAINBOW;
+        }
+    }
     public static Texture2D ArtTexture(string id, bool locked)
     {
         var rows = ArtRows(id); int h = rows.Length, w = 0; foreach (var r in rows) w = Mathf.Max(w, r.Length);
@@ -100,7 +113,7 @@ public static class LevelLibrary
     static readonly Dictionary<char, Color> PAL = new Dictionary<char, Color>
     {
         { 'Y', Hex("ffd84a") }, { 'O', Hex("ff8a1f") }, { 'K', Hex("2b2b3b") }, { 'W', Color.white }, { 'R', Hex("ff4d6d") },
-        { 'P', Hex("ff9ec7") }, { 'G', Hex("5fd35f") }, { 'B', Hex("4fc3f7") }, { 'D', Hex("c7363f") },
+        { 'P', Hex("ff9ec7") }, { 'G', Hex("5fd35f") }, { 'B', Hex("4fc3f7") }, { 'D', Hex("c7363f") }, { 'N', Hex("9a6233") },
     };
     static Color Hex(string h) { ColorUtility.TryParseHtmlString("#" + h, out var c); return c; }
 
@@ -118,6 +131,15 @@ public static class LevelLibrary
         "..Y..YYYY.....", ".YYYYYYYYYYY..", "YYYYYYYYYYYYY.", "YYYYYYYYYYYYY.", ".YYYYYYYYYYY..", "..YYYYYYYYY..." };
     static readonly string[] ART_HEART = { ".DD...DD.", "DRRD.DRRD", "DRWRDRRRD", "DWRRRRRRD", "DRRRRRRRD", ".DRRRRRD.", "..DRRRD..", "...DRD...", "....D...." };
     static readonly string[] ART_STRAW = { "...GGGG...", "..GGGGGG..", ".RRRRRRRR.", "RRWRRRRWRR", "RRRRRWRRRR", "RWRRRRRRWR", ".RRRWRRRR.", "..RRRRRR..", "...RRRR..." };
+    // original simple pixel pictures (album collection)
+    static readonly string[] ART_STAR = { "....Y....", "...YYY...", "...YOY...", "YYYYYYYYY", ".YYYYYYY.", "..YYYYY..", ".YYYYYYY.", ".YY...YY.", "YY.....YY" };
+    static readonly string[] ART_FLOWER = { "..PP.PP..", ".PPPPPPP.", "PPPYYYPPP", ".PPYOYPP.", "PPPYYYPPP", ".PPPPPPP.", "..PP.PP..", "....G....", "..GGG....", "....GGG..", "....G...." };
+    static readonly string[] ART_MUSH = { "...RRRR...", ".RRWRRWRR.", "RRRRRRRRRR", "RWRRRRRRWR", "RRRRRRRRRR", "..WWWWWW..", "...WKWK...", "...WWWW...", "...WWWW..." };
+    static readonly string[] ART_SUN = { "Y...Y...Y", ".Y.OOO.Y.", "..OOOOO..", ".OOYYYOO.", "YOOYYYOOY", ".OOYYYOO.", "..OOOOO..", ".Y.OOO.Y.", "Y...Y...Y" };
+    static readonly string[] ART_APPLE = { "....N....", "....NGG..", "..RR.RR..", ".RRRRRRR.", "RRWRRRRRR", "RWRRRRRRR", "RRRRRRRRR", ".RRRRRRR.", "..RR.RR.." };
+    static readonly string[] ART_BOAT = { ".....W.....", ".....WW....", ".....WWW...", ".....WWWW..", ".....N.....", "NNNNNNNNNNN", ".NNNNNNNNN.", "..BBBBBBB..", "BBB.BBB.BBB" };
+    static readonly string[] ART_CAT = { "K.........K", "KK.......KK", "KOK.....KOK", "KOOOOOOOOOK", "KOGKOOOGKOK", "KOOOOOOOOOK", "KOOOOPOOOOK", ".KOOOOOOOK.", "..KKKKKKK.." };
+    static readonly string[] ART_RAINBOW = { "...RRRRRR...", ".RROOOOOORR.", "ROOYYYYYYOOR", "ROYGGGGGGYOR", "OYGBBBBBBGYO", "YGB......BGY", "GB........BG" };
     static readonly string[] ART_FISH = { "....BBB.....", "..BBBBBBB..B", ".BBWKBBBBBBB", "BBBKKBBBBBB.", ".BBBBBBBBBBB", "..BBBBBBB..B", "....BBB....." };
 
     static BumperDef BumperL(float y, float h = 140) => new BumperDef { x = 32, y = y, w = 12, h = h };
@@ -143,7 +165,7 @@ public static class LevelLibrary
             // ======== ONBOARDING: one new kind of breakable per level ========
             case 1:
                 d = L(8, "Kéo một con vịt ra sau rồi thả để bắn! Phá hết 1 hàng = CLEAR!", (200, 790, null), (340, 790, null), (270, 690, null));
-                d.blocks.AddRange(Cluster("glass", 270, 270, 4, 11, 40)); d.blocks.AddRange(Row("soap", 70, 440, 11, 40));
+                d.blocks.AddRange(PixelArt(ART_STAR, 270, 318, 34)); d.art = "star"; d.blocks.AddRange(Row("soap", 70, 500, 11, 40));
                 d.bumpers.Add(BumperL(500)); d.bumpers.Add(BumperR(500));
                 break;
             case 2:
@@ -355,7 +377,16 @@ public static class LevelLibrary
     {
         var d = new LevelDef { moves = 7 + n / 10 };
         float y = 205; int guard = 0;
-        while (y < 590 && guard++ < 10) y = AddModule(d, y, true);
+        string pic = n == 14 ? "flower" : n == 16 ? "mush" : n == 17 ? "sun" : n == 18 ? "apple" : n == 19 ? "boat"
+                   : n == 21 ? "cat" : n == 22 ? "rainbow" : n == 23 ? "heart" : n == 24 ? "duck" : null;
+        if (pic != null)
+        {   // picture on top (looks great + goes into the album), destruction modules underneath
+            var rows = ArtRows(pic); int w = 0; foreach (var r in rows) w = Mathf.Max(w, r.Length);
+            float cell = Mathf.Min(28f, Mathf.Min(250f / rows.Length, 430f / w));
+            d.blocks.AddRange(PixelArt(rows, 270, y + rows.Length * cell / 2f, cell)); d.art = pic;
+            y += rows.Length * cell + 24;
+        }
+        while (y < 590 && guard++ < 10) y = AddModule(d, y, pic == null);
         foreach (var b in d.blocks) if (b.type == "plank") d.moves++;   // each shelf needs extra shots for its legs
         if (R() < 0.6f) d.blocks.Add(B("chest", RI(130, 410), Mathf.Min(y + 30, 660)));
         if (R() < 0.5f) { d.bumpers.Add(BumperL(680)); d.bumpers.Add(BumperR(680)); }
