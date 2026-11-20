@@ -88,6 +88,7 @@ public class GameController : MonoBehaviour
     float freeze, shake, comboPulse, t, lastW, lastH;
     Duck drag; Vector2 dragPt, dragSm; int powerStep, shotBanks; bool lastWarned;
     Transform popCard; float loseAnim;
+    RectTransform feverBar, feverGhost; Text feverHint, feverPop; float feverShown, feverPopT; int feverShownInt = -1, feverMode;
     Text powerTxt; int shownPower = -1; bool halfShown; RawImage popArt; GameObject popArtBg;
     bool aimVisible = true; RectTransform dynLayer, objFill; int goalTotal, shownLeft = -1; float goalPulse; int shownMoves = -1, shownScore = -1, shownStreak = -1;
     float swoop, flashA, hudTick; Image flashImg; int comboShown = -1; Block bossBlock;
@@ -1148,7 +1149,9 @@ public class GameController : MonoBehaviour
         else if (streak > 0) { PopText("Mất chuỗi…", new Vector2(270, 620), new Color(0.8f, 0.84f, 0.9f), 44); streak = 0; }
         if (!frenzyShot && !frenzyReady)
         {
-            fever = Mathf.Min(FEVER_MAX, fever + n);
+            float before = fever; fever = Mathf.Min(FEVER_MAX, fever + n);
+            int gain = Mathf.RoundToInt(fever - before);
+            if (gain > 0) { feverPop.text = "+" + gain + " FRENZY"; feverPopT = 1.1f; feverPop.gameObject.SetActive(true); }
             if (fever >= FEVER_MAX) { frenzyReady = true; BigText("FRENZY SẴN SÀNG!", new Color(1f, 0.5f, 0.75f)); }
         }
     }
@@ -1943,11 +1946,22 @@ public class GameController : MonoBehaviour
         var gear = UIKit.Btn(topIn, "II", Yellow, Ink, 44, () => App.OpenSettings(true), "Settings");
         UIKit.Place((RectTransform)gear.transform, 1, 0.5f, -65, 10, 100, 100);
         // fever bar
-        var fb = UIKit.Panel(hud, new Color(0.23f, 0.18f, 0.42f, 0.45f), "Fever").rectTransform; UIKit.Place(fb, 0.5f, 1, 0, -305, 1000, 44);
-        var ff = UIKit.Panel(fb, new Color(1f, 0.49f, 0.71f), "Fill"); feverFill = ff.rectTransform;
-        feverFill.anchorMin = Vector2.zero; feverFill.anchorMax = new Vector2(0, 1); feverFill.offsetMin = feverFill.offsetMax = Vector2.zero; feverFill.pivot = new Vector2(0, 0.5f);
-        feverTxt = UIKit.Label(fb, "FRENZY", 28, Color.white);
-        streakTxt = UIKit.Label(fb, "", 30, new Color(1f, 0.5f, 0f), TextAnchor.MiddleLeft); streakTxt.rectTransform.offsetMin = new Vector2(20, 0);
+        // FRENZY meter: how much is banked, what a full bar gives, and what this shot will add
+        feverBar = UIKit.Panel(hud, new Color(0.25f, 0.19f, 0.45f, 1f), "Fever").rectTransform; UIKit.Place(feverBar, 0.5f, 1, 0, -312, 1010, 62);
+        var ftrack = UIKit.Rect("Track", feverBar); UIKit.Stretch(ftrack, 6, 6, 6, 6);
+        feverGhost = UIKit.Panel(ftrack, new Color(1f, 1f, 1f, 0.4f), "Ghost").rectTransform;
+        var ff = UIKit.Panel(ftrack, new Color(1f, 0.42f, 0.68f), "Fill"); feverFill = ff.rectTransform;
+        foreach (var r in new[] { feverGhost, feverFill }) { r.anchorMin = Vector2.zero; r.anchorMax = new Vector2(0, 1); r.offsetMin = r.offsetMax = Vector2.zero; r.pivot = new Vector2(0, 0.5f); }
+        for (int i = 1; i < 7; i++)
+        {   // a tick every 10 points
+            var tk = UIKit.Panel(ftrack, new Color(1f, 1f, 1f, 0.35f), "Tick").rectTransform; tk.anchorMin = tk.anchorMax = new Vector2(i / 7f, 0.5f); tk.sizeDelta = new Vector2(3, 40);
+        }
+        var fl = UIKit.Outlined(UIKit.Label(feverBar, "FRENZY", 30, Color.white, TextAnchor.MiddleLeft), new Color(0.6f, 0.15f, 0.4f), 3); UIKit.Place(fl.rectTransform, 0, 0.5f, 110, 0, 200, 60);
+        feverTxt = UIKit.Outlined(UIKit.Label(feverBar, "0 / 70", 36, Color.white), Ink, 3); UIKit.Place(feverTxt.rectTransform, 0.5f, 0.5f, 0, 0, 600, 60);
+        feverHint = UIKit.Label(feverBar, "đầy = bắn 5 vịt", 24, new Color(1f, 1f, 1f, 0.85f), TextAnchor.MiddleRight); UIKit.Place(feverHint.rectTransform, 1, 0.5f, -120, 0, 220, 60);
+        feverPop = UIKit.Outlined(UIKit.Label(hud, "", 46, new Color(1f, 0.55f, 0.8f)), Color.white, 3); UIKit.Place(feverPop.rectTransform, 0.5f, 1, 300, -262, 400, 70);
+        feverPop.raycastTarget = false; feverPop.gameObject.SetActive(false);
+        streakTxt = UIKit.Label(topIn, "", 26, new Color(1f, 0.8f, 0.35f), TextAnchor.MiddleRight); UIKit.Place(streakTxt.rectTransform, 1, 0.5f, -265, -70, 300, 40);
         // boss bar
         bossBar = UIKit.Panel(hud, new Color(0.23f, 0.18f, 0.42f, 0.7f), "BossBar").rectTransform; UIKit.Place(bossBar, 0.5f, 1, 0, -360, 700, 40);
         var bf = UIKit.Panel(bossBar, new Color(1f, 0.35f, 0.2f), "Fill"); bossFill = bf.rectTransform;
@@ -2035,7 +2049,7 @@ public class GameController : MonoBehaviour
 
     void BuildComboBar()
     {
-        comboBar = UIKit.Panel(hud, new Color(0.23f, 0.18f, 0.42f, 0.55f), "ComboBar").rectTransform; UIKit.Place(comboBar, 0.5f, 1, -70, -372, 820, 52);
+        comboBar = UIKit.Panel(hud, new Color(0.25f, 0.19f, 0.45f, 0.92f), "ComboBar").rectTransform; UIKit.Place(comboBar, 0.5f, 1, -70, -384, 820, 52);
         var track = UIKit.Rect("Track", comboBar); UIKit.Stretch(track, 96, 6, 12, 6);
         comboGhost = UIKit.Panel(track, new Color(1f, 1f, 1f, 0.35f), "Ghost").rectTransform;
         comboFill = UIKit.Panel(track, new Color(1f, 0.82f, 0.3f), "Fill").rectTransform;
@@ -2052,7 +2066,7 @@ public class GameController : MonoBehaviour
             comboMarks.Add((tr.need, tr.kind, dot, lbl, mk));
         }
         var help = UIKit.Btn(hud, "COMBO ?", Yellow, Ink, 28, OpenComboGuide, "ComboHelp");
-        UIKit.Place((RectTransform)help.transform, 1, 1, -88, -372, 150, 56);
+        UIKit.Place((RectTransform)help.transform, 1, 1, -88, -384, 150, 56);
     }
 
     void UpdateComboBar()
@@ -2161,10 +2175,24 @@ public class GameController : MonoBehaviour
         }
         int ds = Mathf.RoundToInt(displayScore); if (ds != shownScore) { shownScore = ds; scoreTxt.text = ds.ToString("N0"); }
         scoreTxt.rectTransform.localScale = Vector3.one * (1 + scorePulse * 1.5f);
-        float fr = frenzyReady ? 1 : fever / FEVER_MAX;
-        feverFill.anchorMax = new Vector2(fr, 1);
-        feverFill.GetComponent<Image>().color = frenzyReady ? Color.HSVToRGB(t * 0.8f % 1, 0.6f, 1f) : new Color(1f, 0.49f, 0.71f);
-        feverTxt.text = frenzyReady ? "DUCK FRENZY SẴN SÀNG — BẮN ĐI!" : "FRENZY";
+        float fdt = Time.unscaledDeltaTime;
+        float fTarget = frenzyReady ? FEVER_MAX : fever;
+        feverShown = Mathf.MoveTowards(feverShown, fTarget, Mathf.Max(20f, Mathf.Abs(fTarget - feverShown) * 4f) * fdt);   // fills smoothly
+        feverFill.anchorMax = new Vector2(Mathf.Clamp01(feverShown / FEVER_MAX), 1);
+        int ghost = !moving && drag != null && aimVisible && !frenzyReady ? aimHits.Count : 0;   // what this shot would add
+        feverGhost.anchorMax = new Vector2(Mathf.Clamp01((feverShown + ghost) / FEVER_MAX), 1);
+        feverFill.GetComponent<Image>().color = frenzyReady ? Color.HSVToRGB(t * 0.8f % 1, 0.6f, 1f) : new Color(1f, 0.42f, 0.68f);
+        int shownF = Mathf.RoundToInt(feverShown);
+        if (frenzyReady) { if (feverMode != 2) { feverMode = 2; feverTxt.text = "FRENZY SẴN SÀNG!"; feverHint.text = "phát sau bắn 5 vịt"; } }
+        else if (shownF != feverShownInt || feverMode != 1) { feverMode = 1; feverShownInt = shownF; feverTxt.text = shownF + " / " + (int)FEVER_MAX; feverHint.text = "đầy = bắn 5 vịt"; }
+        feverBar.localScale = Vector3.one * (frenzyReady ? 1f + Mathf.Sin(Time.unscaledTime * 6f) * 0.025f : 1f);
+        if (feverPopT > 0)
+        {
+            feverPopT -= fdt; float a = 1.1f - feverPopT;
+            feverPop.rectTransform.localScale = Vector3.one * BackOut(a / 0.25f);
+            var pc = feverPop.color; pc.a = Mathf.Clamp01(feverPopT * 2.5f); feverPop.color = pc;
+            if (feverPopT <= 0) feverPop.gameObject.SetActive(false);
+        }
         if (shownStreak != streak) { shownStreak = streak; streakTxt.text = streak > 0 ? "Chuỗi: điểm x" + (streak + 1) : ""; }
         if (boss != null) { bossFill.anchorMax = new Vector2(Mathf.Clamp01((float)boss.hp / boss.max), 1); bossTxt.text = boss.alive ? "VUA BÁNH  " + Mathf.Max(0, boss.hp) + "/" + boss.max : "HẠ GỤC!"; }
         string ht = target == "hammer" ? "Chạm vào một khối để đập vỡ (chạm Búa để huỷ)" : target == "bomb" ? "Chạm chỗ muốn thả bom nước" : moving ? "" : hint;
