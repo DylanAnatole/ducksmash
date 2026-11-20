@@ -166,7 +166,7 @@ public static class LevelLibrary
         {
             // ======== ONBOARDING: one new kind of breakable per level ========
             case 1:
-                d = L(8, "Kéo vịt ra sau, thả để bắn!", (200, 790, null), (340, 790, null), (270, 690, null));
+                d = L(10, "Kéo vịt ra sau, thả để bắn!", (200, 790, null), (340, 790, null), (270, 690, null));
                 d.blocks.AddRange(PixelArt(ART_STAR, 270, 318, 34)); d.art = "star"; d.blocks.AddRange(Row("soap", 70, 500, 11, 40));
                 d.bumpers.Add(BumperL(500)); d.bumpers.Add(BumperR(500));
                 break;
@@ -190,7 +190,7 @@ public static class LevelLibrary
                 d.blocks.AddRange(Cluster("glass", 270, 480, 2, 11, 40));
                 break;
             case 5:
-                d = L(7, "Đổ 1 domino, đổ cả dây!", (200, 800, null), (340, 800, null), (270, 710, null));
+                d = L(9, "Đổ 1 domino, đổ cả dây!", (200, 800, null), (340, 800, null), (270, 710, null));
                 d.blocks.AddRange(Cluster("glass", 270, 220, 2, 11, 40));
                 for (int i = 0; i < 19; i++) d.blocks.Add(Dom(60 + i * 22, 310, true, 0));
                 d.blocks.Add(B("bathbomb", 488, 310));

@@ -313,8 +313,8 @@ public class GameController : MonoBehaviour
         foreach (var b in blocks) { b.appear = 0; b.delay = 0.15f + (b.p.y - TY) / TH * 0.7f + UnityEngine.Random.value * 0.08f; }
         foreach (var b in blocks) MakeView(b);
         foreach (var cb in blocks) if (cb.type == "chest" && cb.view != null) cb.tag = MakeTag("+2 vịt", new Color(1f, 0.7f, 0.2f), true);
-        foreach (var cb in blocks) if (cb.type == "ring" && cb.view != null) cb.tag = MakeTag("ĐẨY TRƯỢT", new Color(1f, 0.42f, 0.4f), false);
-        foreach (var cb in blocks) if (cb.type == "gold" && cb.mvAmp > 0 && cb.view != null) cb.tag = MakeTag("+1 LƯỢT", new Color(0.95f, 0.65f, 0.1f), false);
+        if (level <= 19) foreach (var cb in blocks) if (cb.type == "ring" && cb.view != null) cb.tag = MakeTag("ĐẨY TRƯỢT", new Color(1f, 0.42f, 0.4f), false);
+        if (level <= 16) foreach (var cb in blocks) if (cb.type == "gold" && cb.mvAmp > 0 && cb.view != null) cb.tag = MakeTag("+1 LƯỢT", new Color(0.95f, 0.65f, 0.1f), false);
         // water colour by chapter: the bath changes as you progress (blue -> teal -> lavender bubble bath; hard = deeper)
         if (waterMat != null)
             waterMat.SetColor("_Shift", LevelLibrary.IsSandbox(level) || level <= 12 ? new Color(1, 1, 1, 0)
@@ -1728,6 +1728,7 @@ public class GameController : MonoBehaviour
         for (float st = 0; st < len; st += 6)
         {
             gp += gv * 6;
+            if (whirls.Count > 0 && d.kind != "rocket") { float om = WhirlTurn(gp, out _); if (om > 0) gv = Rot(gv, om * 6f / MAX_SPEED * 1.1f); }
             if (TubWalls(ref gp, ref gv, d.r, 1f)) path?.Add(gp);
             gv.Normalize();
             bool stop = false;
@@ -1737,8 +1738,8 @@ public class GameController : MonoBehaviour
                 {
                     var b = blocks[i];
                     if (!b.alive || Covered(b) || b.falling > 0 || simHits.Contains(b) || !Collide(gp, d.r, b, out _)) continue;
-                    if (!b.Hard && b.hp <= dmg) { simHits.Add(b); len -= 10; score += b.type == "bathbomb" || b.type == "tnt" || b.type == "laser" || b.type == "domino" || b.type == "screw" ? 5f : 1f; }
-                    else { stop = true; break; }
+                    if (!b.Hard && b.hp <= dmg) { simHits.Add(b); len -= 10; score += b.type == "bathbomb" || b.type == "tnt" || b.type == "laser" || b.type == "domino" || b.type == "screw" ? 5f : b.type == "gold" ? 6f : 1f; }
+                    else { if (b.type == "ring" && b.hp > 1) score += 4f; else if (b.type == "boss") score += 3f; stop = true; break; }   // knocking a ring sends it skating; boss hits count
                 }
             if (stop) break;
         }
