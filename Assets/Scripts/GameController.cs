@@ -615,7 +615,7 @@ public class GameController : MonoBehaviour
     void AddPips(Block b)
     {
         if (b.Hard || b.type == "boss" || b.max <= 1 || b.max > 6) return;
-        if (pipMat == null) pipMat = Art.Mat(new Color(0.16f, 0.12f, 0.33f), 0.6f, 0, 0.05f);
+        if (pipMat == null) pipMat = Art.Mat(new Color(1f, 0.97f, 0.9f), 0.8f, 0, 0.25f, 0.002f);   // cream dots with a thin outline: readable without black "eyes" everywhere
         float top = b.type == "plates" ? 0.5f : b.type == "chest" ? 1.15f : b.type == "crate" ? 1.0f : 1.02f;
         var root = Art.Root("Pips", b.view); root.localPosition = new Vector3(0, top, 0);
         for (int i = 0; i < b.max; i++)
