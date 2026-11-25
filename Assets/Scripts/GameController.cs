@@ -2175,6 +2175,7 @@ public class GameController : MonoBehaviour
             // white flash on hit (property block keeps the shared baked material untouched)
             // last few targets glow softly so the player can find them
             bool aimed = drag != null && !moving && aimHits.Contains(b);   // will break on this shot: light it up while aiming
+            if (aimed && b.hit <= 0 && b.appear >= 1) { b.view.localScale = b.baseScale * (1f + 0.05f * Mathf.Sin(Time.unscaledTime * 7f + b.p.x * 0.05f)); b.scaled = true; }   // targeted props breathe: "these will go"
             bool enraged = b.type == "boss" && b.hp <= b.max / 2;
             bool glow = (fewLeft && b.Goal && !Covered(b)) || b.type == "gold" || aimed || enraged;
             if (b.type == "bathbomb" && UnityEngine.Random.value < dt * (App.Mobile ? 0.25f : 0.5f)) FxKit.Bubble(W(b.p + UnityEngine.Random.insideUnitCircle * 10f, 0.3f));   // fizzing: "I go boom"
