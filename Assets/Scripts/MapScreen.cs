@@ -55,7 +55,7 @@ public class MapScreen : MonoBehaviour
         // section banners
         Banner("HƯỚNG DẪN  ·  MÀN 1–5", 150, NodePos(1).y - 20, Teal);
         Banner("THỬ THÁCH  ·  MÀN 6–" + LevelLibrary.Count, -200, NodePos(6).y - 90, PurpleDark);
-        Banner("ĐÍCH: TRÙM CUỐI VUA BÁNH QUY", 0, NodePos(LevelLibrary.Count).y + 340, new Color(1f, 0.55f, 0.3f));   // end of the road
+        Banner("ĐÍCH: MÀN " + LevelLibrary.Count + " SIÊU KHÓ", 0, NodePos(LevelLibrary.Count).y + 340, new Color(1f, 0.55f, 0.3f));   // end of the road
 
         for (int n = 1; n <= LevelLibrary.Count; n++)
         {
@@ -67,7 +67,7 @@ public class MapScreen : MonoBehaviour
             var btn = img.gameObject.AddComponent<Button>(); btn.onClick.AddListener(() => { if (lvl <= SaveData.MaxLevel) { Sfx.Play("click"); App.StartLevel(lvl); } });
             var inner = UIKit.Dot(img.transform, Color.white, "Inner"); UIKit.Stretch(inner.rectTransform, 12, 12, 12, 12); inner.raycastTarget = false;
             var num = UIKit.Outlined(UIKit.Label(img.transform, n.ToString(), boss ? 64 : 58, Color.white), Ink, 3);
-            var tag = UIKit.Label(img.transform, boss ? (n == LevelLibrary.Count ? "TRÙM" : LevelLibrary.IsSuperHard(n) ? "SIÊU KHÓ" : "KHÓ") : LevelLibrary.NewSpecialAt(n) != null ? "VỊT MỚI" : n == 13 || n == 19 || n == 26 ? "BỒN MỚI" : "", 28, Color.white); tag.rectTransform.offsetMin = new Vector2(0, -size * 0.75f); tag.rectTransform.offsetMax = new Vector2(0, -size * 0.55f);
+            var tag = UIKit.Label(img.transform, boss ? (LevelLibrary.IsSuperHard(n) ? "SIÊU KHÓ" : "KHÓ") : LevelLibrary.NewSpecialAt(n) != null ? "VỊT MỚI" : n == 13 || n == 19 || n == 26 ? "BỒN MỚI" : "", 28, Color.white); tag.rectTransform.offsetMin = new Vector2(0, -size * 0.75f); tag.rectTransform.offsetMax = new Vector2(0, -size * 0.55f);
             var st = UIKit.Outlined(UIKit.Label(img.transform, "", 44, Yellow), Ink, 2); st.rectTransform.offsetMin = new Vector2(0, size * 0.62f); st.rectTransform.offsetMax = new Vector2(0, size * 0.62f);
             nodes.Add((inner, num, st, tag, n));
             // picture levels show their pixel picture as a badge (silhouette until collected)

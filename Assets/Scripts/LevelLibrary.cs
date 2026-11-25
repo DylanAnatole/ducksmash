@@ -24,14 +24,14 @@ public class LevelDef
 
 // 25 levels: 1-5 onboarding (one new idea each), 6-25 gameplay (boss at 10/15/20/25).
 // Coordinates are "sim pixels" on a 540x960 board; the tub spans x 28..512, y 150..870.
-public static class LevelLibrary
+public static partial class LevelLibrary
 {
     public const int Count = 30, Onboarding = 5;
     public const int TestLevel = 99;   // sandbox level for trying new mechanics (not on the 25-level path, saves nothing)
     public const int SmashLevel = 101, SmashCount = 3;   // "phá đồ" destruction test levels 101..103
     public static bool IsSandbox(int n) => n >= TestLevel;
     public static string Title(int n) => n == TestLevel ? "Màn thử" : n >= SmashLevel ? "Phá đồ " + (n - SmashLevel + 1)
-        : n == Count ? "Trùm cuối" : IsSuperHard(n) ? "Siêu khó " + n : IsHard(n) ? "Màn khó " + n : (n <= Onboarding ? "Hướng dẫn " : "Màn ") + n;
+        : IsSuperHard(n) ? "Siêu khó " + n : IsHard(n) ? "Màn khó " + n : (n <= Onboarding ? "Hướng dẫn " : "Màn ") + n;
 
     // ---------- pixel-art album ----------
     public static readonly string[] ArtIds = { "star", "duck", "heart", "straw", "fish", "flower", "mush", "sun", "apple", "boat", "cat", "rainbow" };
@@ -257,19 +257,14 @@ public static class LevelLibrary
                 for (int i = 0; i < 7; i++) d.blocks.Add(B("plates", 90 + i * 60, 590));
                 d.bumpers.Add(BumperL(640)); d.bumpers.Add(BumperR(640));
                 break;
-            case 30:
-                d = BossLevel();
-                break;
             default:
+                if (n >= 14 && n <= Count) { d = Puzzle(n); break; }   // hand-designed puzzle levels (LevelPuzzles.cs)
                 d = IsHard(n) ? HardLevel(n) : Procedural(n);
                 break;
         }
         if (n <= 13) d.bumpers.Clear();   // early game: no side bumpers until the player can judge power + angle
         if (n >= 14 && !IsHard(n)) AddDriftingGold(d, n);
-        if (n >= 19 && !IsHard(n)) PlaceWhirl(d, n == 19 || n >= 23 ? 72 : 62);
-        if (n == 19 && d.whirls.Count > 0) d.hint = "Xoáy nước: bẻ cong đường bay!";
-        if (n == 23) d.hint = "Đồ đóng băng: cú đầu vỡ băng, cú sau mới vỡ!";
-        d.boss = n == 30; d.hard = IsHard(n);
+        d.boss = false; d.hard = IsHard(n);
         // unlock levels gift one special by transforming a plain duck: make sure there is one
         if (NewSpecialAt(n) != null && !d.ducks.Exists(x => x.kind == "normal") && d.ducks.Count > 0) d.ducks[d.ducks.Count - 1].kind = "normal";
         d.moves = Mathf.Max(3, d.moves);
