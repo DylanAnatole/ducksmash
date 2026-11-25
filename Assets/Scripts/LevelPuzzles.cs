@@ -53,6 +53,12 @@ public static partial class LevelLibrary
     // "bait" ducks parked out on the water: shoot a duck into them and they fly off and smash too (billiards)
     static void Bait(LevelDef d, params float[] xy) { for (int i = 0; i + 1 < xy.Length; i += 2) d.ducks.Add(new DuckDef(xy[i], xy[i + 1], "normal")); }
     static void Whirl(LevelDef d, float x, float y, float r) => d.whirls.Add(new Vector3(x, y, r));
+    // water current given by its centre + size; dir "left" / "right" / "up" / "down"
+    static void Flow(LevelDef d, float cx, float cy, float w, float h, string dir)
+    {
+        float dx = dir == "left" ? -1 : dir == "right" ? 1 : 0, dy = dir == "up" ? -1 : dir == "down" ? 1 : 0;
+        d.flows.Add(new FlowDef { x = cx - w / 2, y = cy - h / 2, w = w, h = h, dx = dx, dy = dy });
+    }
     static void Pipe(LevelDef d, float ax, float ay, float bx, float by) => d.portals.Add(new Vector4(ax, ay, bx, by));
     static LevelDef Ducks(LevelDef d, params string[] kinds)
     {
@@ -155,14 +161,15 @@ public static partial class LevelLibrary
                 Mix(d, 230, 310, 760, 800, "plates", "glass", "soap");
                 Duck(d, 270, 440); Duck(d, 270, 530, "bomb"); Duck(d, 270, 620);
                 return d;
-            case 23:   // ducks on TOP of a sheet of ice: iron ducks smash down through it
-                d.moves = 7; d.hint = "Vịt trên lớp băng: Vịt Sắt đập xuyên băng!";
-                Duck(d, 150, 240, "heavy"); Duck(d, 270, 240); Duck(d, 390, 240, "heavy");
-                Fill(d, "ice", 70, 470, 340, 380);
-                Mix(d, 110, 430, 460, 580, "glass", "soap", "vase", "glass");
-                Ring(d, 270, 650);
-                Fill(d, "soap", 110, 430, 760, 760);
-                Pad(d, 90, 700, 14, 120); Pad(d, 450, 700, 14, 120);
+            case 23:   // a river runs across the middle: drop a duck in and the current carries it into the pile on the far side
+                d.moves = 7; d.hint = "Dòng chảy: thả vịt vào, nước cuốn đi!";
+                Pic(d, "heart", 14);
+                Flow(d, 255, 520, 390, 76, "right");
+                Flow(d, 285, 745, 390, 64, "left");
+                Mix(d, 430, 470, 400, 640, "glass", "vase", "soap", "plates");
+                Mix(d, 70, 110, 700, 790, "soap", "glass", "vase");
+                Mix(d, 150, 350, 410, 410, "vase", "glass", "soap"); Mix(d, 150, 350, 630, 630, "soap", "glass", "vase");
+                Duck(d, 90, 520, "heavy"); Duck(d, 90, 430); Duck(d, 270, 830);
                 return d;
             case 24:   // the ducks sit at the TOP; everything is below them - shoot down into the bath
                 d.moves = 7; d.hint = "Vịt ở trên cao: kéo lên, bắn xuống!";

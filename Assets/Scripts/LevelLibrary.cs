@@ -20,11 +20,14 @@ public class LevelDef
     public List<BlockDef> blocks = new List<BlockDef>();
     public List<BumperDef> bumpers = new List<BumperDef>();
     public List<Vector3> whirls = new List<Vector3>();   // whirlpools: x, y, radius (sim px) - bend passing ducks
-    public List<Vector4> portals = new List<Vector4>();  // drain pipes: (ax, ay, bx, by) - a duck that swims into one end pops out of the other
+    public List<Vector4> portals = new List<Vector4>();
+    public List<FlowDef> flows = new List<FlowDef>();   // water currents: rectangles that push moving ducks one way  // drain pipes: (ax, ay, bx, by) - a duck that swims into one end pops out of the other
 }
 
 // 25 levels: 1-5 onboarding (one new idea each), 6-25 gameplay (boss at 10/15/20/25).
 // Coordinates are "sim pixels" on a 540x960 board; the tub spans x 28..512, y 150..870.
+public class FlowDef { public float x, y, w, h, dx, dy; }   // x,y = top-left (sim px); (dx,dy) = unit direction
+
 public static partial class LevelLibrary
 {
     public const int Count = 30, Onboarding = 5;
@@ -205,15 +208,14 @@ public static partial class LevelLibrary
                 d.bumpers.Add(BumperL(580, 160)); d.bumpers.Add(BumperR(580, 160));
                 d.ducks.Add(new DuckDef(170, 610, "normal")); d.ducks.Add(new DuckDef(370, 610, "normal"));
                 break;
-            case 7:
-                d = L(11, "Gãy 2 chân kệ → cả kệ đổ!", (150, 810, null), (270, 810, null), (390, 810, null));
+            case 7:   // ducks in the MIDDLE floor between the shelves: shoot up at one shelf's legs, down at the other's
+                d = L(12, "Vịt giữa các kệ: bắn lên hay bắn xuống?", (150, 455, null), (270, 455, null), (390, 455, null));
                 d.blocks.AddRange(Shelf(270, 230, 420, "glass", "vase", "glass", "vase", "glass", "vase", "glass", "vase"));
                 d.blocks.AddRange(Row("soap", 70, 300, 11, 40));
-                d.blocks.AddRange(Shelf(270, 380, 420, "vase", "glass", "glass", "vase", "glass", "glass", "vase", "glass"));
-                d.blocks.AddRange(Row("glass", 70, 450, 11, 40));
-                d.blocks.AddRange(Shelf(270, 530, 360, "glass", "vase", "glass", "vase", "glass", "vase"));
-                d.bumpers.Add(BumperL(620)); d.bumpers.Add(BumperR(620));
-                d.ducks.Add(new DuckDef(200, 700, "normal")); d.ducks.Add(new DuckDef(340, 700, "normal"));
+                d.blocks.AddRange(Shelf(270, 370, 420, "vase", "glass", "glass", "vase", "glass", "glass", "vase", "glass"));
+                d.blocks.AddRange(Shelf(270, 560, 360, "glass", "vase", "glass", "vase", "glass", "vase"));
+                d.blocks.AddRange(Row("glass", 70, 640, 11, 40));
+                d.ducks.Add(new DuckDef(200, 760, "normal")); d.ducks.Add(new DuckDef(340, 760, "normal"));
                 break;
             case 8:   // iron ducks in the MIDDLE: smash up into the plate towers, or down into the bottom pile
                 d = L(9, "Vịt Sắt ở giữa: phá lên trên, phá xuống dưới!", (120, 500, null), (210, 480, "heavy"), (330, 480, "heavy"), (420, 500, null), (270, 830, null));

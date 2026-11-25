@@ -68,6 +68,16 @@ public class GameController : MonoBehaviour
     class Portal { public Vector2 a, b; public Transform sa, sb; public Color c; }
     readonly List<Portal> portals = new List<Portal>();
     const float PORTAL_R = 24f;
+    class Flow { public Rect r; public Vector2 dir; public Material m; public Mesh mesh; public float tu, tv; readonly Vector2[] uv = new Vector2[4];
+        // the shared material ignores tiling/offset, so the chevrons are tiled + scrolled through the quad's own UVs
+        public void Scroll(float off) { if (!mesh) return; uv[0] = new Vector2(off, 0); uv[1] = new Vector2(off + tu, 0); uv[2] = new Vector2(off, tv); uv[3] = new Vector2(off + tu, tv); mesh.uv = uv; } }
+    readonly List<Flow> flows = new List<Flow>();
+    const float FLOW_ACC = 1500f;   // px/s^2 along the current
+    Vector2 FlowAt(Vector2 p)
+    {
+        for (int i = 0; i < flows.Count; i++) if (flows[i].r.Contains(p)) return flows[i].dir;
+        return Vector2.zero;
+    }
     bool portalTaught;
     const float WHIRL_TURN = 11f;   // rad/s at the centre: a full-power pass bends ~25-30 deg, a soft one much more
     // how fast (rad/s) the water turns a moving duck at this point; 0 outside every whirlpool
@@ -93,7 +103,7 @@ public class GameController : MonoBehaviour
     int level, moves, startMoves, shotSmash, streak, pushes, score, stars, reward;
     static float fever; static bool frenzyReady;
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { fever = 0; frenzyReady = false; trailMat = null; pipMat = null; contactMat = null; portalHole = null; tagDuckIcon = null; templates.Clear(); tplRoot = null; }
+    static void ResetStatics() { fever = 0; frenzyReady = false; trailMat = null; pipMat = null; contactMat = null; portalHole = null; flowTex = null; tagDuckIcon = null; templates.Clear(); tplRoot = null; }
 
     // Building a block from primitives + baking it costs ~0.5 ms; cloning a cached template is ~20x cheaper.
     // Every block/duck kind is built ONCE (under an inactive root) and Instantiate()d afterwards.
@@ -270,6 +280,8 @@ public class GameController : MonoBehaviour
         foreach (var bt in bits) if (bt.t) { bt.t.gameObject.SetActive(false); bitPools[bt.type].Push(bt.t); }   // debris pool persists across levels
         foreach (var w in whirls) if (w.view) Destroy(w.view.gameObject);
         whirls.Clear(); portals.Clear(); portalTaught = false;
+        foreach (var fl in flows) { if (fl.m) Destroy(fl.m); if (fl.mesh) Destroy(fl.mesh); }
+        flows.Clear();
         ducks.Clear(); blocks.Clear(); bumpers.Clear(); timers.Clear(); bits.Clear(); bitPool.Clear(); rings.Clear(); zaps.Clear(); dying.Clear();
         foreach (var c in coins) if (c.rt) Destroy(c.rt.gameObject);
         coins.Clear(); slowTimer = camZoom = rushTimer = 0; rushLeft = rushCoins = 0; movesAtClear = -1; displayScore = 0;
@@ -342,6 +354,20 @@ public class GameController : MonoBehaviour
             w.view = Art.Prim(PrimitiveType.Quad, world, W(w.p, 0.025f), new Vector3(w.r * 2 * K, w.r * 2 * K, 1f), Art.SwirlMat(), new Vector3(90, 0, 0));
             var sh = w.view.GetComponent<Renderer>(); sh.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; sh.receiveShadows = false;
             whirls.Add(w);
+        }
+        foreach (var fd in L.flows)
+        {
+            var fl = new Flow { r = new Rect(fd.x, fd.y, fd.w, fd.h), dir = new Vector2(fd.dx, fd.dy) };
+            bool horiz = Mathf.Abs(fd.dx) > 0.5f;
+            float along = horiz ? fd.w : fd.h, across = horiz ? fd.h : fd.w;
+            fl.m = Art.Fade(new Color(1f, 1f, 1f, 0.55f)); fl.m.mainTexture = FlowTex(); fl.m.renderQueue = 2980;
+            fl.tu = along / 44f; fl.tv = Mathf.Max(1, Mathf.Round(across / 44f));
+            // the quad's local +x is the flow direction; texture chevrons point along +u
+            float yaw = horiz ? (fd.dx > 0 ? 0 : 180) : (fd.dy > 0 ? 90 : -90);
+            var q = Art.Prim(PrimitiveType.Quad, world, W(fd.x + fd.w / 2, fd.y + fd.h / 2, 0.026f), new Vector3(along * K, across * K, 1f), fl.m, new Vector3(90, yaw, 0));
+            var qr = q.GetComponent<Renderer>(); qr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; qr.receiveShadows = false;
+            fl.mesh = q.GetComponent<MeshFilter>().mesh; fl.Scroll(0);
+            flows.Add(fl);
         }
         int pIdx = 0;
         foreach (var pd in L.portals)
@@ -878,6 +904,15 @@ public class GameController : MonoBehaviour
                 if (om <= 0) { d.inWhirl = false; continue; }
                 if (!d.inWhirl) { d.inWhirl = true; Sfx.Play("splash", 0.6f, 0.7f); FxKit.Ripple(W(d.p), 0.9f); FxKit.Splash(W(d.p), 4, 0.7f); }
                 d.v = Rot(d.v, om * dt) * Mathf.Exp(-1.6f * dep * dt);   // turn + a little drag so nobody circles forever
+            }
+        if (flows.Count > 0)
+            for (int di = 0; di < ducks.Count; di++)
+            {   // currents carry moving ducks along (resting ducks stay put so aiming is fair)
+                var d = ducks[di]; if (d.v.sqrMagnitude < 30 * 30 || d.rocketT > 0) continue;
+                var fdir = FlowAt(d.p); if (fdir == Vector2.zero) continue;
+                d.v += fdir * FLOW_ACC * dt;
+                float sp = d.v.magnitude; if (sp > MAX_SPEED) d.v *= MAX_SPEED / sp;
+                if (UnityEngine.Random.value < dt * 10f) FxKit.Wake(W(d.p));
             }
         if (portals.Count > 0)
             for (int di = 0; di < ducks.Count; di++)
@@ -1994,6 +2029,7 @@ public class GameController : MonoBehaviour
         {
             gp += gv * stepL;
             if (whirls.Count > 0 && drag.kind != "rocket") { float om = WhirlTurn(gp, out _); if (om > 0) gv = Rot(gv, om * stepL / aimSpeed * 1.1f); }
+            if (flows.Count > 0 && drag.kind != "rocket") { var fdir = FlowAt(gp); if (fdir != Vector2.zero) gv = (gv * aimSpeed + fdir * FLOW_ACC * stepL / aimSpeed).normalized; }
             if (TubWalls(ref gp, ref gv, drag.r, 1f)) aimPath.Add(gp);
             gv.Normalize();
             if (jumpIdx < 0 && s > 10)
@@ -2257,6 +2293,7 @@ public class GameController : MonoBehaviour
             }
             else dd.t.localScale = dd.s0 * (f < 0.4f ? Mathf.Lerp(1f, 1.35f, f / 0.4f) : Mathf.Lerp(1.35f, 0f, (f - 0.4f) / 0.6f));   // quick puff-up then vanish
         }
+        foreach (var fl in flows) fl.Scroll(-Mathf.Repeat(t * 1.6f, 1000f));
         foreach (var pt in portals)
         {
             if (pt.sa) pt.sa.Rotate(0, 200f * dt, 0, Space.World);
@@ -2282,6 +2319,24 @@ public class GameController : MonoBehaviour
         var glow = Art.Prim(PrimitiveType.Quad, world, W(p, 0.036f), new Vector3(D * 1.75f, D * 1.75f, 1f), Art.Glow(new Color(c.r, c.g, c.b, 0.55f)), new Vector3(90, 0, 0));
         foreach (var t in new[] { hole, swirl, rim, glow }) { var r = t.GetComponent<Renderer>(); r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false; }
         return swirl;
+    }
+    static Texture2D flowTex;
+    static Texture2D FlowTex()
+    {   // soft white chevrons ">" on a faint aqua band; tiles along u
+        if (flowTex != null) return flowTex;
+        const int S = 64; flowTex = new Texture2D(S, S, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat };
+        var px = new Color[S * S];
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                float u = (x + 0.5f) / S, v = (y + 0.5f) / S;
+                float chev = (0.62f - Mathf.Abs(v - 0.5f) * 0.6f) - u;                       // ">" shape: tip at the +u side
+                float line = Mathf.Clamp01(1f - Mathf.Abs(chev) / 0.07f) * Mathf.Clamp01((0.42f - Mathf.Abs(v - 0.5f)) / 0.08f);
+                float band = 0.22f;
+                px[y * S + x] = Color.Lerp(new Color(0.55f, 0.95f, 1f, band), new Color(1f, 1f, 1f, 0.95f), line);
+            }
+        flowTex.SetPixels(px); flowTex.Apply();
+        return flowTex;
     }
     static Material portalHole;
     static Material PortalHoleMat()
@@ -2327,8 +2382,8 @@ public class GameController : MonoBehaviour
 
     void AddRing(Vector2 p, float radius, Color c)
     {
-        var tr = Art.Prim(PrimitiveType.Cylinder, fx, W(p, 0.3f), Vector3.one, Art.Glow(c));   // additive: reads as light on the water, not a grey disc
-        rings.Add(new Ring { t = tr, m = tr.GetComponent<Renderer>().sharedMaterial, life = 0.35f, max = 0.35f, r0 = 0.2f, r1 = radius * 2 * K, c = c });
+        // pooled additive particle instead of a new cylinder + material per ring (chain explosions spawned dozens on phones)
+        FxKit.Shockwave(W(p, 0.06f), radius * 2 * K * 1.15f, c, 0.35f);
     }
 
     void UpdateFx(float dt)
@@ -2688,6 +2743,7 @@ public class GameController : MonoBehaviour
         sb.Append("\n• Nảy tường rồi phá: điểm x2\n• Đầy FRENZY: phát sau bắn 5 vịt");
         if (level >= 17 && !LevelLibrary.IsSandbox(level)) sb.Append("\n• Phao bơi: bắn trúng → trượt húc vỡ đồ");
         if (whirls.Count > 0) sb.Append("\n• Xoáy nước: bẻ cong đường bay (bắn nhẹ cong nhiều)");
+        if (flows.Count > 0) sb.Append("\n• Dòng chảy: đẩy vịt trôi theo mũi tên");
         if (portals.Count > 0) sb.Append("\n• Cống nước: chui vào 1 đầu, trồi ra đầu cùng màu");
         if (blocks.Any(b => b.type == "ice" && b.alive)) sb.Append("\n• Đồ đóng băng: cú đầu vỡ băng, cú sau mới vỡ");
         if (blocks.Any(b => b.type == "gold" && b.mvAmp > 0 && b.alive)) sb.Append("\n• Bánh vàng trôi ở mép trên: trúng = +1 lượt");
