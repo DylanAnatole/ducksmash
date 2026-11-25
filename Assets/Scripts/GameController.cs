@@ -1040,7 +1040,7 @@ public class GameController : MonoBehaviour
                         a.hot = b.hot = true; a.squash = b.squash = 0.2f; var mid = (a.p + b.p) / 2;
                         Splash(mid, 8); FxKit.Sparkle(W(mid), Color.white, 8); AddRing(mid, 38 + Mathf.Min(pushes, 6) * 6, new Color(0.55f, 0.95f, 1f, 0.75f)); Shake(0.15f); HitStop(0.03f); pushes++; shotSmash++; comboPulse = 0.18f;
                         PopText(LevelLibrary.Unlocked("zap", level) && pushes == ZAP_PUSHES ? "ĐỦ 3 CỐC → VỊT SÉT!" : LevelLibrary.Unlocked("zap", level) && pushes < ZAP_PUSHES ? "CỐC! " + pushes + "/" + ZAP_PUSHES : pushes > 1 ? "CỐC x" + pushes + "!" : "CỐC!", mid, Color.white, 46 + Mathf.Min(20, pushes * 4));
-                        Sfx.Play(pushes % 2 == 1 ? "quack" : "squeak", 0.9f, 1f + pushes * 0.08f);
+                        Sfx.Play(pushes % 2 == 1 ? "quack" : "squeak", 0.9f, 1f + pushes * 0.08f); Sfx.Play("thud", 0.5f, 1.35f);   // the "clack" has weight
                     }
                 }
             }
@@ -1442,6 +1442,7 @@ public class GameController : MonoBehaviour
         foreach (var k in ducks) k.charged = true;
         d.stretch = 0.22f; d.pullVis = 0;
         Sfx.Play("shoot"); Sfx.Play("squeak", 0.5f, 1.3f); Sfx.Buzz(18);
+        FxKit.Shockwave(W(d.p), 1.5f, new Color(0.85f, 0.97f, 1f, 0.7f), 0.25f);   // launch ring on the water
         { var vn = v.normalized; camKick = new Vector3(vn.x, 0, -vn.y) * Mathf.Clamp01(v.magnitude / MAX_SPEED) * 0.16f; } FxKit.Splash(W(d.p), 6); FxKit.Ripple(W(d.p), 1.1f);
         if (d.special) d.spent = true;
         if (moves == 0 && !d.frenzy && state == "play" && GoalsLeft() <= 6)

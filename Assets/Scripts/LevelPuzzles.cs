@@ -154,6 +154,7 @@ public static partial class LevelLibrary
                     if (hz) { b.type = "laser"; b.dir = "h"; } else if (vt) { b.type = "laser"; b.dir = "v"; }
                 }
                 Mix(d, 110, 430, 700, 700, "glass", "vase", "glass");
+                Pipe(d, 70, 810, 470, 340);   // bottom-left pipe pops out beside the grid's top corner
                 Duck(d, 270, 500, "heavy"); Duck(d, 60, 500); Duck(d, 480, 500);
                 return d;
             case 22:   // the ducks stand in the MIDDLE between two bath-bomb chains: shoot sideways to light them
