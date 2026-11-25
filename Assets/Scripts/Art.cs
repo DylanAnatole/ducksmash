@@ -529,7 +529,7 @@ public static class Art
     public static Transform BathBomb(Transform parent, float d)
     {
         var root = Root("BathBomb", parent);
-        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.3f, 0), new Vector3(d * 0.92f, d * 0.85f, d * 0.92f), Mat(Hex("a66bff"), 0.4f, 0, 0, 0.003f));
+        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.3f, 0), new Vector3(d * 0.92f, d * 0.85f, d * 0.92f), Mat(Hex("b38dff"), 0.45f, 0, 0, 0.003f));   // softer lavender
         string[] dots = { "ff8fb0", "ffe066", "7fe0a0", "ffffff" };
         for (int i = 0; i < 8; i++)
         {
