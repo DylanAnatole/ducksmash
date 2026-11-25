@@ -285,7 +285,7 @@ public class GameController : MonoBehaviour
         whirls.Clear(); portals.Clear(); portalTaught = false;
         foreach (var fl in flows) { if (fl.m) Destroy(fl.m); if (fl.mesh) Destroy(fl.mesh); }
         flows.Clear();
-        padClock = 0;
+        padClock = 0; shotsTaken = 0;
         ducks.Clear(); blocks.Clear(); bumpers.Clear(); timers.Clear(); bits.Clear(); bitPool.Clear(); rings.Clear(); zaps.Clear(); dying.Clear();
         foreach (var c in coins) RecycleCoin(c.rt);
         coins.Clear(); slowTimer = camZoom = rushTimer = 0; rushLeft = rushCoins = 0; movesAtClear = -1; displayScore = 0;
@@ -394,6 +394,7 @@ public class GameController : MonoBehaviour
             portals.Add(pt);
         }
         if (aimRoot == null) BuildAim(); else aimVisible = true;
+        MarkKeys();
         ShowIntro(L);
         popupRoot.gameObject.SetActive(false);
         bossBar.gameObject.SetActive(L.boss);
@@ -1242,7 +1243,7 @@ public class GameController : MonoBehaviour
         }
     }
 
-    float lastBoomT = -9f, shotClock; int boomChain;
+    float lastBoomT = -9f, shotClock; int boomChain, shotsTaken;
     void Explode(Vector2 p, float R, int dmg)
     {
         HitStop(0.05f); Shake(0.45f); Flash(0.28f);
@@ -1446,7 +1447,7 @@ public class GameController : MonoBehaviour
     // ---------- shooting ----------
     void Launch(Duck d, Vector2 v)
     {
-        d.v = v; d.hot = true; moves--; moving = true; shotClock = 0; shotSmash = 0; hint = ""; pushes = 0; frenzyShot = false; shotBanks = 0; shotClears = 0; dominoFalls = 0;
+        d.v = v; d.hot = true; moves--; moving = true; shotClock = 0; shotsTaken++; if (shotsTaken == 1) foreach (var k in keyTags) if (k) { tags.Remove(k); Destroy(k.gameObject); } shotSmash = 0; hint = ""; pushes = 0; frenzyShot = false; shotBanks = 0; shotClears = 0; dominoFalls = 0;
         foreach (var k in ducks) k.charged = true;
         d.stretch = 0.22f; d.pullVis = 0;
         Sfx.Play("shoot"); Sfx.Play("squeak", 0.5f, 1.3f); Sfx.Buzz(18);
@@ -1606,8 +1607,10 @@ public class GameController : MonoBehaviour
         }
         else if (!string.IsNullOrEmpty(L.hint) && !LevelLibrary.IsSandbox(level))
         {   // one short line about what's special here (shelves, rings, hard level...), then the goal
-            introBody.text = "<size=38><color=#7a4dd8><b>" + (level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? "MỚI:" : "MẸO:") + "</b></color> " + L.hint + "</size>\n\n<b>PHÁ SẠCH BỒN</b> · " + moves + " lượt";
-            introRoot.sizeDelta = new Vector2(820, 520); introMax = introTimer = level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? 4f : 3f;
+            introBody.text = "<size=38><color=#7a4dd8><b>" + (level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? "MỚI:" : "CÂU ĐỐ:") + "</b></color> " + L.hint + "</size>"
+                + (keyName != "" && level > LevelLibrary.Onboarding ? "\n<size=32><color=#c98a00>Chìa khoá: <b>" + keyName + "</b> (vòng vàng nhấp nháy)</color></size>" : "")
+                + "\n\n<b>PHÁ SẠCH " + GoalsLeft() + " MÓN</b> · " + moves + " lượt";
+            introRoot.sizeDelta = new Vector2(860, 560); introMax = introTimer = level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? 4.5f : 4f;
         }
 
         // unlock level: teach how to earn the new duck and how it works, and give one free copy to try
@@ -1937,11 +1940,13 @@ public class GameController : MonoBehaviour
 
     void UpdateHint(float rdt)
     {
-        bool can = (level <= LevelLibrary.Onboarding || level == 19 || level == 23 || level == 24) && state == "play" && !moving && drag == null && introTimer <= 0 && target == null && ducks.Count > 0
+        UpdateKeys(rdt);
+        bool can = state == "play" && !moving && drag == null && introTimer <= 0 && target == null && ducks.Count > 0
                    && !popupRoot.gameObject.activeSelf && (guideRoot == null || !guideRoot.gameObject.activeSelf) && Time.timeScale > 0;
         if (!can || Input.GetMouseButton(0)) { idleT = 0; hintReady = false; hintSearch = -1; if (hintShown) HideHint(); return; }
         idleT += rdt;
-        if (idleT > 5f && hintSearch < 0 && !hintReady) { hintSearch = 0; hintBestScore = 0; hintBestDuck = -1; }
+        float hintAt = level <= LevelLibrary.Onboarding || level == 19 || level == 23 || level == 24 ? 5f : 9f;
+        if (idleT > hintAt && hintSearch < 0 && !hintReady) { hintSearch = 0; hintBestScore = 0; hintBestDuck = -1; }
         if (hintSearch >= 0)
         {   // a few candidates per frame so the search never causes a hitch
             int total = ducks.Count * HINT_ANGLES;
@@ -1956,7 +1961,7 @@ public class GameController : MonoBehaviour
             }
             if (hintSearch >= total) { hintSearch = -1; hintReady = hintBestDuck >= 0; if (hintReady) PredictShot(ducks[hintBestDuck], hintBestDir, hintPath); }
         }
-        if (hintReady && idleT > 8f && hintBestDuck < ducks.Count)
+        if (hintReady && idleT > hintAt + 3f && hintBestDuck < ducks.Count)
         {
             hintShown = true;
             // marching soft dots along the suggested path
@@ -2423,6 +2428,50 @@ public class GameController : MonoBehaviour
         Sfx.Play("pop", 0.7f, 0.6f); Sfx.Play("splash", 0.6f, 1.4f);
     }
 
+    // ---------- puzzle clarity: point at the piece the level is built around ----------
+    readonly List<Vector2> keyPts = new List<Vector2>();
+    readonly List<RectTransform> keyTags = new List<RectTransform>();
+    string keyName = "";
+    float keyPulse;
+    void ClearKeys() { foreach (var k in keyTags) if (k) { tags.Remove(k); Destroy(k.gameObject); } keyTags.Clear(); keyPts.Clear(); }
+    void MarkKeys()
+    {
+        ClearKeys(); keyName = ""; keyPulse = 0;
+        if (level <= 1 || LevelLibrary.IsSandbox(level)) return;
+        Vector2 dc = Vector2.zero; foreach (var d in ducks) dc += d.p; if (ducks.Count > 0) dc /= ducks.Count;
+        // the closest few of one kind of block, labelled once
+        void Pick(string type, int n, string label, Color col)
+        {
+            var list = blocks.Where(b => b.alive && b.type == type && !Covered(b)).OrderBy(b => (b.p - dc).sqrMagnitude).Take(n).ToList();
+            if (list.Count == 0) return;
+            if (keyName == "") keyName = label;
+            for (int i = 0; i < list.Count; i++)
+            {
+                keyPts.Add(list[i].p);
+                if (i == 0 && list[i].tag == null) { list[i].tag = MakeTag(label, col, false); keyTags.Add(list[i].tag); }
+            }
+        }
+        if (portals.Count > 0) { keyName = "CỐNG NƯỚC"; foreach (var pt in portals) { keyPts.Add(pt.a); keyPts.Add(pt.b); } }
+        else if (flows.Count > 0) { keyName = "DÒNG CHẢY"; foreach (var f in flows) keyPts.Add(f.r.center); }
+        if (keyPts.Count == 0) Pick("laser", 2, "LASER: xoá cả hàng", new Color(0.6f, 0.4f, 1f));
+        if (keyPts.Count == 0) Pick("bathbomb", 2, "BOM: nổ lan", new Color(0.65f, 0.42f, 1f));
+        if (keyPts.Count == 0) Pick("screw", 2, "CHÂN KỆ: gãy là đổ", new Color(1f, 0.6f, 0.25f));
+        if (keyPts.Count == 0) Pick("domino", 1, "DOMINO: đổ cả dây", new Color(0.4f, 0.35f, 0.6f));
+        if (keyPts.Count == 0) Pick("ring", 2, "PHAO: húc cho trượt", new Color(1f, 0.42f, 0.4f));
+        if (keyPts.Count == 0 && bumpers.Count > 0) { keyName = "ĐỆM CAO SU"; foreach (var m in bumpers) keyPts.Add(new Vector2(m.x + m.w / 2, m.y + m.h / 2)); }
+        if (keyPts.Count == 0) Pick("ice", 1, "BĂNG: 2 cú", new Color(0.45f, 0.75f, 1f));
+        if (keyPts.Count > 6) keyPts.RemoveRange(6, keyPts.Count - 6);
+    }
+    // pulse rings on the key pieces until the first shot (and again while the player is stuck)
+    void UpdateKeys(float rdt)
+    {
+        if (keyPts.Count == 0 || state != "play" || moving || drag != null) return;
+        if (shotsTaken > 0 && idleT < 6f) return;
+        keyPulse -= rdt; if (keyPulse > 0) return;
+        keyPulse = 0.9f;
+        foreach (var p in keyPts) FxKit.Shockwave(W(p, 0.05f), 2.4f, new Color(1f, 0.92f, 0.45f, 0.85f), 0.6f);
+    }
+
     void Splash(Vector2 p, int n) => FxKit.Splash(W(p), Mathf.Max(3, n), n > 12 ? 1.4f : 1f);
     void Debris(Vector2 p, Color c, int n, float power)
     {
@@ -2869,7 +2918,8 @@ public class GameController : MonoBehaviour
         if (left != shownLeft)
         {
             shownLeft = left;
-            goalsTxt.text = "<size=28>MỤC TIÊU: PHÁ SẠCH BỒN</size>\n<size=66><b>" + (left == 0 ? "XONG!" : "còn " + left) + "</b></size>";
+            int done = goalTotal - left, pctDone = goalTotal > 0 ? Mathf.RoundToInt(100f * done / goalTotal) : 100;
+            goalsTxt.text = "<size=34>ĐÃ PHÁ <b>" + done + "/" + goalTotal + "</b> · <color=#9dffa0><b>" + pctDone + "%</b></color></size>\n<size=62><b>" + (left == 0 ? "XONG!" : "còn " + left + " món") + "</b></size>";
             objFill.anchorMax = new Vector2(goalTotal > 0 ? 1f - left / (float)goalTotal : 1f, 1);
             goalPulse = 0.25f;
             if (!halfShown && goalTotal >= 10 && left > 0 && left <= goalTotal / 2)
