@@ -224,13 +224,14 @@ public static partial class LevelLibrary
                 Duck(d, 70, 520); Duck(d, 470, 520, "zap"); Duck(d, 270, 790, "heavy");
                 return d;
             case 29:   // everything at once; two ducks stand in the alley between the pile and the fort
-                d.moves = 7; d.hint = "Vịt giữa hẻm: domino → laser → bom, phát nào mở màn?";
+                d.moves = 7; d.hint = "Đủ cả: domino, laser, xoáy, cống nước. Phát nào mở màn?";
                 Pic(d, "straw", 13);
                 Snake(d, 2, new Vector2(70, 640), new Vector2(250, 640));
                 d.blocks.Add(LZ(272, 640, "v"));
                 Fort(d, 400, 480, "left");
                 Mix(d, 70, 190, 420, 560, "glass", "vase", "soap");
                 Whirl(d, 430, 650, 52);
+                Pipe(d, 110, 790, 460, 330);   // bottom-left pipe pops out above the fort
                 Duck(d, 255, 430); Duck(d, 255, 530, "bomb"); Duck(d, 270, 800, "heavy");
                 return d;
             default:   // 30 - SUPER HARD: the ducks are boxed in by rubber pads; get out through the corners or bounce out

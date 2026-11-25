@@ -277,6 +277,7 @@ public class GameController : MonoBehaviour
         Close(); Active = true; hud.gameObject.SetActive(true);
         level = n;
         var L = LevelLibrary.Get(n);
+        Sfx.SetTrack(LevelLibrary.IsHard(n) || ((n - 1) / 10) % 2 == 1 ? 1 : 0);   // levels 11-20 + hard levels get the bouncier loop
         world = new GameObject("World").transform; fx = new GameObject("FX").transform;
         foreach (var bt in bits) if (bt.t) { bt.t.gameObject.SetActive(false); bitPools[bt.type].Push(bt.t); }   // debris pool persists across levels
         foreach (var w in whirls) if (w.view) Destroy(w.view.gameObject);

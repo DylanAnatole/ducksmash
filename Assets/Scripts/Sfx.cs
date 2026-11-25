@@ -189,16 +189,35 @@ public class Sfx : MonoBehaviour
     }
 
     // Bouncy 8-bar loop (~17 s @ 112 BPM): soft kick, plucked bass, ukulele-like arpeggio, pad, shaker.
+    int wantTrack;
+    // 0 = the original easy-going loop, 1 = a brighter, bouncier loop (later chapters + hard levels)
+    public static void SetTrack(int track)
+    {
+        if (I == null) return;
+        I.wantTrack = track;
+        if (I.clips.TryGetValue(track == 1 ? "music2" : "music", out var c) && I.music.clip != c) { I.music.clip = c; I.music.Play(); }
+    }
+
     System.Collections.IEnumerator MusicAsync()
     {
         yield return null;
-        float[][] chords = {
+        float[][] chordsA = {
             new[] { 261.6f, 329.6f, 392f }, new[] { 220f, 261.6f, 329.6f }, new[] { 174.6f, 220f, 261.6f }, new[] { 196f, 246.9f, 293.7f },
             new[] { 261.6f, 329.6f, 392f }, new[] { 164.8f, 196f, 246.9f }, new[] { 174.6f, 220f, 261.6f }, new[] { 196f, 246.9f, 293.7f } };
-        const float bpm = 112f; float beat = 60f / bpm, bar = beat * 4, eighth = beat / 2;
+        yield return BuildLoop("music", chordsA, 112f, new[] { 0, 1, 2, 1, 0, 2, 1, 2 }, 11, false);
+        // second loop: G - Em - C - D, I - vi - IV - V, a bit faster, syncopated arpeggio + clap on 2 and 4
+        float[][] chordsB = {
+            new[] { 196f, 246.9f, 293.7f }, new[] { 164.8f, 196f, 246.9f }, new[] { 261.6f, 329.6f, 392f }, new[] { 293.7f, 370f, 440f },
+            new[] { 196f, 246.9f, 293.7f }, new[] { 164.8f, 196f, 246.9f }, new[] { 220f, 261.6f, 329.6f }, new[] { 293.7f, 370f, 440f } };
+        yield return BuildLoop("music2", chordsB, 122f, new[] { 0, 2, 1, 2, 0, 1, 2, 1 }, 23, true);
+    }
+
+    System.Collections.IEnumerator BuildLoop(string name, float[][] chords, float bpm, int[] pat, int seed, bool clap)
+    {
+        float beat = 60f / bpm, bar = beat * 4, eighth = beat / 2;
         int n = (int)(bar * 8 * SR);
         var data = new float[n];
-        var rnd = new System.Random(11); float hp = 0, prevN = 0;
+        var rnd = new System.Random(seed); float hp = 0, prevN = 0;
         for (int i = 0; i < n; i++)
         {
             if (i > 0 && (i & 32767) == 0) yield return null;
@@ -214,17 +233,19 @@ public class Sfx : MonoBehaviour
             float bf = ch[0] / 2 * (bi % 2 == 1 && bt > eighth ? 2 : 1); float bt2 = bt > eighth && bi % 2 == 1 ? bt - eighth : bt;
             s += (Mathf.Sin(2 * Mathf.PI * bf * t) + 0.3f * Mathf.Sin(4 * Mathf.PI * bf * t)) * Mathf.Exp(-bt2 * 6) * 0.22f;
             // ukulele arpeggio in 8ths
-            int ei = (int)(lt / eighth); float et = lt - ei * eighth; int[] pat = { 0, 1, 2, 1, 0, 2, 1, 2 };
+            int ei = (int)(lt / eighth); float et = lt - ei * eighth;
             float af = ch[pat[ei % 8]] * 2;
             s += (Mathf.Sin(2 * Mathf.PI * af * t) + 0.5f * Mathf.Sin(4 * Mathf.PI * af * t) + 0.25f * Mathf.Sin(6 * Mathf.PI * af * t)) * Mathf.Exp(-et * 14) * 0.11f;
             // shaker on off-beats (high-passed noise)
             float nz = (float)rnd.NextDouble() * 2 - 1; hp = 0.85f * (hp + nz - prevN); prevN = nz;
             float st = lt % eighth; bool off = ((int)(lt / eighth)) % 2 == 1;
             s += hp * Mathf.Exp(-st * 60) * (off ? 0.07f : 0.03f);
+            if (clap) { float ct = (lt + beat) % (beat * 2); s += hp * Mathf.Exp(-ct * 28) * 0.16f; }   // soft clap on beats 2 and 4
             data[i] = Mathf.Clamp(s, -1, 1) * 0.8f;
         }
-        var clip = AudioClip.Create("music", n, 1, SR, false);
+        var clip = AudioClip.Create(name, n, 1, SR, false);
         clip.SetData(data, 0);
-        clips["music"] = clip; music.clip = clip; music.Play();
+        clips[name] = clip;
+        if ((name == "music2") == (wantTrack == 1) || music.clip == null) { music.clip = clip; music.Play(); }
     }
 }
