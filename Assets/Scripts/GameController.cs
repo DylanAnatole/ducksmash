@@ -1562,8 +1562,8 @@ public class GameController : MonoBehaviour
         }
         else if (!string.IsNullOrEmpty(L.hint) && !LevelLibrary.IsSandbox(level))
         {   // one short line about what's special here (shelves, rings, hard level...), then the goal
-            introBody.text = "<size=38><color=#7a4dd8><b>" + (level <= LevelLibrary.Onboarding ? "MỚI:" : "MẸO:") + "</b></color> " + L.hint + "</size>\n\n<b>PHÁ SẠCH BỒN</b> · " + moves + " lượt";
-            introRoot.sizeDelta = new Vector2(820, 520); introMax = introTimer = level <= LevelLibrary.Onboarding ? 4f : 3f;
+            introBody.text = "<size=38><color=#7a4dd8><b>" + (level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? "MỚI:" : "MẸO:") + "</b></color> " + L.hint + "</size>\n\n<b>PHÁ SẠCH BỒN</b> · " + moves + " lượt";
+            introRoot.sizeDelta = new Vector2(820, 520); introMax = introTimer = level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? 4f : 3f;
         }
 
         // unlock level: teach how to earn the new duck and how it works, and give one free copy to try

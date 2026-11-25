@@ -103,13 +103,14 @@ public static partial class LevelLibrary
                 Duck(d, 230, 500); Duck(d, 310, 500, "heavy"); Duck(d, 270, 570);
                 return d;
             case 17:   // ducks up TOP, float rings sit on top of two glass columns: shoot down, the rings plough through
-                d.moves = 7; d.hint = "Vịt trên cao: bắn phao trượt xuống, phá cả cột!";
+                d.moves = 8; d.hint = "Vịt trên cao: bắn phao trượt xuống, phá cả cột!";
                 Duck(d, 150, 230); Duck(d, 270, 220, "heavy"); Duck(d, 390, 230);
                 for (int k = 0; k < 2; k++) { float x = k == 0 ? 90 : 450; Ring(d, x, 320); Fill(d, "glass", x, x, 390, 630); }
                 StoneRow(d, 230, 310, 330);
                 Mix(d, 170, 370, 420, 580, "plates", "glass", "soap", "vase");
                 Fill(d, "soap", 150, 390, 760, 760);
                 Pad(d, 270, 845, 220, 14);   // bounce off the bottom pad back up into the pile
+                Flow(d, 270, 690, 200, 70, "up");   // ...and the current lifts it back into the pile
                 return d;
             case 18:   // three narrow shelves, ducks on BOTH SIDE WALLS level with the legs: snap them sideways
                 d.moves = 10; d.hint = "Vịt hai bên: bắn ngang gãy chân kệ!";
