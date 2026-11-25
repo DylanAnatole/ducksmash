@@ -46,7 +46,7 @@ public class GameController : MonoBehaviour
         public float hit, falling; public Block under, plankRef; public List<Block> screws; public string dir; public Color color;
         public float mvCx, mvAmp, mvSp; public int pid; public Transform view; public Vector3 baseScale = Vector3.one;
         public Renderer[] rends; public bool flashing, scaled; public Transform pips; public RectTransform tag; public float appear = 1, delay; public Vector2 hitDir;
-        public bool shelf; public Vector2 vel; public float mvPhase;   // vel: float rings skate across the tub after a knock
+        public bool shelf; public Vector2 vel; public float mvPhase, wob;   // vel: float rings skate across the tub after a knock
         public bool Prop => type == "glass" || type == "vase" || type == "soap" || type == "plates";
         public bool Goal => !Hard;   // single objective: smash EVERYTHING breakable in the tub (only stone + shelf boards stay)
         public bool Hard => type == "stone" || type == "plank";
@@ -1013,6 +1013,11 @@ public class GameController : MonoBehaviour
         Sfx.Play("pop", 0.35f, pitch);
         Debris(b.p, BlockColor(b), b.type == "pixel" ? 4 : b.type == "boss" ? 40 : 9, b.type == "boss" ? 1.6f : 1f);
         FxKit.PopFlash(W(b.p, 0.45f), b.type == "pixel" ? 0.45f : 0.75f);
+        for (int i = 0; i < blocks.Count; i++)
+        {   // neighbours shudder as the shock passes through the water
+            var o = blocks[i]; if (!o.alive || o == b || o.Hard) continue;
+            float dd = (o.p - b.p).sqrMagnitude; if (dd < 75 * 75) o.wob = Mathf.Max(o.wob, 0.22f * (1 - Mathf.Sqrt(dd) / 75f));
+        }
         if (b.type != "pixel" && t - lastBreakRing > 0.035f) { lastBreakRing = t; AddRing(b.p, 30, BlockColor(b)); }   // a soft ring in the block's own colour
         // material read: soap fizzes into bubbles, glass and china throw bright glints
         if (b.type == "soap") { int nb = App.Mobile ? 2 : 4; for (int i = 0; i < nb; i++) FxKit.Bubble(W(b.p + UnityEngine.Random.insideUnitCircle * 14f, 0.2f)); }
@@ -2140,6 +2145,11 @@ public class GameController : MonoBehaviour
             b.hit = Mathf.Max(0, b.hit - dt);
             float k = 1 + b.hit * (b.type == "boss" ? 0.4f : 1.2f);
             if (b.hit > 0 || b.scaled) { b.view.localScale = b.baseScale * k; b.scaled = b.hit > 0; }
+            if (b.wob > 0 && b.under == null && b.type != "boss")
+            {
+                b.wob = Mathf.Max(0, b.wob - dt * 1.6f);
+                b.view.localEulerAngles = new Vector3(Mathf.Sin(t * 37f + b.p.x) * b.wob * 40f, 0, Mathf.Sin(t * 43f + b.p.y) * b.wob * 40f);
+            }
             if (b.type == "boss") b.view.localEulerAngles = new Vector3(0, 0, b.hit > 0 ? Mathf.Sin(t * 60f) * b.hit * 60f : 0);   // the king wobbles when struck
             // floating goodies bob gently on the bath water
             // everything afloat bobs gently on the bath water (slow, small: calm motion, not visual noise)
