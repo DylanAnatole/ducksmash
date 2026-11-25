@@ -286,7 +286,7 @@ public class GameController : MonoBehaviour
         flows.Clear();
         padClock = 0;
         ducks.Clear(); blocks.Clear(); bumpers.Clear(); timers.Clear(); bits.Clear(); bitPool.Clear(); rings.Clear(); zaps.Clear(); dying.Clear();
-        foreach (var c in coins) if (c.rt) Destroy(c.rt.gameObject);
+        foreach (var c in coins) RecycleCoin(c.rt);
         coins.Clear(); slowTimer = camZoom = rushTimer = 0; rushLeft = rushCoins = 0; movesAtClear = -1; displayScore = 0;
         foreach (var p in pops) RecyclePop(p.t);
         pops.Clear();
@@ -1668,7 +1668,7 @@ public class GameController : MonoBehaviour
             var p1 = Vector2.Lerp(c.from, mid, f); var p2 = Vector2.Lerp(mid, target, f);
             c.rt.anchoredPosition = Vector2.Lerp(p1, p2, f);
             c.rt.localScale = Vector3.one * (f < 0.15f ? f / 0.15f * 1.3f : Mathf.Lerp(1.3f, 0.7f, f));
-            if (f >= 1) { Destroy(c.rt.gameObject); coins.RemoveAt(i); scorePulse = 0.2f; Sfx.Play("coin", 0.25f, 1.2f + UnityEngine.Random.value * 0.2f); }
+            if (f >= 1) { RecycleCoin(c.rt); coins.RemoveAt(i); scorePulse = 0.2f; Sfx.Play("coin", 0.25f, 1.2f + UnityEngine.Random.value * 0.2f); }
         }
         scorePulse = Mathf.Max(0, scorePulse - rdt);
         displayScore = Mathf.MoveTowards(displayScore, score, Mathf.Max(30, Mathf.Abs(score - displayScore) * 6) * rdt);
@@ -1702,10 +1702,15 @@ public class GameController : MonoBehaviour
     void SpawnCoin(Vector2 simPos)
     {
         if (coins.Count > 25) return;
-        var img = UIKit.Dot(dynLayer, new Color(1f, 0.82f, 0.25f), "Coin");
-        var o = img.gameObject.AddComponent<Outline>(); o.effectColor = new Color(0.75f, 0.45f, 0.05f); o.effectDistance = new Vector2(4, -4);
-        img.raycastTarget = false;
-        var rt = img.rectTransform; rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f); rt.sizeDelta = new Vector2(56, 56);
+        RectTransform rt = null;
+        while (coinPool.Count > 0 && rt == null) rt = coinPool.Pop();
+        if (rt != null) { rt.gameObject.SetActive(true); rt.SetAsLastSibling(); }
+        else
+        {
+            var img = UIKit.Dot(dynLayer, new Color(1f, 0.82f, 0.25f), "Coin");
+            var o = img.gameObject.AddComponent<Outline>(); o.effectColor = new Color(0.75f, 0.45f, 0.05f); o.effectDistance = new Vector2(4, -4);
+            img.raycastTarget = false; rt = img.rectTransform;
+        } rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f); rt.sizeDelta = new Vector2(56, 56);
         var from = WorldToHud(W(simPos, 0.5f)); rt.anchoredPosition = from;
         coins.Add(new Coin { rt = rt, from = from });
     }
@@ -2511,6 +2516,8 @@ public class GameController : MonoBehaviour
         if (pops.Count > 30) { RecyclePop(pops[0].t); pops.RemoveAt(0); }
     }
     readonly Stack<Text> popPool = new Stack<Text>();
+    readonly Stack<RectTransform> coinPool = new Stack<RectTransform>();
+    void RecycleCoin(RectTransform rt) { if (rt == null) return; rt.gameObject.SetActive(false); if (coinPool.Count < 30) coinPool.Push(rt); else Destroy(rt.gameObject); }
     void RecyclePop(Text t) { if (t == null) return; t.gameObject.SetActive(false); if (popPool.Count < 24) popPool.Push(t); else Destroy(t.gameObject); }
 
     void BigText(string s, Color c) { bigTxt.text = s; bigTxt.color = c; bigLife = 1.4f; }
