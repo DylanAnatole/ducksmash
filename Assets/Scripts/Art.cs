@@ -521,7 +521,7 @@ public static class Art
         {
             float a = i / 10f * Mathf.PI * 2;
             Prim(PrimitiveType.Sphere, root, new Vector3(Mathf.Cos(a) * d * 0.34f, 0.2f, Mathf.Sin(a) * d * 0.34f), new Vector3(d * 0.34f, d * 0.26f, d * 0.34f),
-                Mat(i % 2 == 0 ? Hex("ff5a5a") : Color.white, 0.6f, 0, 0, 0.003f));
+                Mat(i % 2 == 0 ? Hex("ff7f78") : Color.white, 0.6f, 0, 0, 0.003f));
         }
         return root;
     }

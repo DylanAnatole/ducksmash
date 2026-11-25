@@ -2186,7 +2186,7 @@ public class GameController : MonoBehaviour
                 var e = b.hit > 0 ? Color.white * Mathf.Min(1f, b.hit * 6f) * 0.55f
                       : aimed ? new Color(1f, 1f, 0.85f) * (0.26f + 0.07f * Mathf.Sin(Time.unscaledTime * 6f))
                       : enraged ? new Color(1f, 0.2f, 0.15f) * (0.25f + 0.2f * Mathf.Sin(t * 10f))
-                      : glow ? new Color(1f, 0.85f, 0.35f) * (0.18f + 0.18f * Mathf.Sin(t * 6f)) : Color.clear;
+                      : glow ? new Color(1f, 0.85f, 0.35f) * (0.16f + 0.1f * Mathf.Sin(t * 3f)) : Color.clear;
                 mpb.Clear(); mpb.SetColor("_Emission", e);
                 foreach (var r in b.rends) if (r) r.SetPropertyBlock(b.flashing ? mpb : null);
             }
