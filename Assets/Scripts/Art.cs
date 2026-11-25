@@ -463,6 +463,7 @@ public static class Art
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.76f, 0), new Vector3(d * 0.28f, 0.12f, d * 0.28f), g);
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.9f, 0), new Vector3(d * 0.33f, 0.04f, d * 0.33f), Mat(Hex("ff8a8a"), 0.7f));
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.22f, 0), new Vector3(d * 0.74f, 0.1f, d * 0.74f), Mat(Hex("5fbf8c"), 0.9f, 0, 0.1f)); // liquid
+        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.38f, 0), new Vector3(d * 0.735f, 0.05f, d * 0.735f), Mat(Hex("fff6e8"), 0.7f));   // paper label band
         Prim(PrimitiveType.Cube, root, new Vector3(d * 0.16f, 0.42f, -d * 0.34f), new Vector3(0.035f, 0.3f, 0.02f), Mat(Color.white, 1f, 0, 0.9f));   // glint
         return root;
     }
@@ -666,7 +667,7 @@ public static class Art
     public static Transform Pixel(Transform parent, float s, Color c)
     {
         var root = Root("Pixel", parent);
-        Prim(PrimitiveType.Cube, root, new Vector3(0, 0.16f, 0), new Vector3(s, 0.32f, s), Mat(c, 0.5f));
+        Prim(PrimitiveType.Cube, root, new Vector3(0, 0.16f, 0), new Vector3(s, 0.32f, s), Mat(Color.Lerp(c, new Color(1f, 0.97f, 0.95f), 0.14f), 0.5f));
         return root;
     }
 

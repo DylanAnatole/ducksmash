@@ -201,7 +201,7 @@ public class GameController : MonoBehaviour
             }
         });
     }
-    void Flash(float a) => flashA = Mathf.Max(flashA, a * 0.5f);
+    void Flash(float a) => flashA = Mathf.Max(flashA, a * 0.3f);
     Transform aimTarget, aimGrab; readonly List<Transform> pushDots = new List<Transform>(), frenzyDots = new List<Transform>(); LineRenderer band2;
     MaterialPropertyBlock mpb; static Material trailMat;
     Vector3 camBase; Material waterMat;
@@ -2167,12 +2167,14 @@ public class GameController : MonoBehaviour
             bool aimed = drag != null && !moving && aimHits.Contains(b);   // will break on this shot: light it up while aiming
             bool enraged = b.type == "boss" && b.hp <= b.max / 2;
             bool glow = (fewLeft && b.Goal && !Covered(b)) || b.type == "gold" || aimed || enraged;
+            if (b.type == "bathbomb" && UnityEngine.Random.value < dt * (App.Mobile ? 0.25f : 0.5f)) FxKit.Bubble(W(b.p + UnityEngine.Random.insideUnitCircle * 10f, 0.3f));   // fizzing: "I go boom"
+            if (b.type == "chest" && UnityEngine.Random.value < dt * 0.6f) FxKit.Sparkle(W(b.p + new Vector2(UnityEngine.Random.Range(-18f, 18f), 0), 0.9f), new Color(1f, 0.92f, 0.55f), 1);
             if (b.type == "gold" && b.mvAmp > 0 && UnityEngine.Random.value < dt * 6f) FxKit.Sparkle(W(b.p, 0.5f), new Color(1f, 0.9f, 0.4f), 1);   // drifting gold leaves glints
             if (b.hit > 0 || b.flashing || glow)
             {
                 b.flashing = b.hit > 0 || glow;
                 var e = b.hit > 0 ? Color.white * Mathf.Min(1f, b.hit * 6f) * 0.55f
-                      : aimed ? new Color(1f, 1f, 0.85f) * (0.3f + 0.15f * Mathf.Sin(Time.unscaledTime * 14f))
+                      : aimed ? new Color(1f, 1f, 0.85f) * (0.26f + 0.07f * Mathf.Sin(Time.unscaledTime * 6f))
                       : enraged ? new Color(1f, 0.2f, 0.15f) * (0.25f + 0.2f * Mathf.Sin(t * 10f))
                       : glow ? new Color(1f, 0.85f, 0.35f) * (0.18f + 0.18f * Mathf.Sin(t * 6f)) : Color.clear;
                 mpb.Clear(); mpb.SetColor("_Emission", e);
