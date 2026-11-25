@@ -272,6 +272,7 @@ public class GameController : MonoBehaviour
         foreach (var p in pops) if (p.t) Destroy(p.t.gameObject);
         pops.Clear();
         projShown = -1; starLossT = 0;
+        fever = 0; frenzyReady = false; feverShown = 0; feverShownInt = -1; feverMode = 0;   // frenzy starts empty in every level: no banking it for the next one
         moves = startMoves = L.moves; state = "play"; moving = false; shotSmash = streak = pushes = score = 0;
         frenzyShot = bossKilled = rewarded = false; hardLevel = L.hard; target = null; hint = level <= LevelLibrary.Onboarding || LevelLibrary.IsSandbox(level) ? L.hint : ""; freeze = shake = 0; drag = null;
 

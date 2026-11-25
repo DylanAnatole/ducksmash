@@ -31,12 +31,38 @@
       var AN = window.AudioNode; if (!AN || !AN.prototype || !AN.prototype.connect) return;
       var ctxs = [], orig = AN.prototype.connect;
       AN.prototype.connect = function () { var c = this.context; if (c && ctxs.indexOf(c) < 0) ctxs.push(c); return orig.apply(this, arguments); };
+      // iOS: WebAudio is muted by the ring/silent switch unless the page's audio session is "playback".
+      // Safari 16.4+ exposes navigator.audioSession; older iOS needs a looping (silent) <audio> element
+      // started from a tap, which switches the session to playback so the game's sound comes through.
+      try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) {}
+      var silent = null;
+      function silentWav() {   // 0.5 s of silence, 8 kHz mono 8-bit
+        var n = 4000, b = new Uint8Array(44 + n), v = new DataView(b.buffer);
+        function s(o, t) { for (var i = 0; i < t.length; i++) b[o + i] = t.charCodeAt(i); }
+        s(0, "RIFF"); v.setUint32(4, 36 + n, true); s(8, "WAVEfmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+        v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); s(36, "data"); v.setUint32(40, n, true);
+        for (var i = 0; i < n; i++) b[44 + i] = 128;
+        return URL.createObjectURL(new Blob([b], { type: "audio/wav" }));
+      }
+      var isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
       function wake() {
         if (document.hidden) return;
-        for (var i = 0; i < ctxs.length; i++) { var c = ctxs[i]; if (c.state !== "running" && c.state !== "closed") { try { c.resume(); } catch (e) {} } }
+        if (isIOS) {
+          try {
+            if (!silent) { silent = document.createElement("audio"); silent.setAttribute("playsinline", ""); silent.loop = true; silent.src = silentWav(); }
+            if (silent.paused) { var pr = silent.play(); if (pr && pr.catch) pr.catch(function () {}); }
+          } catch (e) {}
+        }
+        for (var i = 0; i < ctxs.length; i++) {
+          var c = ctxs[i]; if (c.state === "closed") continue;
+          if (c.state !== "running") { try { c.resume(); } catch (e) {} }
+          if (isIOS) { try { var src = c.createBufferSource(); src.buffer = c.createBuffer(1, 1, 22050); orig.call(src, c.destination); src.start(0); } catch (e) {} }   // iOS unlock: play one sample inside the tap
+        }
       }
-      ["touchend", "pointerup", "mouseup", "keydown"].forEach(function (e) { document.addEventListener(e, wake, true); });
-      document.addEventListener("visibilitychange", function () { if (!document.hidden) wake(); });
+      ["touchstart", "touchend", "pointerup", "mouseup", "keydown"].forEach(function (e) { document.addEventListener(e, wake, true); });
+      document.addEventListener("visibilitychange", function () {
+        if (document.hidden) { if (silent) try { silent.pause(); } catch (e) {} } else wake();
+      });
     })();
   </script>
   <script>
