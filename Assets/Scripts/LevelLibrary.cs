@@ -212,6 +212,7 @@ public static partial class LevelLibrary
                 d.blocks.AddRange(Row("glass", 70, 450, 11, 40));
                 d.blocks.AddRange(Shelf(270, 530, 360, "glass", "vase", "glass", "vase", "glass", "vase"));
                 d.bumpers.Add(BumperL(620)); d.bumpers.Add(BumperR(620));
+                d.ducks.Add(new DuckDef(200, 700, "normal")); d.ducks.Add(new DuckDef(340, 700, "normal"));
                 break;
             case 8:
                 d = L(9, "Vịt Sắt: 1 cú hạ chồng đĩa!", (150, 800, null), (270, 800, null), (390, 800, null), (210, 700, "heavy"), (330, 700, "heavy"));
@@ -226,6 +227,7 @@ public static partial class LevelLibrary
                 d.blocks.AddRange(PixelArt(ART_HEART, 270, 320, 34)); d.art = "heart"; d.blocks.Add(LZ(60, 320, "h")); d.blocks.Add(LZ(480, 252, "h"));
                 d.blocks.AddRange(Shelf(270, 520, 340, "glass", "vase", "glass", "vase", "glass", "vase"));
                 d.blocks.AddRange(Row("soap", 70, 590, 11, 40));
+                d.ducks.Add(new DuckDef(200, 675, "normal")); d.ducks.Add(new DuckDef(340, 675, "normal"));
                 break;
             case 10:
                 d = L(15, "MÀN KHÓ! Ngắm qua khe đá!", (150, 810, "heavy"), (270, 810, null), (390, 810, null));
@@ -258,6 +260,7 @@ public static partial class LevelLibrary
                 d.blocks.AddRange(Row("vase", 70, 460, 11, 40)); d.blocks.Add(LZ(70, 520, "h")); d.blocks.AddRange(Row("soap", 110, 520, 10, 40));
                 for (int i = 0; i < 7; i++) d.blocks.Add(B("plates", 90 + i * 60, 590));
                 d.bumpers.Add(BumperL(640)); d.bumpers.Add(BumperR(640));
+                d.ducks.Add(new DuckDef(270, 670, "normal"));
                 break;
             default:
                 if (n >= 14 && n <= Count) { d = Puzzle(n); break; }   // hand-designed puzzle levels (LevelPuzzles.cs)

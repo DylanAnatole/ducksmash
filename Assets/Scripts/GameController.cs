@@ -1341,6 +1341,11 @@ public class GameController : MonoBehaviour
         foreach (var d in ducks) d.spent = false;
         moving = false;
         int n = shotSmash;
+        if (pushes >= 3 && state == "play")
+        {   // a good carom gets its own little celebration
+            PopText((pushes >= 5 ? "BI-A THẦN SẦU! x" : "BI-A ĐẸP! x") + pushes, new Vector2(270, 470), new Color(0.45f, 0.9f, 1f), 66 + Mathf.Min(pushes, 8) * 3);
+            Sfx.Play("combo", 0.9f, 1.15f); FxKit.StarBurst(W(270, 470, 0.5f), 10 + pushes * 2);
+        }
         if (n >= 25) BigText("DUCKTASTROPHE!", new Color(1f, 0.35f, 0.2f));
         else if (n >= 15) BigText("MEGA SMASH!", new Color(1f, 0.88f, 0.3f));
         else if (n >= 8) BigText("SMASH!", Color.white);
