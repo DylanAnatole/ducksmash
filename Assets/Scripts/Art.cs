@@ -544,7 +544,7 @@ public static class Art
     {
         var root = Root("Domino", parent);
         Prim(PrimitiveType.Cube, root, new Vector3(0, 0.36f, 0), new Vector3(w, 0.7f, h), Mat(Hex("fff8ea"), 0.8f, 0, 0, 0.003f));
-        var ink = Mat(Hex("2b2b3b"), 0.4f);
+        var ink = Mat(Hex("4a4570"), 0.4f);   // soft navy pips instead of near-black
         bool vert = h > w; float L = Mathf.Max(w, h);
         Prim(PrimitiveType.Cube, root, new Vector3(0, 0.715f, 0), vert ? new Vector3(w * 0.9f, 0.01f, 0.02f) : new Vector3(0.02f, 0.01f, h * 0.9f), ink);
         foreach (float s in new[] { -0.25f, 0.25f })

@@ -1018,7 +1018,7 @@ public class GameController : MonoBehaviour
             var o = blocks[i]; if (!o.alive || o == b || o.Hard) continue;
             float dd = (o.p - b.p).sqrMagnitude; if (dd < 75 * 75) o.wob = Mathf.Max(o.wob, 0.22f * (1 - Mathf.Sqrt(dd) / 75f));
         }
-        if (b.type != "pixel" && t - lastBreakRing > 0.035f) { lastBreakRing = t; AddRing(b.p, 30, BlockColor(b)); }   // a soft ring in the block's own colour
+        if (b.type != "pixel" && t - lastBreakRing > 0.035f) { lastBreakRing = t; var bc = BlockColor(b); bc.a = 0.5f; AddRing(b.p, 30, bc); }   // a soft ring in the block's own colour
         // material read: soap fizzes into bubbles, glass and china throw bright glints
         if (b.type == "soap") { int nb = App.Mobile ? 2 : 4; for (int i = 0; i < nb; i++) FxKit.Bubble(W(b.p + UnityEngine.Random.insideUnitCircle * 14f, 0.2f)); }
         else if (b.type == "glass" || b.type == "vase" || b.type == "plates") FxKit.Sparkle(W(b.p, 0.45f), new Color(0.9f, 0.97f, 1f), App.Mobile ? 3 : 5);
