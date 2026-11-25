@@ -64,15 +64,19 @@ Shader "DuckSmash/ToonFlat"
                 half3 v = normalize(_WorldSpaceCameraPos - i.wp);
                 fixed4 col = tex2D(_MainTex, i.uv) * _Color * i.vc;
 
-                half ndl = dot(n, l);
-                half atten = SHADOW_ATTENUATION(i);
-                half lit = smoothstep(-0.08, 0.32, ndl) * smoothstep(0.3, 0.6, atten);
-
-                half3 c = col.rgb * lerp(_ShadowTint.rgb, half3(1,1,1), lit) * (0.55 + 0.5 * _LightColor0.rgb);
-                half3 h = normalize(l + v);
-                c += smoothstep(0.965 - _Gloss * 0.02, 0.985 - _Gloss * 0.02, dot(n, h)) * lit * _Gloss * 0.75;
-                half rim = 1.0 - saturate(dot(n, v)); rim = rim * rim * rim;
-                c += rim * 0.18 * col.rgb + rim * 0.06;
+                float ndl = dot(n, l);
+                float atten = SHADOW_ATTENUATION(i);
+                // glossy vinyl-toy shading: soft wrapped light (round, 3D) + sky/ground fill + broad sheen + sharp hotspot + white rim
+                float wrap = saturate(ndl * 0.55 + 0.45);
+                float lit = (wrap * wrap * (3.0 - 2.0 * wrap)) * lerp(0.55, 1.0, smoothstep(0.3, 0.6, atten));
+                float sky = saturate(n.y * 0.5 + 0.5);
+                float3 shade = lerp(_ShadowTint.rgb * 0.95, float3(1.06, 1.05, 1.02), lit) * lerp(0.9, 1.06, sky);
+                float3 c = col.rgb * shade * (0.6 + 0.45 * _LightColor0.rgb);
+                float3 h = normalize(l + v);
+                float ndh = saturate(dot(n, h));
+                c += (pow(ndh, 18.0) * 0.16 + smoothstep(0.972, 0.988, ndh) * 0.55) * _Gloss * saturate(lit + 0.2);
+                float rim = pow(1.0 - saturate(dot(n, v)), 2.6);
+                c += rim * (0.22 * col.rgb + 0.14) * sky;
                 c *= lerp(1.0, lerp(0.68, 1.0, saturate(i.wp.y * 3.2 + 0.08)), _Ground);   // grounded look without a shadow pass
                 c += _Emission.rgb;
                 return fixed4(c, 1);
