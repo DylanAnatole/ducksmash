@@ -89,7 +89,7 @@ public class GameController : MonoBehaviour
     int level, moves, startMoves, shotSmash, streak, pushes, score, stars, reward;
     static float fever; static bool frenzyReady;
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { fever = 0; frenzyReady = false; trailMat = null; pipMat = null; tagDuckIcon = null; templates.Clear(); tplRoot = null; }
+    static void ResetStatics() { fever = 0; frenzyReady = false; trailMat = null; pipMat = null; contactMat = null; tagDuckIcon = null; templates.Clear(); tplRoot = null; }
 
     // Building a block from primitives + baking it costs ~0.5 ms; cloning a cached template is ~20x cheaper.
     // Every block/duck kind is built ONCE (under an inactive root) and Instantiate()d afterwards.
@@ -576,12 +576,19 @@ public class GameController : MonoBehaviour
         b.view = Spawn(key, parent =>
         {
             var v = BuildBlockArt(b, parent);
-            float outline = b.type == "stone" || b.type == "screw" ? 0.003f : 0f;
+            float outline = b.type == "stone" || b.type == "screw" ? 0.0022f : 0f;
             float gloss = b.type == "screw" ? 0.9f : b.type == "chest" ? 0.7f : 0.4f;
             Art.Bake(v, key, gloss, outline, "Spark", "IceShell", "Arrow", "Glow", "Plate1", "Plate2", "Plate3");
             if (b.type == "plates")   // each plate: one baked, instanced mesh
                 for (int i = 1; i <= 3; i++) { var pc = v.Find("Plate" + i); if (pc) Art.Bake(pc, "plate_" + Mathf.RoundToInt(b.r * 2), 0.9f, 0.003f); }
             if (App.Mobile) foreach (var r in v.GetComponentsInChildren<Renderer>(true)) { r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false; }
+            if (b.type != "pixel" && b.type != "plank" && b.type != "screw" && b.type != "domino")
+            {   // soft contact shadow on the water: blocks sit IN the bath instead of hovering, and read apart from the caustics
+                if (contactMat == null) { contactMat = Art.Fade(new Color(0.06f, 0.1f, 0.3f, 0.34f)); contactMat.mainTexture = BlobTex(); }
+                float sx = (b.rect ? b.w : b.r * 2) * K * 1.45f, sz = (b.rect ? b.h : b.r * 2) * K * 1.45f;
+                var sh = Art.Prim(PrimitiveType.Quad, v, new Vector3(0.04f, 0.015f, -0.04f), new Vector3(sx, sz, 1f), contactMat, new Vector3(90, 0, 0));
+                sh.name = "Contact"; var sr = sh.GetComponent<Renderer>(); sr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; sr.receiveShadows = false;
+            }
             return v;
         }, world);
         b.view.position = W(b.p);
@@ -591,7 +598,20 @@ public class GameController : MonoBehaviour
     }
 
     // ---------- hit-count pips: one dark dot per hit still needed, floating above multi-hit blocks ----------
-    static Material pipMat;
+    static Material pipMat, contactMat;
+    float lastBreakRing = -9f;
+    // round soft blob (radial falloff) for contact shadows
+    static Texture2D BlobTex()
+    {
+        const int S = 64; var t = new Texture2D(S, S, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+        var px = new Color[S * S];
+        for (int y = 0; y < S; y++) for (int x = 0; x < S; x++)
+        {
+            float dx = (x + 0.5f) / S * 2 - 1, dy = (y + 0.5f) / S * 2 - 1, r = Mathf.Sqrt(dx * dx + dy * dy);
+            float a = Mathf.Clamp01(1 - r); px[y * S + x] = new Color(1, 1, 1, a * a * (3 - 2 * a));
+        }
+        t.SetPixels(px); t.Apply(); return t;
+    }
     void AddPips(Block b)
     {
         if (b.Hard || b.type == "boss" || b.max <= 1 || b.max > 6) return;
@@ -993,6 +1013,7 @@ public class GameController : MonoBehaviour
         Sfx.Play("pop", 0.35f, pitch);
         Debris(b.p, BlockColor(b), b.type == "pixel" ? 4 : b.type == "boss" ? 40 : 9, b.type == "boss" ? 1.6f : 1f);
         FxKit.PopFlash(W(b.p, 0.45f), b.type == "pixel" ? 0.45f : 0.75f);
+        if (b.type != "pixel" && t - lastBreakRing > 0.035f) { lastBreakRing = t; AddRing(b.p, 30, BlockColor(b)); }   // a soft ring in the block's own colour
         // material read: soap fizzes into bubbles, glass and china throw bright glints
         if (b.type == "soap") { int nb = App.Mobile ? 2 : 4; for (int i = 0; i < nb; i++) FxKit.Bubble(W(b.p + UnityEngine.Random.insideUnitCircle * 14f, 0.2f)); }
         else if (b.type == "glass" || b.type == "vase" || b.type == "plates") FxKit.Sparkle(W(b.p, 0.45f), new Color(0.9f, 0.97f, 1f), App.Mobile ? 3 : 5);
@@ -1099,10 +1120,10 @@ public class GameController : MonoBehaviour
             case "cookie": case "ice": case "boss": return new Color(0.94f, 0.63f, 0.29f);
             case "crate": return new Color(0.69f, 0.48f, 0.27f);
             case "chest": case "gold": return new Color(1f, 0.8f, 0.25f);
-            case "glass": return new Color(0.56f, 0.91f, 0.44f);
-            case "vase": return new Color(1f, 0.6f, 0.29f);
-            case "soap": return new Color(1f, 0.44f, 0.68f);
-            case "plates": return new Color(0.98f, 0.98f, 1f);
+            case "glass": return new Color(0.56f, 0.86f, 0.69f);
+            case "vase": return new Color(1f, 0.68f, 0.45f);
+            case "soap": return new Color(1f, 0.61f, 0.78f);
+            case "plates": return new Color(0.75f, 0.88f, 1f);
             case "bathbomb": return new Color(0.65f, 0.42f, 1f);
             case "domino": return new Color(1f, 0.97f, 0.9f);
             case "tnt": return new Color(0.91f, 0.28f, 0.23f);
@@ -2121,7 +2142,9 @@ public class GameController : MonoBehaviour
             if (b.hit > 0 || b.scaled) { b.view.localScale = b.baseScale * k; b.scaled = b.hit > 0; }
             if (b.type == "boss") b.view.localEulerAngles = new Vector3(0, 0, b.hit > 0 ? Mathf.Sin(t * 60f) * b.hit * 60f : 0);   // the king wobbles when struck
             // floating goodies bob gently on the bath water
-            bool floats = !App.Mobile && (b.type == "cookie" || b.type == "gold" || b.type == "ice" || b.type == "pixel" || b.type == "chest" || b.type == "tnt" || b.type == "laser" || b.type == "boss");
+            // everything afloat bobs gently on the bath water (slow, small: calm motion, not visual noise)
+            bool floats = b.type == "cookie" || b.type == "gold" || b.type == "ice" || b.type == "chest" || b.type == "tnt" || b.type == "laser" || b.type == "boss"
+                       || b.Prop || b.type == "bathbomb" || (!App.Mobile && b.type == "pixel");
             float lift = 0;
             if (b.appear < 1)
             {   // level build-in: drop from above with a little overshoot squash

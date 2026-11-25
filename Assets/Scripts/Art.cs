@@ -72,7 +72,13 @@ public static class Art
         var sh = holder != null ? holder.shader : Shader.Find("DuckSmash/Water");
         if (sh == null) return Toon(Color.white, tex, tiling, 0.3f);
         var m = new Material(sh) { color = new Color(1.06f, 1.06f, 1.06f), mainTexture = tex, mainTextureScale = tiling };
-        m.SetFloat("_Speed", 1f); m.SetFloat("_Sparkle", 0.55f);
+        m.SetFloat("_Speed", 0.7f); m.SetFloat("_Sparkle", 0.28f); m.SetFloat("_Contrast", 0.58f);
+        if (tex is Texture2D t2 && t2.isReadable)
+        {   // average colour of the caustic texture: the calm level the lines are pulled towards
+            var px = t2.GetPixels32(); long r = 0, g = 0, bl = 0; int n = 0;
+            for (int i = 0; i < px.Length; i += 7) { r += px[i].r; g += px[i].g; bl += px[i].b; n++; }
+            m.SetColor("_Avg", new Color(r / (255f * n), g / (255f * n), bl / (255f * n), 1));
+        }
         return m;
     }
 
@@ -339,7 +345,7 @@ public static class Art
     static readonly Color Beak = Hex("ff9a1f"), Eye = Hex("231a33"), Cheek = Hex("ff8fa8"),
         CookieTop = Hex("f4b25e"), CookieSide = Hex("d98a3a"), Chip = Hex("6b3a1a"),
         Wood = Hex("c98f55"), WoodDark = Hex("8e5b2c"), WoodLight = Hex("e2ae72"),
-        Gold = Hex("ffd34d"), Red = Hex("ff5a4f"), Purple = Hex("8b5cff"), StoneCol = Hex("6f7790"), StoneDark = Hex("4f566b");   // darker: reads as "solid, can't break"
+        Gold = Hex("ffd34d"), Red = Hex("ff5a4f"), Purple = Hex("8b5cff"), StoneCol = Hex("8c94ad"), StoneDark = Hex("6d7590");   // slate: still reads as "solid", without the harsh dark blobs
 
     // ---------------- ducks ----------------
     public static readonly Dictionary<string, Color> DuckBody = new Dictionary<string, Color>
@@ -451,12 +457,12 @@ public static class Art
     public static Transform Glass(Transform parent, float d)
     {
         var root = Root("Glass", parent);
-        var g = Mat(Hex("8ee86f"), 1f, 0, 0.12f, 0.003f);   // green bottle
+        var g = Mat(Hex("8fdcb0"), 1f, 0, 0.1f, 0.003f);   // mint bottle (softer than the old lime)
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.3f, 0), new Vector3(d * 0.72f, 0.28f, d * 0.72f), g);
         Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.58f, 0), new Vector3(d * 0.72f, 0.22f, d * 0.72f), g);
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.76f, 0), new Vector3(d * 0.28f, 0.12f, d * 0.28f), g);
-        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.9f, 0), new Vector3(d * 0.33f, 0.04f, d * 0.33f), Mat(Hex("ff4f6e"), 0.7f));
-        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.22f, 0), new Vector3(d * 0.74f, 0.1f, d * 0.74f), Mat(Hex("4cc23c"), 0.9f, 0, 0.1f)); // liquid
+        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.9f, 0), new Vector3(d * 0.33f, 0.04f, d * 0.33f), Mat(Hex("ff8a8a"), 0.7f));
+        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.22f, 0), new Vector3(d * 0.74f, 0.1f, d * 0.74f), Mat(Hex("5fbf8c"), 0.9f, 0, 0.1f)); // liquid
         Prim(PrimitiveType.Cube, root, new Vector3(d * 0.16f, 0.42f, -d * 0.34f), new Vector3(0.035f, 0.3f, 0.02f), Mat(Color.white, 1f, 0, 0.9f));   // glint
         return root;
     }
@@ -464,7 +470,7 @@ public static class Art
     public static Transform Vase(Transform parent, float d)
     {
         var root = Root("Vase", parent);
-        var body = Mat(Hex("ff9a4a"), 0.85f, 0, 0, 0.003f);   // terracotta vase
+        var body = Mat(Hex("ffad73"), 0.85f, 0, 0, 0.003f);   // peach vase
         Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.32f, 0), new Vector3(d * 0.86f, 0.56f, d * 0.86f), body);
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.34f, 0), new Vector3(d * 0.88f, 0.035f, d * 0.88f), Mat(Color.white, 0.6f));
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.22f, 0), new Vector3(d * 0.8f, 0.02f, d * 0.8f), Mat(Hex("ffd34d"), 0.6f));
@@ -476,9 +482,9 @@ public static class Art
     public static Transform Soap(Transform parent, float d)
     {
         var root = Root("Soap", parent);
-        var pink = Mat(Hex("ff6fae"), 0.95f, 0, 0, 0.003f);
+        var pink = Mat(Hex("ff9cc6"), 0.95f, 0, 0, 0.003f);
         Prim(PrimitiveType.Cube, root, new Vector3(0, 0.12f, 0), new Vector3(d * 0.92f, 0.18f, d * 0.64f), pink);
-        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.21f, 0), new Vector3(d * 0.9f, 0.08f, d * 0.62f), Mat(Hex("ff9cc8"), 0.95f));
+        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.21f, 0), new Vector3(d * 0.9f, 0.08f, d * 0.62f), Mat(Hex("ffc2de"), 0.95f));
         var foam = Mat(Color.white, 0.9f);
         Prim(PrimitiveType.Sphere, root, new Vector3(-d * 0.18f, 0.27f, 0.02f), Vector3.one * d * 0.24f, foam);
         Prim(PrimitiveType.Sphere, root, new Vector3(d * 0.1f, 0.28f, -0.03f), Vector3.one * d * 0.3f, foam);
@@ -490,7 +496,7 @@ public static class Art
     public static Transform Plates(Transform parent, float d)
     {
         var root = Root("Plates", parent);
-        var white = Mat(Hex("ffffff"), 0.95f, 0, 0, 0.003f); var rim = Mat(Hex("ff4d4d"), 0.8f);
+        var white = Mat(Hex("fbfaff"), 0.95f, 0, 0, 0.003f); var rim = Mat(Hex("6cb4ff"), 0.8f);   // sky-blue rims: no more red-on-red rows
         for (int i = 1; i <= 3; i++)
         {
             var p = Root("Plate" + i, root); p.localPosition = new Vector3(0, 0.02f + i * 0.1f, 0);
@@ -612,7 +618,7 @@ public static class Art
     public static Transform Stone(Transform parent, float w, float h)
     {
         var root = Root("Stone", parent);
-        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.26f, 0), new Vector3(w * 1.05f, 0.55f, h * 1.05f), Mat(StoneCol, 0.2f, 0, 0, 0.0035f));
+        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.26f, 0), new Vector3(w * 1.05f, 0.55f, h * 1.05f), Mat(StoneCol, 0.25f, 0, 0, 0.0025f));
         Prim(PrimitiveType.Sphere, root, new Vector3(-w * 0.18f, 0.44f, h * 0.1f), new Vector3(w * 0.55f, 0.36f, h * 0.5f), Mat(Color.Lerp(StoneCol, Color.white, 0.2f), 0.2f));
         Prim(PrimitiveType.Sphere, root, new Vector3(w * 0.22f, 0.32f, -h * 0.2f), new Vector3(w * 0.4f, 0.3f, h * 0.4f), Mat(StoneDark, 0.2f));
         return root;
