@@ -2385,7 +2385,7 @@ public class GameController : MonoBehaviour
         UIKit.Place((RectTransform)gear.transform, 1, 0.5f, -65, 10, 100, 100);
         // fever bar
         // FRENZY meter: how much is banked, what a full bar gives, and what this shot will add
-        feverBar = UIKit.Panel(hud, new Color(0.25f, 0.19f, 0.45f, 1f), "Fever").rectTransform; UIKit.Place(feverBar, 0.5f, 1, 0, -312, 1010, 62);
+        feverBar = UIKit.Panel(hud, new Color(0.33f, 0.27f, 0.53f, 1f), "Fever").rectTransform; UIKit.Place(feverBar, 0.5f, 1, 0, -312, 1010, 62);
         var ftrack = UIKit.Rect("Track", feverBar); UIKit.Stretch(ftrack, 6, 6, 6, 6);
         UIKit.Gloss(feverBar, 0.16f);
         feverGhost = UIKit.Panel(ftrack, new Color(1f, 1f, 1f, 0.4f), "Ghost").rectTransform;
@@ -2527,7 +2527,7 @@ public class GameController : MonoBehaviour
 
     void BuildComboBar()
     {
-        comboBar = UIKit.Panel(hud, new Color(0.25f, 0.19f, 0.45f, 0.92f), "ComboBar").rectTransform; UIKit.Place(comboBar, 0.5f, 1, -70, -384, 820, 52);
+        comboBar = UIKit.Panel(hud, new Color(0.33f, 0.27f, 0.53f, 0.92f), "ComboBar").rectTransform; UIKit.Place(comboBar, 0.5f, 1, -70, -384, 820, 52);
         var track = UIKit.Rect("Track", comboBar); UIKit.Stretch(track, 96, 6, 12, 6);
         comboGhost = UIKit.Panel(track, new Color(1f, 1f, 1f, 0.35f), "Ghost").rectTransform;
         comboFill = UIKit.Panel(track, new Color(1f, 0.82f, 0.3f), "Fill").rectTransform;
