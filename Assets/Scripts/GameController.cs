@@ -576,7 +576,7 @@ public class GameController : MonoBehaviour
         b.view = Spawn(key, parent =>
         {
             var v = BuildBlockArt(b, parent);
-            float outline = b.type == "stone" || b.type == "screw" ? 0.0022f : 0f;
+            float outline = b.type == "stone" || b.type == "screw" ? 0.0022f : b.type == "pixel" || b.type == "domino" ? 0f : 0.0016f;   // thin silhouette: blocks read apart in a crowd (desktop; phones skip outlines)
             float gloss = b.type == "screw" ? 0.9f : b.type == "chest" ? 0.7f : 0.4f;
             Art.Bake(v, key, gloss, outline, "Spark", "IceShell", "Arrow", "Glow", "Plate1", "Plate2", "Plate3");
             if (b.type == "plates")   // each plate: one baked, instanced mesh
