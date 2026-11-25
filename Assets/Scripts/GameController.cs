@@ -1037,7 +1037,7 @@ public class GameController : MonoBehaviour
         else if (shotSmash % 4 == 0 || b.type == "chest" || b.type == "boss") SpawnCoin(b.p);
         if (b.Goal && state == "play" && GoalsLeft() == 0)
         {   // last target: slow-motion + camera punch
-            slowTimer = 0.75f; camZoom = 1f; BigText("SẠCH BÓNG!", new Color(0.55f, 0.95f, 0.6f)); Sfx.Play("combo", 1f, 1.3f);
+            slowTimer = 0.75f; camZoom = 1f; BigText("SẠCH BÓNG!", new Color(0.55f, 0.95f, 0.6f)); for (int k = 0; k < 7; k++) FxKit.Sparkle(W(UnityEngine.Random.Range(TX + 40, TX + TW - 40), UnityEngine.Random.Range(TY + 60, TY + TH - 120), 0.3f), new Color(0.85f, 1f, 0.9f), 6); Sfx.Play("combo", 1f, 1.3f);
         }
         switch (b.type)
         {
@@ -2121,7 +2121,7 @@ public class GameController : MonoBehaviour
                 d.ring.localScale = new Vector3(pulse, 0.01f, pulse);
                 Color rc = frenzyReady || d.frenzy ? new Color(1f, 0.5f, 0.75f, 0.6f)
                          : dragged ? (Color)(Color32)Color.Lerp(new Color(1, 1, 1, 0.7f), new Color(1f, 0.45f, 0.3f, 0.75f), powerStep / 4f)
-                         : d.special ? new Color(1f, 0.8f, 0.3f, 0.6f) : new Color(0.37f, 0.9f, 0.37f, 0.55f);
+                         : d.special ? new Color(1f, 0.8f, 0.3f, 0.6f) : new Color(0.45f, 0.9f, 0.55f, 0.42f);
                 if (d.ringCol != rc) { d.ringCol = rc; d.ring.GetComponent<Renderer>().sharedMaterial = Art.RingShared(rc); }   // only when the colour changes (the cache key is a string)
             }
             var spark = d.body.Find("Spark"); if (spark) spark.gameObject.SetActive((d.charged || d.special) && Mathf.Sin(t * 14) > -0.3f);
