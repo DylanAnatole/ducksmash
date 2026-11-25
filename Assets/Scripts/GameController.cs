@@ -947,7 +947,7 @@ public class GameController : MonoBehaviour
                         a.v = Rot(a.v, UnityEngine.Random.Range(-0.06f, 0.06f)) * 1.08f; b.v = Rot(b.v, UnityEngine.Random.Range(-0.06f, 0.06f)) * 1.08f;
                         if (a.v.sqrMagnitude > cap * cap) a.v = a.v.normalized * cap; if (b.v.sqrMagnitude > cap * cap) b.v = b.v.normalized * cap;
                         a.hot = b.hot = true; a.squash = b.squash = 0.2f; var mid = (a.p + b.p) / 2;
-                        Splash(mid, 8); FxKit.Sparkle(W(mid), Color.white, 8); AddRing(mid, 38 + Mathf.Min(pushes, 6) * 6, new Color(1f, 1f, 0.85f, 0.8f)); Shake(0.15f); HitStop(0.03f); pushes++; shotSmash++; comboPulse = 0.18f;
+                        Splash(mid, 8); FxKit.Sparkle(W(mid), Color.white, 8); AddRing(mid, 38 + Mathf.Min(pushes, 6) * 6, new Color(0.55f, 0.95f, 1f, 0.75f)); Shake(0.15f); HitStop(0.03f); pushes++; shotSmash++; comboPulse = 0.18f;
                         PopText(LevelLibrary.Unlocked("zap", level) && pushes == ZAP_PUSHES ? "ĐỦ 3 CỐC → VỊT SÉT!" : LevelLibrary.Unlocked("zap", level) && pushes < ZAP_PUSHES ? "CỐC! " + pushes + "/" + ZAP_PUSHES : pushes > 1 ? "CỐC x" + pushes + "!" : "CỐC!", mid, Color.white, 46 + Mathf.Min(20, pushes * 4));
                         Sfx.Play(pushes % 2 == 1 ? "quack" : "squeak", 0.9f, 1f + pushes * 0.08f);
                     }
@@ -970,7 +970,7 @@ public class GameController : MonoBehaviour
         if (b.hp <= 0) { DestroyBlock(b); return true; }
         if (b.type == "ice")
         {
-            var shell = b.view.Find("IceShell"); if (shell) { Debris(b.p, new Color(0.85f, 0.95f, 1f), 10, 0.5f); Destroy(shell.gameObject); }
+            var shell = b.view.Find("IceShell"); if (shell) { Debris(b.p, new Color(0.85f, 0.95f, 1f), 10, 0.5f); FxKit.Sparkle(W(b.p, 0.5f), new Color(0.85f, 0.97f, 1f), 8); Destroy(shell.gameObject); }
             PopText("RẮC!", b.p, new Color(0.75f, 0.92f, 1f), 40); Sfx.Play("ice");
             return false;
         }
