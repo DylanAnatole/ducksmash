@@ -2310,6 +2310,7 @@ public class GameController : MonoBehaviour
         {
             if (pt.sa) pt.sa.Rotate(0, 200f * dt, 0, Space.World);
             if (pt.sb) pt.sb.Rotate(0, 200f * dt, 0, Space.World);
+            if (UnityEngine.Random.value < dt * (App.Mobile ? 0.8f : 1.8f)) FxKit.Bubble(W((UnityEngine.Random.value < 0.5f ? pt.a : pt.b) + UnityEngine.Random.insideUnitCircle * 10f));   // the pipes gurgle
         }
         foreach (var w in whirls)
             if (w.view)

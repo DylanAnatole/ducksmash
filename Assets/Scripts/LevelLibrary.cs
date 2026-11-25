@@ -188,8 +188,8 @@ public static partial class LevelLibrary
                 d.bumpers.Add(BumperL(600)); d.bumpers.Add(BumperR(600));
                 break;
             case 4:
-                d = L(14, "Chấm đen = số cú. Rương: +2 vịt!", (150, 800, null), (270, 800, null), (390, 800, null), (270, 690, null));
-                for (int i = 0; i < 7; i++) d.blocks.Add(B("plates", 90 + i * 60, 240));
+                d = L(15, "Chấm đen = số cú. Rương: +2 vịt!", (150, 800, null), (270, 800, null), (390, 800, null), (270, 690, null));
+                for (int i = 0; i < 5; i++) d.blocks.Add(B("plates", 110 + i * 80, 240));   // tutorial: fewer 3-hit plates
                 d.blocks.AddRange(Row("vase", 70, 320, 11, 40)); d.blocks.Add(B("chest", 270, 400));
                 d.blocks.AddRange(Cluster("glass", 270, 480, 2, 11, 40));
                 break;
