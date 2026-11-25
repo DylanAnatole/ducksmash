@@ -356,6 +356,13 @@ public class GameController : MonoBehaviour
         {
             var bu = new Bumper { x = bd.x, y = bd.y, w = bd.w, h = bd.h, x0 = bd.x, y0 = bd.y, amp = bd.amp, speed = bd.speed, vertical = bd.vertical };
             bu.view = Art.Bumper(world, bd.w * K, bd.h * K); bu.view.position = W(bd.x + bd.w / 2, bd.y + bd.h / 2);
+            if (bd.amp > 0)
+            {   // faint rail: shows how far the sliding pad travels
+                float rl = (bd.vertical ? bd.h : bd.w) + bd.amp * 2, rw = Mathf.Max(6f, Mathf.Min(bd.w, bd.h) * 0.45f);
+                var rail = Art.Prim(PrimitiveType.Quad, world, W(bd.x + bd.w / 2, bd.y + bd.h / 2, 0.022f),
+                    bd.vertical ? new Vector3(rw * K, rl * K, 1f) : new Vector3(rl * K, rw * K, 1f), Art.FadeShared(new Color(1f, 0.6f, 0.75f, 0.45f)), new Vector3(90, 0, 0));
+                var rr = rail.GetComponent<Renderer>(); rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; rr.receiveShadows = false;
+            }
             bumpers.Add(bu);
         }
         foreach (var wd in L.whirls)
