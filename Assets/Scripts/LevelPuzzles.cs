@@ -24,8 +24,8 @@ public static partial class LevelLibrary
                 bool ring = Mathf.Abs(r) == 2 || Mathf.Abs(c) == 2;
                 if (ring)
                 {
-                    bool open = (gap == "down" && r == 2 && c == 0) || (gap == "up" && r == -2 && c == 0)
-                             || (gap == "left" && c == -2 && r == 0) || (gap == "right" && c == 2 && r == 0);
+                    bool open = (gap == "down" && r == 2 && (c == 0 || c == 1)) || (gap == "up" && r == -2 && (c == 0 || c == 1))
+                             || (gap == "left" && c == -2 && (r == 0 || r == 1)) || (gap == "right" && c == 2 && (r == 0 || r == 1));
                     if (!open) d.blocks.Add(B("stone", x, y));
                 }
                 else d.blocks.Add(B(r == 0 && c == 0 ? "bathbomb" : ((r + c) % 2 == 0 ? shell : "glass"), x, y));
@@ -47,6 +47,8 @@ public static partial class LevelLibrary
         }
     }
     static void Ring(LevelDef d, float x, float y) => d.blocks.Add(B("ring", x, y));
+    // "bait" ducks parked out on the water: shoot a duck into them and they fly off and smash too (billiards)
+    static void Bait(LevelDef d, params float[] xy) { for (int i = 0; i + 1 < xy.Length; i += 2) d.ducks.Add(new DuckDef(xy[i], xy[i + 1], "normal")); }
     static void Whirl(LevelDef d, float x, float y, float r) => d.whirls.Add(new Vector3(x, y, r));
     static LevelDef Ducks(LevelDef d, params string[] kinds)
     {
@@ -65,10 +67,10 @@ public static partial class LevelLibrary
                 d.moves = 7; d.hint = "Bắn lọt khe pháo đài → bom bên trong nổ!";
                 Pic(d, "flower", 15);
                 Fort(d, 150, 485, "down"); Fort(d, 390, 485, "down");
-                Fill(d, "soap", 110, 430, 625, 625);
+                Fill(d, "soap", 110, 430, 680, 680); Bait(d, 165, 620, 405, 620);   // push a bait duck up through the door
                 return Ducks(d, "normal", "heavy", "normal");
             case 15:   // HARD maze: stone bars with alternating gaps, a laser in every glass row
-                d.moves = 12; d.hint = "MÀN KHÓ! Bắn trúng laser để xoá cả hàng";
+                d.moves = 13; d.hint = "MÀN KHÓ! Bắn trúng laser để xoá cả hàng";
                 Fill(d, "plates", 90, 450, 215, 215, 60);
                 for (int k = 0; k < 4; k++)
                 {
@@ -78,6 +80,7 @@ public static partial class LevelLibrary
                     for (int i = 0; i < 11; i++) d.blocks.Add(i == (leftGap ? 10 : 0) ? LZ(70 + i * 40, gy, "h") : B(i % 3 == 0 ? "vase" : "glass", 70 + i * 40, gy));
                 }
                 d.bumpers.Add(BumperL(660, 120)); d.bumpers.Add(BumperR(660, 120));
+                Bait(d, 230, 690, 270, 655, 310, 690);   // a little rack to break
                 return Ducks(d, "heavy", "normal", "bomb");
             case 16:   // domino snake winding through the pile, a bath bomb at the far end
                 d.moves = 5; d.hint = "Chạm 1 quân domino: cả con rắn đổ!";
@@ -87,6 +90,7 @@ public static partial class LevelLibrary
                 Mix(d, 130, 410, 590, 590, "vase", "glass", "soap");
                 Mix(d, 130, 410, 490, 490, "glass", "plates", "glass");
                 d.blocks.Add(B("chest", 270, 395));
+                Bait(d, 200, 700, 340, 700);
                 return Ducks(d, "normal", "normal", "heavy");
             case 17:   // float rings sit under two glass columns: knock them up the lanes
                 d.moves = 6; d.hint = "Phao: bắn trúng thì trượt, húc vỡ cả cột!";
@@ -101,7 +105,8 @@ public static partial class LevelLibrary
                 d.blocks.AddRange(Shelf(270, 400, 400, "vase", "glass", "vase", "glass", "vase", "glass"));
                 d.blocks.AddRange(Shelf(270, 500, 440, "glass", "vase", "glass", "vase", "glass", "vase", "glass"));
                 d.blocks.AddRange(Shelf(270, 600, 360, "soap", "vase", "soap", "vase", "soap"));
-                d.blocks.Add(B("stone", 90, 650)); d.blocks.Add(B("stone", 450, 650));   // the bottom shelf's legs are shielded from straight shots
+                d.blocks.Add(B("stone", 90, 650)); d.blocks.Add(B("stone", 450, 650));
+                Bait(d, 200, 690, 340, 690);   // the bottom shelf's legs are shielded from straight shots
                 return Ducks(d, "heavy", "normal", "zap");
             case 19:   // a wall straight ahead; the whirlpool on the left curls shots round it
                 d.moves = 7; d.hint = "Xoáy nước: bẻ cong đường bay!";
@@ -109,6 +114,7 @@ public static partial class LevelLibrary
                 StoneRow(d, 150, 430, 610);
                 Mix(d, 150, 430, 430, 560, "soap", "glass", "vase", "glass");
                 Whirl(d, 95, 620, 66);
+                Bait(d, 300, 690, 360, 690);
                 return Ducks(d, "normal", "normal", "heavy");
             case 20:   // HARD: two treasure chests locked in a stone cage - open it for more ducks
                 d.moves = 9; d.hint = "MÀN KHÓ! Phá rương trong lồng để có thêm vịt";
@@ -130,6 +136,7 @@ public static partial class LevelLibrary
                     if (hz) { b.type = "laser"; b.dir = "h"; } else if (vt) { b.type = "laser"; b.dir = "v"; }
                 }
                 StoneRow(d, 110, 230, 640); StoneRow(d, 310, 430, 640);   // only the middle lane reaches the grid head-on
+                Bait(d, 270, 690);   // knock it up the lane into the laser
                 return Ducks(d, "normal", "normal", "normal");
             case 22:   // two bath-bomb chains: each bomb is just close enough to set off the next one
                 d.moves = 5; d.hint = "Bom tắm nổ lan: châm đúng quả đầu dây!";
@@ -139,6 +146,7 @@ public static partial class LevelLibrary
                 Mix(d, 110, 190, 620, 620, "glass", "vase", "glass"); Mix(d, 350, 430, 620, 620, "glass", "vase", "glass");
                 Mix(d, 230, 310, 400, 600, "plates", "glass", "soap");
                 StoneCol(d, 230, 640, 640); StoneCol(d, 310, 640, 640);
+                Bait(d, 270, 690, 150, 690, 390, 690);
                 return Ducks(d, "normal", "bomb", "normal");
             case 23:   // a wall of ice: iron ducks crack it in one blow
                 d.moves = 6; d.hint = "Đồ đóng băng: cú đầu vỡ băng, Vịt Sắt phá 1 cú!";
@@ -146,6 +154,7 @@ public static partial class LevelLibrary
                 Fill(d, "ice", 70, 470, 560, 600);
                 Mix(d, 110, 430, 430, 510, "glass", "soap", "vase", "glass");
                 Ring(d, 270, 680);
+                Bait(d, 170, 680, 370, 680);
                 return Ducks(d, "heavy", "normal", "heavy");
             case 24:   // S-bend: two whirlpools steer shots round a central wall
                 d.moves = 6; d.hint = "Hai xoáy nước: bắn vòng qua tường";
@@ -153,6 +162,7 @@ public static partial class LevelLibrary
                 StoneRow(d, 190, 350, 590); StoneCol(d, 270, 470, 550);
                 Mix(d, 110, 230, 440, 540, "vase", "glass", "soap"); Mix(d, 310, 430, 440, 540, "soap", "glass", "vase");
                 Whirl(d, 110, 640, 60); Whirl(d, 430, 640, 60);
+                Bait(d, 210, 690, 330, 690);
                 return Ducks(d, "normal", "heavy", "normal");
             case 25:   // HARD: the fort's only door faces a whirlpool - aim off-centre and let it curl you in
                 d.moves = 9; d.hint = "MÀN KHÓ! Xoáy trước cửa: bắn lệch để bị cuốn vào khe";
@@ -160,6 +170,7 @@ public static partial class LevelLibrary
                 Mix(d, 70, 150, 300, 540, "vase", "glass"); Mix(d, 390, 470, 300, 540, "glass", "vase");
                 Whirl(d, 270, 610, 62);
                 Ring(d, 100, 690); Ring(d, 440, 690);
+                Bait(d, 200, 700, 340, 700);
                 return Ducks(d, "heavy", "normal", "bomb");
             case 26:   // billiards: a stone spine splits the tub, side bumpers bank shots round it
                 d.moves = 7; d.hint = "Nảy băng vào thành để vòng qua vách đá";
@@ -167,9 +178,10 @@ public static partial class LevelLibrary
                 StoneCol(d, 270, 410, 650);
                 Mix(d, 90, 230, 410, 570, "vase", "glass", "soap"); Mix(d, 310, 450, 410, 570, "plates", "glass", "glass");
                 d.bumpers.Add(BumperL(430, 200)); d.bumpers.Add(BumperR(430, 200));
+                Bait(d, 170, 650, 370, 650);
                 return Ducks(d, "normal", "normal", "heavy");
             case 27:   // staircase: each step ends in a bath bomb that reaches the next step
-                d.moves = 7; d.hint = "Bậc thang bom: nổ từ dưới lan lên trên";
+                d.moves = 9; d.hint = "Bậc thang bom: nổ từ dưới lan lên trên";
                 for (int s = 0; s < 5; s++)
                 {
                     float y = 640 - s * 85, x0 = 70 + s * 50;
@@ -178,6 +190,7 @@ public static partial class LevelLibrary
                     d.blocks.Add(B("bathbomb", x0 + 120, y));
                 }
                 Mix(d, 430, 470, 220, 260, "plates", "glass"); d.blocks.Add(B("vase", 110, 260));
+                Bait(d, 330, 690, 390, 690, 450, 690);
                 return Ducks(d, "heavy", "normal", "normal");
             case 28:   // frozen river: ice lanes with float rings waiting at the bottom
                 d.moves = 7; d.hint = "Đẩy phao trượt qua dòng băng";
@@ -195,13 +208,15 @@ public static partial class LevelLibrary
                 Fort(d, 390, 480, "left");
                 Mix(d, 70, 190, 420, 560, "glass", "vase", "soap");
                 Whirl(d, 430, 650, 52);
+                Bait(d, 170, 700);
                 return Ducks(d, "normal", "bomb", "heavy");
             default:   // 30 - SUPER HARD finale: three forts, each door facing a different way
-                d.moves = 13; d.hint = "SIÊU KHÓ! 3 pháo đài, 3 cửa khác hướng";
+                d.moves = 15; d.hint = "SIÊU KHÓ! 3 pháo đài, 3 cửa khác hướng";
                 Fort(d, 130, 330, "right"); Fort(d, 410, 330, "left"); Fort(d, 270, 520, "down", "plates");
                 Mix(d, 230, 310, 215, 255, "vase", "glass");
                 for (int i = 0; i < 11; i++) d.blocks.Add(B(i == 0 || i == 10 ? "stone" : i % 4 == 2 ? "bathbomb" : "glass", 70 + i * 40, 650));
                 Ring(d, 90, 720); Ring(d, 450, 720);
+                Bait(d, 200, 710, 340, 710);
                 return Ducks(d, "heavy", "bomb", "normal", "normal");
         }
     }

@@ -184,7 +184,7 @@ public static partial class LevelLibrary
                 d.bumpers.Add(BumperL(600)); d.bumpers.Add(BumperR(600));
                 break;
             case 4:
-                d = L(12, "Chấm đen = số cú. Rương: +2 vịt!", (150, 800, null), (270, 800, null), (390, 800, null), (270, 690, null));
+                d = L(14, "Chấm đen = số cú. Rương: +2 vịt!", (150, 800, null), (270, 800, null), (390, 800, null), (270, 690, null));
                 for (int i = 0; i < 7; i++) d.blocks.Add(B("plates", 90 + i * 60, 240));
                 d.blocks.AddRange(Row("vase", 70, 320, 11, 40)); d.blocks.Add(B("chest", 270, 400));
                 d.blocks.AddRange(Cluster("glass", 270, 480, 2, 11, 40));
@@ -202,6 +202,7 @@ public static partial class LevelLibrary
                 d.blocks.AddRange(PixelArt(ART_DUCK, 270, 330, 26)); d.art = "duck";
                 d.blocks.AddRange(Row("soap", 70, 520, 11, 40));
                 d.bumpers.Add(BumperL(580, 160)); d.bumpers.Add(BumperR(580, 160));
+                d.ducks.Add(new DuckDef(170, 610, "normal")); d.ducks.Add(new DuckDef(370, 610, "normal"));
                 break;
             case 7:
                 d = L(11, "Gãy 2 chân kệ → cả kệ đổ!", (150, 810, null), (270, 810, null), (390, 810, null));
@@ -227,7 +228,7 @@ public static partial class LevelLibrary
                 d.blocks.AddRange(Row("soap", 70, 590, 11, 40));
                 break;
             case 10:
-                d = L(13, "MÀN KHÓ! Ngắm qua khe đá!", (150, 810, "heavy"), (270, 810, null), (390, 810, null));
+                d = L(15, "MÀN KHÓ! Ngắm qua khe đá!", (150, 810, "heavy"), (270, 810, null), (390, 810, null));
                 d.blocks.AddRange(Shelf(270, 215, 440, "glass", "vase", "glass", "vase", "glass", "vase", "glass", "vase"));
                 for (int i = 0; i < 11; i++) d.blocks.Add(B(i == 2 || i == 5 || i == 8 ? "stone" : "glass", 70 + i * 40, 290));   // lanes along the walls stay open for bank shots at the shelf legs
                 for (int i = 0; i < 19; i++) d.blocks.Add(Dom(60 + i * 22, 350, true, 0));
@@ -241,6 +242,7 @@ public static partial class LevelLibrary
                 d = L(10, "Vịt Sét: giật 3 món gần nhất!", (150, 810, null), (270, 810, "zap"), (390, 810, null), (270, 720, "zap"));
                 for (int r = 0; r < 7; r++) d.blocks.AddRange(Row(r % 3 == 2 ? "plates" : (r == 1 || r == 4 ? "vase" : "glass"), 70, 200 + r * 42, 11, 40));
                 d.blocks.Add(B("bathbomb", 270, 620)); d.blocks.Add(B("chest", 150, 620)); d.blocks.Add(B("chest", 390, 620));
+                d.ducks.Add(new DuckDef(200, 530, "normal")); d.ducks.Add(new DuckDef(340, 530, "normal"));
                 d.bumpers.Add(BumperL(660)); d.bumpers.Add(BumperR(660));
                 break;
             case 12:
@@ -267,6 +269,7 @@ public static partial class LevelLibrary
         d.boss = false; d.hard = IsHard(n);
         // unlock levels gift one special by transforming a plain duck: make sure there is one
         if (NewSpecialAt(n) != null && !d.ducks.Exists(x => x.kind == "normal") && d.ducks.Count > 0) d.ducks[d.ducks.Count - 1].kind = "normal";
+        if (n > Onboarding && !IsSandbox(n)) d.moves += 1;   // playtest feedback: too hard -> one more move everywhere after the tutorial
         d.moves = Mathf.Max(3, d.moves);
         return d;
     }

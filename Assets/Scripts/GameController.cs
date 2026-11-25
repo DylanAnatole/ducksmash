@@ -920,12 +920,15 @@ public class GameController : MonoBehaviour
                 float vn = Vector2.Dot(b.v - a.v, n);
                 if (vn < 0)
                 {
-                    float j2 = -(1 + 0.96f) * vn / 2; a.v -= j2 * n; b.v += j2 * n;
+                    float j2 = -(1 + 1f) * vn / 2; a.v -= j2 * n; b.v += j2 * n;
                     if (-vn > 220)
-                    {
+                    {   // billiards feel: a bit of extra energy and a small random spread, so a pack of ducks bursts apart
+                        float cap = MAX_SPEED * 1.1f;
+                        a.v = Rot(a.v, UnityEngine.Random.Range(-0.06f, 0.06f)) * 1.08f; b.v = Rot(b.v, UnityEngine.Random.Range(-0.06f, 0.06f)) * 1.08f;
+                        if (a.v.sqrMagnitude > cap * cap) a.v = a.v.normalized * cap; if (b.v.sqrMagnitude > cap * cap) b.v = b.v.normalized * cap;
                         a.hot = b.hot = true; a.squash = b.squash = 0.2f; var mid = (a.p + b.p) / 2;
-                        Splash(mid, 8); FxKit.Sparkle(W(mid), Color.white, 6); Shake(0.15f); HitStop(0.03f); pushes++; shotSmash++; comboPulse = 0.18f;
-                        PopText(LevelLibrary.Unlocked("zap", level) && pushes == ZAP_PUSHES ? "ĐỦ 3 CỐC → VỊT SÉT!" : LevelLibrary.Unlocked("zap", level) && pushes < ZAP_PUSHES ? "CỐC! " + pushes + "/" + ZAP_PUSHES : "CỐC!", mid, Color.white, 46 + Mathf.Min(20, pushes * 4));
+                        Splash(mid, 8); FxKit.Sparkle(W(mid), Color.white, 8); AddRing(mid, 38 + Mathf.Min(pushes, 6) * 6, new Color(1f, 1f, 0.85f, 0.8f)); Shake(0.15f); HitStop(0.03f); pushes++; shotSmash++; comboPulse = 0.18f;
+                        PopText(LevelLibrary.Unlocked("zap", level) && pushes == ZAP_PUSHES ? "ĐỦ 3 CỐC → VỊT SÉT!" : LevelLibrary.Unlocked("zap", level) && pushes < ZAP_PUSHES ? "CỐC! " + pushes + "/" + ZAP_PUSHES : pushes > 1 ? "CỐC x" + pushes + "!" : "CỐC!", mid, Color.white, 46 + Mathf.Min(20, pushes * 4));
                         Sfx.Play(pushes % 2 == 1 ? "quack" : "squeak", 0.9f, 1f + pushes * 0.08f);
                     }
                 }
@@ -1381,7 +1384,7 @@ public class GameController : MonoBehaviour
     {
         state = "win";
         int left = movesAtClear >= 0 ? movesAtClear : moves; leftAtWin = left;
-        stars = left >= Mathf.CeilToInt(startMoves * 0.5f) ? 3 : left >= Mathf.CeilToInt(startMoves * 0.2f) ? 2 : 1;
+        stars = left >= Mathf.CeilToInt(startMoves * 0.4f) ? 3 : left >= Mathf.CeilToInt(startMoves * 0.15f) ? 2 : 1;
         score += left * 150;
         if (!rewarded && LevelLibrary.IsSandbox(level)) { rewarded = true; reward = 0; }   // test levels: no progress saved
         newArt = false;
@@ -1442,7 +1445,7 @@ public class GameController : MonoBehaviour
         // reminder of the combo ducks the player has already unlocked
         var known = LevelLibrary.Specials.Where(s => LevelLibrary.Unlocked(s.kind, level) && LevelLibrary.NewSpecialAt(level) != s).ToList();
         string combos = "";   // no combo recipe reminder on every level (players found it patronising); the COMBO ? guide has it
-        introBody.text = string.Join("\n", g) + "\n\n" + moves + " lượt bắn\n<size=30><color=#c9a400>3 sao khi còn ≥ " + Mathf.CeilToInt(startMoves * 0.5f) + " lượt</color></size>" + combos;
+        introBody.text = string.Join("\n", g) + "\n\n" + moves + " lượt bắn\n<size=30><color=#c9a400>3 sao khi còn ≥ " + Mathf.CeilToInt(startMoves * 0.4f) + " lượt</color></size>" + combos;
         introMax = introTimer = 1.6f;
         introRoot.sizeDelta = new Vector2(760, 520);
 
@@ -1828,7 +1831,7 @@ public class GameController : MonoBehaviour
             dt.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             dt.gameObject.SetActive(false); aimDots.Add(dt);
         }
-        for (int i = 0; i < 6; i++)
+        for (int i = 0; i < 14; i++)
         {
             var dt = Art.Prim(PrimitiveType.Sphere, aimRoot, Vector3.zero, Vector3.one * 0.1f, Art.Mat(new Color(0.55f, 0.9f, 1f), 0.5f, 0, 0.8f));
             dt.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -2001,13 +2004,24 @@ public class GameController : MonoBehaviour
         }
         // billiard preview: where the knocked duck will go
         if (hitDuck != null)
-        {
-            var n = (hitDuck.p - gp).normalized;
-            for (int i = 0; i < pushDots.Count; i++)
+        {   // carom preview: where the knocked duck travels (walls included) and what it will break on the way
+            Vector2 cp = hitDuck.p, cvv = (hitDuck.p - gp).normalized; float clen = 140 + pv.z * 2.4f; int used2 = 0;
+            for (float s2 = 0; s2 < clen; s2 += 5)
             {
-                var q = hitDuck.p + n * (hitDuck.r + 14 + i * 20);
-                pushDots[i].gameObject.SetActive(true); pushDots[i].position = W(q, 0.32f);
-                pushDots[i].localScale = Vector3.one * Mathf.Lerp(0.13f, 0.06f, i / (float)pushDots.Count);
+                cp += cvv * 5; TubWalls(ref cp, ref cvv, hitDuck.r, 1f); cvv.Normalize();
+                bool stop2 = false;
+                foreach (var b in blocks)
+                {
+                    if (!b.alive || Covered(b) || b.falling > 0 || aimHits.Contains(b) || !Collide(cp, hitDuck.r, b, out _)) continue;
+                    if (!b.Hard && b.type != "boss" && b.type != "ring" && b.hp <= hitDuck.Dmg) { aimHits.Add(b); clen -= 8; }
+                    else { stop2 = true; break; }
+                }
+                if (((int)s2) % 20 == 0 && used2 < pushDots.Count)
+                {
+                    var pd = pushDots[used2++]; pd.gameObject.SetActive(true); pd.position = W(cp, 0.32f);
+                    pd.localScale = Vector3.one * Mathf.Lerp(0.14f, 0.07f, used2 / (float)pushDots.Count);
+                }
+                if (stop2) break;
             }
         }
         bool rbAim = drag.kind == "rainbow" && !drag.spent;
@@ -2576,7 +2590,7 @@ public class GameController : MonoBehaviour
         movesPulse = Mathf.Max(0, movesPulse - Time.unscaledDeltaTime);
         movesTxt.rectTransform.localScale = Vector3.one * (1 + movesPulse * 1.2f);
         movesTxt.color = moves <= 2 && state == "play" ? new Color(1f, 0.35f, 0.3f) : Ink;
-        int proj = moves >= Mathf.CeilToInt(startMoves * 0.5f) ? 3 : moves >= Mathf.CeilToInt(startMoves * 0.2f) ? 2 : 1;
+        int proj = moves >= Mathf.CeilToInt(startMoves * 0.4f) ? 3 : moves >= Mathf.CeilToInt(startMoves * 0.15f) ? 2 : 1;
         if (projShown < 0 || state != "play" || moves > shownMovesMax) { projShown = proj; shownMovesMax = moves; }
         if (proj < projShown) { starLossT = 1f; starLostIdx = proj; projShown = proj; Sfx.Play("squeak", 0.45f, 0.6f); PopText("-1 sao", new Vector2(110, 150), new Color(1f, 0.85f, 0.3f), 40); }
         if (proj > projShown) projShown = proj;
