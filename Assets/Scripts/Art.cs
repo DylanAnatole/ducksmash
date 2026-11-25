@@ -674,6 +674,7 @@ public static class Art
     {
         var root = Root("Pixel", parent);
         Prim(PrimitiveType.Cube, root, new Vector3(0, 0.16f, 0), new Vector3(s, 0.32f, s), Mat(Color.Lerp(c, new Color(1f, 0.97f, 0.95f), 0.14f), 0.5f));
+        Prim(PrimitiveType.Cube, root, new Vector3(0, 0.325f, 0), new Vector3(s * 0.8f, 0.02f, s * 0.8f), Mat(Color.Lerp(c, Color.white, 0.3f), 0.6f));   // lighter top face: candy-tile look
         return root;
     }
 
