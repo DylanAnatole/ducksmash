@@ -6,7 +6,8 @@ using UnityEngine;
 public class Sfx : MonoBehaviour
 {
     static Sfx I;
-    AudioSource sfx, music;
+    AudioSource music;
+    AudioSource[] voices; int voiceIdx;   // a small pool: each sound keeps its own pitch (one shared source re-pitched everything already playing)
     readonly Dictionary<string, AudioClip> clips = new Dictionary<string, AudioClip>();
     readonly Dictionary<string, float> lastPlayed = new Dictionary<string, float>();
     const int SR = 44100;
@@ -15,7 +16,8 @@ public class Sfx : MonoBehaviour
     public static void Init(GameObject host)
     {
         I = host.AddComponent<Sfx>();
-        I.sfx = host.AddComponent<AudioSource>();
+        I.voices = new AudioSource[8];
+        for (int i = 0; i < I.voices.Length; i++) { var v = host.AddComponent<AudioSource>(); v.playOnAwake = false; v.spatialBlend = 0; I.voices[i] = v; }
         I.music = host.AddComponent<AudioSource>();
         I.music.loop = true; I.music.volume = 0.16f;
         I.Build();
@@ -41,12 +43,14 @@ public class Sfx : MonoBehaviour
         if (I == null || !SaveData.Sound || !I.clips.TryGetValue(name, out var clip)) return;
         // every PlayOneShot is a new WebAudio node: throttle each sound and cap sounds per frame
         if (Time.frameCount != I.frame) { I.frame = Time.frameCount; I.playedThisFrame = 0; }
-        if (I.playedThisFrame >= 3) return;
+        if (I.playedThisFrame >= 4) return;
         I.lastPlayed.TryGetValue(name, out float last);
-        if (Time.unscaledTime - last < (name == "pop" || name == "crunch" || name == "wood" || name == "splash" || name == "ice" ? 0.05f : 0.03f)) return;
+        bool busy = name == "pop" || name == "crunch" || name == "wood" || name == "splash" || name == "ice" || name == "glass" || name == "thud";
+        if (Time.unscaledTime - last < (busy ? 0.045f : 0.03f)) return;
         I.lastPlayed[name] = Time.unscaledTime; I.playedThisFrame++;
-        I.sfx.pitch = pitch;
-        I.sfx.PlayOneShot(clip, volume);
+        var v = I.voices[I.voiceIdx]; I.voiceIdx = (I.voiceIdx + 1) % I.voices.Length;
+        v.pitch = pitch * UnityEngine.Random.Range(0.965f, 1.035f);   // tiny random detune: repeated hits never sound machine-gunned
+        v.PlayOneShot(clip, volume);
     }
 
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -107,8 +111,33 @@ public class Sfx : MonoBehaviour
         clips["push"] = Make("push", 0.12f, Osc(t => Mathf.Lerp(260, 110, t / 0.12f), t => Mathf.Exp(-t * 30)));
         var whoosh = Filtered(0.12f, t => Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / 0.22f)));
         clips["shoot"] = Make("shoot", 0.22f, t => whoosh(t) * 2.2f);
-        var boomN = Filtered(0.1f, t => Mathf.Exp(-t * 5.5f)); var boomS = Osc(t => Mathf.Lerp(90, 40, t / 0.7f), t => Mathf.Exp(-t * 6));
-        clips["boom"] = Make("boom", 0.7f, t => boomN(t) * 2.4f + boomS(t) * 0.9f);
+        // explosion: sub-bass kick for the chest thump + low rumble + soft-clipped noise body + crackle tail
+        var boomN = Filtered(0.1f, t => Mathf.Exp(-t * 5f)); var boomS = Osc(t => Mathf.Lerp(80, 34, Mathf.Sqrt(Mathf.Clamp01(t / 0.5f))), t => Mathf.Min(1, t * 400) * Mathf.Exp(-t * 5.5f));
+        var boomK = Osc(t => 140 * Mathf.Exp(-t * 18) + 45, t => Mathf.Exp(-t * 14));
+        var crk = new System.Random(5);
+        clips["boom"] = Make("boom", 0.95f, t =>
+        {
+            float body = Tanh(boomN(t) * 3.2f) * 0.8f + boomS(t) * 1.0f + boomK(t) * 0.9f;
+            float crackle = t > 0.08f && crk.NextDouble() < 0.0016 ? (float)(crk.NextDouble() * 2 - 1) * 0.9f * Mathf.Exp(-t * 3) : 0;
+            return Tanh(body * 1.2f) + crackle;
+        });
+        // glass / china shatter: a dense cluster of bright inharmonic tinkles with random onsets over a crisp noise burst
+        var gr = new System.Random(3); var tinkF = new float[14]; var tinkT = new float[14]; var tinkA = new float[14];
+        for (int i = 0; i < 14; i++) { tinkF[i] = 2200f + (float)gr.NextDouble() * 4800f; tinkT[i] = (float)(gr.NextDouble() * gr.NextDouble()) * 0.16f; tinkA[i] = 0.25f + (float)gr.NextDouble() * 0.35f; }
+        float ghp = 0, gprev = 0;
+        clips["glass"] = Make("glass", 0.38f, t =>
+        {
+            float s = 0;
+            for (int i = 0; i < 14; i++) { float lt = t - tinkT[i]; if (lt > 0) s += Mathf.Sin(2 * Mathf.PI * tinkF[i] * lt) * Mathf.Exp(-lt * 26) * tinkA[i]; }
+            float nz = Noise(); ghp = 0.6f * (ghp + nz - gprev); gprev = nz;   // high-passed hiss = the "crsh"
+            return s * 0.45f + ghp * Mathf.Exp(-t * 28) * 0.9f;
+        });
+        // body thump under every break: gives each smash weight (low sine drop, very short)
+        clips["thud"] = Make("thud", 0.14f, Osc(t => Mathf.Lerp(150, 55, t / 0.14f), t => Mathf.Min(1, t * 600) * Mathf.Exp(-t * 26)));
+        // bath-bomb fizz: bubbling hiss with a rising sweep
+        var fzN = Filtered(0.7f, t => Mathf.Min(1, t * 30) * Mathf.Exp(-t * 3.2f));
+        var fzB = new System.Random(9);
+        clips["fizz"] = Make("fizz", 0.75f, t => fzN(t) * 0.7f * (0.6f + 0.4f * Mathf.Sin(t * 90)) + (fzB.NextDouble() < 0.004 ? 0.5f * Mathf.Exp(-t * 3) : 0));
         var crashN = Filtered(0.22f, t => Mathf.Exp(-t * 4.5f)); var crashS = Osc(t => Mathf.Lerp(140, 60, t / 0.6f), t => Mathf.Exp(-t * 8));
         clips["crash"] = Make("crash", 0.7f, t => crashN(t) * 1.8f + crashS(t) * 0.7f);
         clips["zap"] = Make("zap", 0.22f, Osc(t => 700 + 500 * Mathf.Sin(t * 260), t => Mathf.Exp(-t * 12) * 0.5f, 1));
@@ -130,6 +159,8 @@ public class Sfx : MonoBehaviour
         float qlp = 0;
         clips["quack"] = Make("quack", 0.22f, t => { qlp = Mathf.Lerp(qlp, qk(t), 0.35f); return qlp * 1.3f; });
     }
+
+    static float Tanh(float x) { float e = Mathf.Exp(2 * Mathf.Clamp(x, -8, 8)); return (e - 1) / (e + 1); }
 
     static float Arp(float t, float[] notes, float step)
     {

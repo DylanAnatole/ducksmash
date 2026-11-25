@@ -214,13 +214,13 @@ public static partial class LevelLibrary
                 d.bumpers.Add(BumperL(620)); d.bumpers.Add(BumperR(620));
                 d.ducks.Add(new DuckDef(200, 700, "normal")); d.ducks.Add(new DuckDef(340, 700, "normal"));
                 break;
-            case 8:
-                d = L(9, "Vịt Sắt: 1 cú hạ chồng đĩa!", (150, 800, null), (270, 800, null), (390, 800, null), (210, 700, "heavy"), (330, 700, "heavy"));
+            case 8:   // iron ducks in the MIDDLE: smash up into the plate towers, or down into the bottom pile
+                d = L(9, "Vịt Sắt ở giữa: phá lên trên, phá xuống dưới!", (120, 500, null), (210, 480, "heavy"), (330, 480, "heavy"), (420, 500, null), (270, 830, null));
                 foreach (var p in new[] { (190, 260), (350, 260), (190, 340), (350, 340) }) d.blocks.Add(B("stone", p.Item1, p.Item2));
                 d.blocks.Add(B("chest", 270, 250)); d.blocks.Add(B("chest", 270, 340));
                 d.blocks.AddRange(Col("plates", 85, 220, 6, 40)); d.blocks.AddRange(Col("plates", 455, 220, 6, 40));
-                d.blocks.AddRange(Row("vase", 70, 470, 11, 40)); d.blocks.AddRange(Cluster("glass", 270, 550, 2, 10, 40));
-                d.blocks.Add(B("bathbomb", 130, 620)); d.blocks.Add(B("bathbomb", 410, 620));
+                d.blocks.AddRange(Row("vase", 70, 600, 11, 40)); d.blocks.AddRange(Cluster("glass", 270, 680, 2, 10, 40));
+                d.blocks.Add(B("bathbomb", 110, 760)); d.blocks.Add(B("bathbomb", 430, 760));
                 break;
             case 9:
                 d = L(5, "Vịt Bom: nổ ở cú chạm đầu!", (150, 810, null), (270, 810, "bomb"), (390, 810, null));
@@ -247,20 +247,19 @@ public static partial class LevelLibrary
                 d.ducks.Add(new DuckDef(200, 530, "normal")); d.ducks.Add(new DuckDef(340, 530, "normal"));
                 d.bumpers.Add(BumperL(660)); d.bumpers.Add(BumperR(660));
                 break;
-            case 12:
-                d = L(6, "", (150, 810, null), (270, 810, "heavy"), (390, 810, null));
-                d.blocks.AddRange(PixelArt(ART_STRAW, 270, 310, 32)); d.art = "straw"; d.blocks.Add(LZ(270, 470, "h"));
+            case 12:   // ducks on the SIDE WALLS next to the picture, one more at the bottom
+                d = L(6, "Vịt hai bên hông: bắn ngang vào bức tranh!", (60, 250, null), (480, 250, "heavy"), (60, 400, null), (270, 820, null));
+                d.blocks.AddRange(PixelArt(ART_STRAW, 270, 300, 28)); d.art = "straw"; d.blocks.Add(LZ(270, 470, "h"));
                 for (int i = 0; i < 19; i++) d.blocks.Add(Dom(60 + i * 22, 530, true, 0));
                 d.blocks.Add(B("bathbomb", 488, 530));
                 d.blocks.AddRange(Shelf(270, 610, 380, "vase", "glass", "glass", "vase", "glass", "glass", "vase"));
                 break;
-            case 13:
-                d = L(6, "", (150, 810, "zap"), (270, 810, null), (390, 810, "bomb"));
+            case 13:   // a row of ducks in the MIDDLE: the picture is above them, the plates below
+                d = L(6, "Vịt ở giữa: trên là tranh, dưới là đĩa!", (150, 650, "zap"), (270, 650, null), (390, 650, "bomb"));
                 d.blocks.AddRange(PixelArt(ART_FISH, 270, 290, 30)); d.art = "fish";
                 d.blocks.AddRange(Row("vase", 70, 460, 11, 40)); d.blocks.Add(LZ(70, 520, "h")); d.blocks.AddRange(Row("soap", 110, 520, 10, 40));
-                for (int i = 0; i < 7; i++) d.blocks.Add(B("plates", 90 + i * 60, 590));
-                d.bumpers.Add(BumperL(640)); d.bumpers.Add(BumperR(640));
-                d.ducks.Add(new DuckDef(270, 670, "normal"));
+                for (int i = 0; i < 7; i++) d.blocks.Add(B("plates", 90 + i * 60, 770));
+                d.ducks.Add(new DuckDef(270, 840, "normal"));
                 break;
             default:
                 if (n >= 14 && n <= Count) { d = Puzzle(n); break; }   // hand-designed puzzle levels (LevelPuzzles.cs)

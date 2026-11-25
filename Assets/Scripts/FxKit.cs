@@ -5,7 +5,7 @@ using UnityEngine;
 public static class FxKit
 {
     static Transform root;
-    static ParticleSystem sparkle, crumbs, drops, ripple, fire, smoke, flash, sparks, wake, confetti, stars, bubbles;
+    static ParticleSystem sparkle, crumbs, drops, ripple, fire, smoke, flash, sparks, wake, confetti, stars, bubbles, shock, embers;
     static Texture2D softTex, starTex, ringTex, squareTex;
     static int budgetFrame, emitted;
 
@@ -30,6 +30,8 @@ public static class FxKit
         wake = Make("Wake", softTex, 600, 0f, ParticleSystemRenderMode.HorizontalBillboard, sizeCurve: Grow(0.4f));
         confetti = Make("Confetti", squareTex, 600, 0.9f, ParticleSystemRenderMode.Billboard, sizeCurve: null, rotate: true);
         bubbles = Make("Bubbles", ringTex, 120, -0.02f, ParticleSystemRenderMode.Billboard, sizeCurve: Grow(0.6f));
+        shock = Make("Shock", ringTex, 120, 0f, ParticleSystemRenderMode.HorizontalBillboard, sizeCurve: ShockCurve(), additive: true);
+        embers = Make("Embers", softTex, 300, 0.45f, ParticleSystemRenderMode.Billboard, sizeCurve: Shrink(), additive: true);
         var r = drops.GetComponent<ParticleSystemRenderer>(); r.velocityScale = 0.06f; r.lengthScale = 1.2f;
         var rs = sparks.GetComponent<ParticleSystemRenderer>(); rs.velocityScale = 0.05f; rs.lengthScale = 1.5f;
     }
@@ -93,6 +95,20 @@ public static class FxKit
         }
     }
 
+    // flat ring racing out across the water (cheap: one particle, no GameObject)
+    public static void Shockwave(Vector3 p, float size, Color c, float life = 0.32f) => Emit(shock, p + Vector3.up * 0.04f, Vector3.zero, c, size, life);
+
+    // glowing embers that float up and drift after a blast
+    public static void Embers(Vector3 p, float radius, int n)
+    {
+        for (int i = 0; i < n; i++)
+        {
+            var d = Random.insideUnitCircle;
+            Emit(embers, p + new Vector3(d.x, 0.2f, d.y) * radius * 0.6f, new Vector3(d.x * 1.6f, Random.Range(2.5f, 5f), d.y * 1.6f),
+                Color.Lerp(new Color(1f, 0.9f, 0.45f), new Color(1f, 0.45f, 0.25f), Random.value), Random.Range(0.07f, 0.13f), Random.Range(0.7f, 1.2f));
+        }
+    }
+
     // short-lived jet flame (rocket duck exhaust, rocket impacts)
     public static void Flame(Vector3 p) =>
         Emit(fire, p + Vector3.up * 0.15f, Random.insideUnitSphere * 0.5f + Vector3.up * 0.8f,
@@ -130,7 +146,7 @@ public static class FxKit
 
     public static void Clear()
     {
-        foreach (var ps in new[] { sparkle, crumbs, drops, ripple, fire, smoke, flash, sparks, wake, confetti, stars, bubbles }) if (ps) ps.Clear();
+        foreach (var ps in new[] { sparkle, crumbs, drops, ripple, fire, smoke, flash, sparks, wake, confetti, stars, bubbles, shock, embers }) if (ps) ps.Clear();
     }
 
     // ---------------- plumbing ----------------
@@ -179,6 +195,7 @@ public static class FxKit
     }
 
     static AnimationCurve Shrink(float start = 1f) => new AnimationCurve(new Keyframe(0, start), new Keyframe(0.15f, 1), new Keyframe(1, 0));
+    static AnimationCurve ShockCurve() => new AnimationCurve(new Keyframe(0, 0.12f, 0, 4f), new Keyframe(0.45f, 0.8f), new Keyframe(1, 1f));   // fast out, then coasts
     static AnimationCurve Grow(float start = 0.3f) => new AnimationCurve(new Keyframe(0, start), new Keyframe(1, 1));
 
     static Texture2D NewTex(int s) => new Texture2D(s, s, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };

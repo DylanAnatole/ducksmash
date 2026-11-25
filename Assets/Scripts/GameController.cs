@@ -1009,8 +1009,9 @@ public class GameController : MonoBehaviour
         Shake(b.type == "pixel" ? 0.06f : 0.12f);
         float pitch = PopPitch(shotSmash);
         if (b.type == "crate" || b.type == "screw" || b.type == "domino") Sfx.Play("wood", 0.7f, pitch);
-        else if (b.type == "glass" || b.type == "plates" || b.type == "vase") { Sfx.Play("ice", 0.75f, pitch * 1.35f); Sfx.Play("crash", 0.35f, pitch * 1.6f); }
+        else if (b.type == "glass" || b.type == "plates" || b.type == "vase") Sfx.Play("glass", 0.8f, 0.85f + pitch * 0.18f);
         else Sfx.Play("crunch", 0.7f, pitch);
+        if (b.type != "pixel" && b.type != "domino") Sfx.Play("thud", 0.55f, 0.9f + Mathf.Min(shotSmash, 12) * 0.02f);
         Sfx.Play("pop", 0.35f, pitch);
         Debris(b.p, BlockColor(b), b.type == "pixel" ? 4 : b.type == "boss" ? 40 : 9, b.type == "boss" ? 1.6f : 1f);
         FxKit.PopFlash(W(b.p, 0.45f), b.type == "pixel" ? 0.45f : 0.75f);
@@ -1019,7 +1020,7 @@ public class GameController : MonoBehaviour
             var o = blocks[i]; if (!o.alive || o == b || o.Hard) continue;
             float dd = (o.p - b.p).sqrMagnitude; if (dd < 75 * 75) o.wob = Mathf.Max(o.wob, 0.22f * (1 - Mathf.Sqrt(dd) / 75f));
         }
-        if (b.type != "pixel" && t - lastBreakRing > 0.035f) { lastBreakRing = t; var bc = BlockColor(b); bc.a = 0.5f; AddRing(b.p, 30, bc); }   // a soft ring in the block's own colour
+        if (b.type != "pixel") { var bc = Color.Lerp(BlockColor(b), Color.white, 0.35f); bc.a = 0.75f; FxKit.Shockwave(W(b.p), 1.35f, bc, 0.28f); }   // a soft ring in the block's own colour
         // material read: soap fizzes into bubbles, glass and china throw bright glints
         if (b.type == "soap") { int nb = App.Mobile ? 2 : 4; for (int i = 0; i < nb; i++) FxKit.Bubble(W(b.p + UnityEngine.Random.insideUnitCircle * 14f, 0.2f)); }
         else if (b.type == "glass" || b.type == "vase" || b.type == "plates") FxKit.Sparkle(W(b.p, 0.45f), new Color(0.9f, 0.97f, 1f), App.Mobile ? 3 : 5);
@@ -1044,12 +1045,12 @@ public class GameController : MonoBehaviour
         {
             case "tnt": Explode(b.p, 95, 3); break;
             case "glass":   // shatters into a spray of shards
-                for (int i = 0; i < 5; i++) SpawnBit(W(b.p, 0.5f), new Color(0.56f, 0.91f, 0.44f), UnityEngine.Random.Range(0.06f, 0.14f), 6f, 0.7f, PrimitiveType.Cube);
+                for (int i = 0; i < 5; i++) SpawnBit(W(b.p, 0.5f), new Color(0.56f, 0.86f, 0.69f), UnityEngine.Random.Range(0.06f, 0.14f), 6f, 0.7f, PrimitiveType.Cube);
                 FxKit.Sparkle(W(b.p, 0.4f), new Color(0.8f, 0.95f, 1f), 8); FxKit.Splash(W(b.p), 6, 1.2f);
                 if (UnityEngine.Random.value < 0.3f) PopText("XOẢNG!", b.p, new Color(0.7f, 0.9f, 1f), 44);
                 break;
             case "vase":
-                for (int i = 0; i < 4; i++) SpawnBit(W(b.p, 0.4f), new Color(1f, 0.6f, 0.29f), UnityEngine.Random.Range(0.14f, 0.24f), 5f, 0.8f, PrimitiveType.Sphere);
+                for (int i = 0; i < 4; i++) SpawnBit(W(b.p, 0.4f), new Color(1f, 0.68f, 0.45f), UnityEngine.Random.Range(0.14f, 0.24f), 5f, 0.8f, PrimitiveType.Sphere);
                 if (UnityEngine.Random.value < 0.35f) { SpawnCoin(b.p); PopText("+xu", b.p, new Color(1f, 0.85f, 0.3f), 40); }
                 break;
             case "soap":    // pops into a cloud of bubbles
@@ -1061,7 +1062,7 @@ public class GameController : MonoBehaviour
                 PopText("XOẢNG!", b.p, new Color(0.7f, 0.85f, 1f), 50);
                 break;
             case "bathbomb":   // fizzy blast + bubble cloud
-                Explode(b.p, 85, 2); PopText("XÌ XÈO!", b.p, new Color(0.85f, 0.7f, 1f), 64);
+                Explode(b.p, 85, 2); PopText("XÌ XÈO!", b.p, new Color(0.85f, 0.7f, 1f), 64); Sfx.Play("fizz", 0.7f, UnityEngine.Random.Range(0.95f, 1.1f));
                 for (int i = 0; i < 18; i++) FxKit.Bubble(W(b.p + UnityEngine.Random.insideUnitCircle * 70));
                 FxKit.Sparkle(W(b.p), new Color(1f, 0.6f, 0.85f), 10);
                 break;
@@ -1147,6 +1148,11 @@ public class GameController : MonoBehaviour
         FxKit.Explosion(W(p), R * K * 0.6f);
         Debris(p, new Color(1f, 0.7f, 0.28f), 16, 1.5f); Debris(p, new Color(1f, 0.35f, 0.2f), 10, 1.2f);
         Sfx.Play("boom", 0.8f, UnityEngine.Random.Range(0.9f, 1.1f)); Sfx.Vibrate();
+        FxKit.Shockwave(W(p), R * K * 2.9f, new Color(1f, 0.78f, 0.42f, 0.7f), 0.38f);
+        FxKit.Splash(W(p), App.Mobile ? 8 : 16, 1.5f);
+        FxKit.Embers(W(p, 0.3f), R * K, App.Mobile ? 6 : 16);
+        camZoom = Mathf.Max(camZoom, 0.3f);
+        Later(0.09f, () => { if (world != null) { FxKit.Shockwave(W(p), R * K * 2.1f, new Color(1f, 0.95f, 0.85f, 0.45f), 0.3f); FxKit.PopFlash(W(p, 0.6f), R * K * 1.2f); } });
         Later(0.07f, () =>
         {
             foreach (var b in blocks.ToArray()) if (b.alive && Vector2.Distance(b.p, p) < R + 20) { b.hitDir = b.p - p; Damage(b, dmg); }
