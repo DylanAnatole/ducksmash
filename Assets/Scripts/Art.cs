@@ -706,8 +706,9 @@ public static class Art
     public static Transform Bumper(Transform parent, float w, float h)
     {
         var root = Root("Bumper", parent);
-        // pill shape along Z
-        Prim(PrimitiveType.Capsule, root, new Vector3(0, 0.3f, 0), new Vector3(Mathf.Max(w, 0.3f), h / 2, Mathf.Max(w, 0.3f)), Mat(Hex("ff7a9a"), 0.8f, 0, 0, 0.0035f), new Vector3(90, 0, 0));
+        // pill shape along its long side (Z for wall pads, X for flat pads lying across the bath)
+        float thick = Mathf.Max(Mathf.Min(w, h), 0.3f), len = Mathf.Max(Mathf.Max(w, h), thick);
+        Prim(PrimitiveType.Capsule, root, new Vector3(0, 0.3f, 0), new Vector3(thick, len / 2, thick), Mat(Hex("ff7a9a"), 0.8f, 0, 0, 0.0035f), h >= w ? new Vector3(90, 0, 0) : new Vector3(0, 0, 90));
         return root;
     }
 

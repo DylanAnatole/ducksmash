@@ -363,7 +363,7 @@ public class GameController : MonoBehaviour
             var fl = new Flow { r = new Rect(fd.x, fd.y, fd.w, fd.h), dir = new Vector2(fd.dx, fd.dy) };
             bool horiz = Mathf.Abs(fd.dx) > 0.5f;
             float along = horiz ? fd.w : fd.h, across = horiz ? fd.h : fd.w;
-            fl.m = Art.Fade(new Color(1f, 1f, 1f, 0.55f)); fl.m.mainTexture = FlowTex(); fl.m.renderQueue = 2980;
+            fl.m = Art.Fade(new Color(1f, 1f, 1f, 0.8f)); fl.m.mainTexture = FlowTex(); fl.m.renderQueue = 2980;
             fl.tu = along / 44f; fl.tv = Mathf.Max(1, Mathf.Round(across / 44f));
             // the quad's local +x is the flow direction; texture chevrons point along +u
             float yaw = horiz ? (fd.dx > 0 ? 0 : 180) : (fd.dy > 0 ? 90 : -90);
@@ -2320,7 +2320,7 @@ public class GameController : MonoBehaviour
             }
         foreach (var m in bumpers)
         {
-            m.pulse = Mathf.Max(0, m.pulse - dt); m.view.localScale = new Vector3(1 + m.pulse * 2, 1, 1);
+            m.pulse = Mathf.Max(0, m.pulse - dt); m.view.localScale = m.h >= m.w ? new Vector3(1 + m.pulse * 2, 1, 1) : new Vector3(1, 1, 1 + m.pulse * 2);   // swell across the pad, not along it
             if (m.amp > 0) m.view.position = W(m.x + m.w / 2, m.y + m.h / 2);
         }
     }
