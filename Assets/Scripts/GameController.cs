@@ -981,12 +981,14 @@ public class GameController : MonoBehaviour
             var top = b.view.Find("Plate" + (b.hp + 1));
             if (top) { SpawnBit(top.position, Color.white, 0.3f, 5f, 0.7f, PrimitiveType.Cylinder); Destroy(top.gameObject); }
             Debris(b.p, Color.white, 8, 0.9f); PopText("XOẢNG!", b.p, new Color(0.7f, 0.85f, 1f), 40);
-            Sfx.Play("crash", 0.5f, 1.7f); Sfx.Play("ice", 0.4f, 1.6f);
+            Sfx.Play("glass", 0.6f, 1.25f); Sfx.Play("thud", 0.4f, 1.2f);
+            FxKit.Shockwave(W(b.p), 1.1f, new Color(0.85f, 0.93f, 1f, 0.6f), 0.22f);
         }
         if (b.type == "vase")
         {   // cracks and wobbles
             b.view.localEulerAngles = new Vector3(UnityEngine.Random.Range(-10f, 10f), 0, UnityEngine.Random.Range(-10f, 10f));
-            Debris(b.p, new Color(1f, 0.6f, 0.29f), 5, 0.5f); PopText("RẮC!", b.p, new Color(0.6f, 0.95f, 0.85f), 40); Sfx.Play("ice", 0.5f, 0.9f);
+            Debris(b.p, new Color(1f, 0.68f, 0.45f), 5, 0.5f); PopText("RẮC!", b.p, new Color(0.6f, 0.95f, 0.85f), 40); Sfx.Play("crunch", 0.5f, 1.3f); Sfx.Play("thud", 0.45f, 1.1f);
+            FxKit.Shockwave(W(b.p), 1.1f, new Color(1f, 0.85f, 0.7f, 0.6f), 0.22f);
         }
         return false;
     }
@@ -994,6 +996,7 @@ public class GameController : MonoBehaviour
     void DestroyBlock(Block b)
     {
         b.alive = false; shotSmash++; Sfx.Buzz(10);
+        if (shotSmash == 1 && state == "play") HitStop(0.035f);
         if (b.tag) { tags.Remove(b.tag); Destroy(b.tag.gameObject); b.tag = null; }
         if (state == "play")
             foreach (var tr in TIERS)

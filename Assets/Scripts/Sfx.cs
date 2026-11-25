@@ -146,7 +146,16 @@ public class Sfx : MonoBehaviour
         clips["laser"] = Make("laser", 0.35f, t => lz1(t) + lz2(t));
         var iceO = Osc(t => 2600, t => Mathf.Exp(-t * 30) * 0.5f); var iceN = Filtered(0.8f, t => Mathf.Exp(-t * 45));
         clips["ice"] = Make("ice", 0.18f, t => iceO(t) + iceN(t) * 0.8f);
-        clips["win"] = Make("win", 1.1f, t => Arp(t, new[] { 523f, 659f, 784f, 1047f, 1319f }, 0.12f));
+        // win fanfare: bright plucked run, then a warm major chord that rings out with a shimmer on top
+        clips["win"] = Make("win", 1.6f, t =>
+        {
+            float run = Arp(t, new[] { 523f, 659f, 784f, 1047f }, 0.1f) * (t < 0.42f ? 1f : Mathf.Exp(-(t - 0.42f) * 10));
+            float ct = t - 0.4f; if (ct < 0) return run;
+            float env = Mathf.Min(1, ct * 40) * Mathf.Exp(-ct * 2.2f), chord = 0;
+            foreach (var f in new[] { 523f, 659f, 784f, 1047f }) chord += (Mathf.Sin(2 * Mathf.PI * f * t) + 0.35f * Mathf.Sin(4 * Mathf.PI * f * t) + 0.12f * Mathf.Sin(6 * Mathf.PI * f * t)) * 0.16f;
+            float shimmer = Mathf.Sin(2 * Mathf.PI * 2093f * t) * 0.08f * (0.5f + 0.5f * Mathf.Sin(ct * 40)) * Mathf.Exp(-ct * 3);
+            return run + (chord * (1 + 0.08f * Mathf.Sin(ct * 30)) + shimmer) * env;
+        });
         clips["lose"] = Make("lose", 0.9f, t => Arp(t, new[] { 392f, 349f, 294f, 262f }, 0.2f));
         clips["coin"] = Make("coin", 0.3f, t => Mathf.Sin(2 * Mathf.PI * (t < 0.07f ? 988 : 1319) * t) * Mathf.Exp(-t * 10) * 0.6f);
         clips["star"] = Make("star", 0.5f, t => (Mathf.Sin(2 * Mathf.PI * 1568 * t) + 0.5f * Mathf.Sin(2 * Mathf.PI * 2349 * t)) * Mathf.Exp(-t * 7) * 0.45f);

@@ -10,6 +10,9 @@ public static class App
     public static MapScreen Map;
     public static GameController Game;
     public static SettingsPopup Settings;
+#if UNITY_WEBGL && !UNITY_EDITOR
+    [System.Runtime.InteropServices.DllImport("__Internal")] static extern int DS_IsTouchDevice();
+#endif
     public static bool Mobile;   // phone/tablet browser: lighter effects + shadows
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -33,6 +36,9 @@ public static class App
         sun.type = LightType.Directional; sun.transform.rotation = Quaternion.Euler(58, -35, 0);
         // phone profile ("ds_forceMobile" pref lets us test it in the editor / on desktop)
         Mobile = Application.isMobilePlatform || PlayerPrefs.GetInt("ds_forceMobile", 0) == 1;
+#if UNITY_WEBGL && !UNITY_EDITOR
+        if (DS_IsTouchDevice() == 1) Mobile = true;   // iPad: light profile too
+#endif
         // phones: no realtime shadow pass at all (ducks get a cheap blob instead), no HDR/MSAA buffers,
         // and no physics stepping (the game has its own 2D sim; Unity physics has nothing to do)
         cam.allowHDR = false; cam.allowMSAA = !Mobile;
