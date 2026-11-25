@@ -876,6 +876,7 @@ public class GameController : MonoBehaviour
             var v = b.vel; if (TubWalls(ref b.p, ref v, b.r, 0.8f)) Sfx.Play("push", 0.4f, 1.3f); b.vel = v;
             b.vel *= Mathf.Exp(-1.4f * dt);
             if (whirls.Count > 0) { float om = WhirlTurn(b.p, out var dep); if (om > 0) b.vel = Rot(b.vel, om * dt) * Mathf.Exp(-1.6f * dep * dt); }   // rings swirl too
+            if (flows.Count > 0) { var fdir = FlowAt(b.p); if (fdir != Vector2.zero) b.vel += fdir * FLOW_ACC * 0.8f * dt; }   // ...and ride the currents
             if (b.vel.sqrMagnitude < 30 * 30) { b.vel = Vector2.zero; continue; }
             if (b.tag) { tags.Remove(b.tag); Destroy(b.tag.gameObject); b.tag = null; }   // it's been shown what it does
             if (b.vel.sqrMagnitude > 200 * 200 && UnityEngine.Random.value < dt * 30f) FxKit.Wake(W(b.p));
@@ -964,7 +965,9 @@ public class GameController : MonoBehaviour
                 if (CircleRect(d.p, d.r, m, out var bh))
                 {
                     d.p += bh.n * bh.pen; Reflect(ref d.v, bh.n, 1f);
-                    float s = d.v.magnitude; if (s > 0) d.v *= Mathf.Max(s, 650) / s; m.pulse = 0.2f;
+                    float s = d.v.magnitude; if (s > 0) d.v *= Mathf.Max(s, 650) / s;
+                    if (m.pulse <= 0.05f) { Sfx.Play("boing", 0.75f, UnityEngine.Random.Range(0.95f, 1.1f)); FxKit.Sparkle(W(d.p, 0.3f), new Color(1f, 0.6f, 0.75f), 4); }
+                    m.pulse = 0.2f;
                 }
             bool fast = d.v.magnitude > 70;
             foreach (var b in blocks)

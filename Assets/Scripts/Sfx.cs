@@ -132,6 +132,8 @@ public class Sfx : MonoBehaviour
             float nz = Noise(); ghp = 0.6f * (ghp + nz - gprev); gprev = nz;   // high-passed hiss = the "crsh"
             return s * 0.45f + ghp * Mathf.Exp(-t * 28) * 0.9f;
         });
+        // rubber pad "boing": a springy pitch wobble that settles
+        clips["boing"] = Make("boing", 0.32f, Osc(t => 210 + 140 * Mathf.Exp(-t * 9) * Mathf.Sin(t * 70) + 90 * Mathf.Exp(-t * 14), t => Mathf.Min(1, t * 500) * Mathf.Exp(-t * 9) * 0.9f));
         // body thump under every break: gives each smash weight (low sine drop, very short)
         clips["thud"] = Make("thud", 0.14f, Osc(t => Mathf.Lerp(150, 55, t / 0.14f), t => Mathf.Min(1, t * 600) * Mathf.Exp(-t * 26)));
         // bath-bomb fizz: bubbling hiss with a rising sweep
