@@ -277,7 +277,8 @@ public class GameController : MonoBehaviour
         Close(); Active = true; hud.gameObject.SetActive(true);
         level = n;
         var L = LevelLibrary.Get(n);
-        Sfx.SetTrack(LevelLibrary.IsHard(n) || ((n - 1) / 10) % 2 == 1 ? 1 : 0);   // levels 11-20 + hard levels get the bouncier loop
+        Sfx.SetTrack(LevelLibrary.IsHard(n) || ((n - 1) / 10) % 2 == 1 ? 1 : 0);
+        levelTip = L.hint ?? "";   // levels 11-20 + hard levels get the bouncier loop
         world = new GameObject("World").transform; fx = new GameObject("FX").transform;
         foreach (var bt in bits) if (bt.t) { bt.t.gameObject.SetActive(false); bitPools[bt.type].Push(bt.t); }   // debris pool persists across levels
         foreach (var w in whirls) if (w.view) Destroy(w.view.gameObject);
@@ -2933,6 +2934,7 @@ public class GameController : MonoBehaviour
         }
     }
 
+    string levelTip = "";
     void ShowPopup(bool win)
     {
         popupRoot.gameObject.SetActive(true); popAnim = 0; loseAnim = 0;
@@ -2964,7 +2966,7 @@ public class GameController : MonoBehaviour
             foreach (var im in popStarImgs) im.gameObject.SetActive(false);
             popStars.text = "";
             int lft = GoalsLeft(); int pct = goalTotal > 0 ? Mathf.RoundToInt(100f * (goalTotal - lft) / goalTotal) : 0;
-            popBody.text = "Đã phá <b>" + pct + "%</b> · còn <b>" + lft + "</b> món\n<size=34>" + (bossBlock != null && bossBlock.alive ? "Vua Bánh Quy còn " + bossBlock.hp + " máu: canh lúc vua trôi tới rồi bắn!" : pct >= 80 ? "Sắp xong rồi! Thêm lượt để phá nốt" : "Thử góc khác hoặc dùng booster nhé") + "</size>";
+            popBody.text = "Đã phá <b>" + pct + "%</b> · còn <b>" + lft + "</b> món\n<size=34>" + (bossBlock != null && bossBlock.alive ? "Vua Bánh Quy còn " + bossBlock.hp + " máu: canh lúc vua trôi tới rồi bắn!" : pct >= 80 ? "Sắp xong rồi! Thêm lượt để phá nốt" : levelTip.Length > 0 ? "Mẹo: " + levelTip.Replace("MÀN KHÓ! ", "").Replace("SIÊU KHÓ! ", "") : "Thử góc khác hoặc dùng booster nhé") + "</size>";
             popReward.text = "";
             UIKit.BtnText(popA).text = "+5 lượt — " + CONTINUE_PRICE + " xu";
             popA.GetComponent<Image>().color = SaveData.Coins >= CONTINUE_PRICE ? new Color(0.37f, 0.83f, 0.37f) : new Color(0.7f, 0.7f, 0.75f);
