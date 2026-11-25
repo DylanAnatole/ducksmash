@@ -242,6 +242,10 @@ public static partial class LevelLibrary
                 d.blocks.AddRange(Row("vase", 70, 480, 11, 40));
                 for (int i = 0; i < 11; i++) d.blocks.Add(B(i == 2 || i == 8 ? "stone" : "soap", 70 + i * 40, 540));
                 d.blocks.AddRange(Shelf(270, 610, 360, "glass", "vase", "glass", "vase", "glass", "vase"));
+                // flipped upside down: the ducks start at the TOP and shoot down through the stone gaps
+                foreach (var b in d.blocks) b.y = 1020 - b.y;
+                foreach (var dk in d.ducks) dk.y = 1020 - dk.y;
+                d.hint = "MÀN KHÓ! Vịt trên cao: ngắm qua khe đá xuống dưới!";
                 break;
             case 11:
                 d = L(10, "Vịt Sét: giật 3 món gần nhất!", (150, 810, null), (270, 810, "zap"), (390, 810, null), (270, 720, "zap"));
