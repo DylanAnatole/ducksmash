@@ -288,7 +288,7 @@ public class GameController : MonoBehaviour
         ducks.Clear(); blocks.Clear(); bumpers.Clear(); timers.Clear(); bits.Clear(); bitPool.Clear(); rings.Clear(); zaps.Clear(); dying.Clear();
         foreach (var c in coins) if (c.rt) Destroy(c.rt.gameObject);
         coins.Clear(); slowTimer = camZoom = rushTimer = 0; rushLeft = rushCoins = 0; movesAtClear = -1; displayScore = 0;
-        foreach (var p in pops) if (p.t) Destroy(p.t.gameObject);
+        foreach (var p in pops) RecyclePop(p.t);
         pops.Clear();
         projShown = -1; starLossT = 0;
         fever = 0; frenzyReady = false; feverShown = 0; feverShownInt = -1; feverMode = 0;   // frenzy starts empty in every level: no banking it for the next one
@@ -2474,7 +2474,7 @@ public class GameController : MonoBehaviour
         for (int i = pops.Count - 1; i >= 0; i--)
         {
             var p = pops[i]; p.life -= dt;
-            if (p.life <= 0) { Destroy(p.t.gameObject); pops.RemoveAt(i); continue; }
+            if (p.life <= 0) { RecyclePop(p.t); pops.RemoveAt(i); continue; }
             float age = p.max - p.life;
             p.rise += dt * (age < 0.18f ? 25f : 95f);
             var sp = cam.WorldToScreenPoint(p.world);
@@ -2497,16 +2497,21 @@ public class GameController : MonoBehaviour
     void PopText(string s, Vector2 simPos, Color c, int size)
     {
         // too many floating labels at once is unreadable and each one is an outlined UI mesh: drop the oldest
-        if (pops.Count >= (App.Mobile ? 6 : 10)) { if (pops[0].t) Destroy(pops[0].t.gameObject); pops.RemoveAt(0); }
+        if (pops.Count >= (App.Mobile ? 6 : 10)) { RecyclePop(pops[0].t); pops.RemoveAt(0); }
         var wp = W(simPos, 0.6f);
         foreach (var o in pops)
             if (o.t && o.t.text == s && o.max - o.life < 0.6f && (o.world - wp).sqrMagnitude < 9f)
             { o.life = o.max - 0.02f; o.world = Vector3.Lerp(o.world, wp, 0.5f); return; }
-        var tx = UIKit.Outlined(UIKit.Label(dynLayer, s, size, c), new Color(0.23f, 0.18f, 0.42f), 4);
-        var rt = tx.rectTransform; rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f); rt.sizeDelta = new Vector2(600, 120);
+        Text tx = null;
+        while (popPool.Count > 0 && tx == null) tx = popPool.Pop();   // reuse a label: no new UI objects (and no GC hitch) on every smash
+        if (tx != null) { tx.gameObject.SetActive(true); tx.text = s; tx.fontSize = size; tx.color = c; tx.rectTransform.SetAsLastSibling(); }
+        else tx = UIKit.Outlined(UIKit.Label(dynLayer, s, size, c), new Color(0.23f, 0.18f, 0.42f), 4);
+        var rt = tx.rectTransform; rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f); rt.sizeDelta = new Vector2(600, 120); rt.localScale = Vector3.zero;
         pops.Add(new Pop { t = tx, world = W(simPos, 0.6f), life = 0.9f, max = 0.9f });
-        if (pops.Count > 30) { Destroy(pops[0].t.gameObject); pops.RemoveAt(0); }
+        if (pops.Count > 30) { RecyclePop(pops[0].t); pops.RemoveAt(0); }
     }
+    readonly Stack<Text> popPool = new Stack<Text>();
+    void RecyclePop(Text t) { if (t == null) return; t.gameObject.SetActive(false); if (popPool.Count < 24) popPool.Push(t); else Destroy(t.gameObject); }
 
     void BigText(string s, Color c) { bigTxt.text = s; bigTxt.color = c; bigLife = 1.4f; }
 
