@@ -1869,20 +1869,32 @@ public class GameController : MonoBehaviour
     readonly List<Vector2> hintPath = new List<Vector2>();
     readonly HashSet<Block> simHits = new HashSet<Block>();
     float idleT; int hintSearch = -1, hintBestDuck = -1; float hintBestScore; Vector2 hintBestDir; bool hintReady, hintShown;
-    const int HINT_ANGLES = 18;
+    const int HINT_ANGLES = 24;
+    int predJump = -1;
 
     // cheap straight-line prediction (same rules as the aim preview); weights chain-reaction blocks higher
     float PredictShot(Duck d, Vector2 dir, List<Vector2> path)
     {
         Vector2 gp = d.p, gv = dir; float len = 260 + MAX_PULL * 4.5f, score = 0; simHits.Clear();
         path?.Clear(); path?.Add(gp);
-        int dmg = d.kind == "rocket" ? 3 : d.Dmg; float r2 = 0;
+        int dmg = d.kind == "rocket" ? 3 : d.Dmg; float r2 = 0; bool jumped = false; if (path != null) predJump = -1;
         for (float st = 0; st < len; st += 6)
         {
             gp += gv * 6;
             if (whirls.Count > 0 && d.kind != "rocket") { float om = WhirlTurn(gp, out _); if (om > 0) gv = Rot(gv, om * 6f / MAX_SPEED * 1.1f); }
+            if (flows.Count > 0 && d.kind != "rocket") { var fdir = FlowAt(gp); if (fdir != Vector2.zero) gv = (gv * MAX_SPEED + fdir * FLOW_ACC * 6f / MAX_SPEED).normalized; }
             if (TubWalls(ref gp, ref gv, d.r, 1f)) path?.Add(gp);
+            foreach (var m in bumpers) if (CircleRect(gp, d.r, m, out var bh)) { gp += bh.n * bh.pen; Reflect(ref gv, bh.n, 1f); path?.Add(gp); }
             gv.Normalize();
+            if (!jumped && st > 10)
+                foreach (var pt in portals)
+                {
+                    bool inA = (gp - pt.a).sqrMagnitude < PORTAL_R * PORTAL_R, inB = !inA && (gp - pt.b).sqrMagnitude < PORTAL_R * PORTAL_R;
+                    if (!inA && !inB) continue;
+                    path?.Add(gp); gp = (inA ? pt.b : pt.a) + gv * 4f; jumped = true; score += 30f;   // a pipe shot is the thing to show off (and the straight-line guess undersells its bounces)
+                    if (path != null) { predJump = path.Count; path.Add(gp); }   // the hop itself is not drawn
+                    break;
+                }
             bool stop = false;
             for (int i = 0; i < ducks.Count; i++) { var o = ducks[i]; if (o == d) continue; r2 = o.r + d.r; if ((o.p - gp).sqrMagnitude < r2 * r2) { stop = true; score += 2f; break; } }
             if (!stop)
@@ -1911,7 +1923,7 @@ public class GameController : MonoBehaviour
 
     void UpdateHint(float rdt)
     {
-        bool can = level <= LevelLibrary.Onboarding && state == "play" && !moving && drag == null && introTimer <= 0 && target == null && ducks.Count > 0
+        bool can = (level <= LevelLibrary.Onboarding || level == 19 || level == 23 || level == 24) && state == "play" && !moving && drag == null && introTimer <= 0 && target == null && ducks.Count > 0
                    && !popupRoot.gameObject.activeSelf && (guideRoot == null || !guideRoot.gameObject.activeSelf) && Time.timeScale > 0;
         if (!can || Input.GetMouseButton(0)) { idleT = 0; hintReady = false; hintSearch = -1; if (hintShown) HideHint(); return; }
         idleT += rdt;
@@ -1922,7 +1934,8 @@ public class GameController : MonoBehaviour
             for (int k = 0; k < 4 && hintSearch < total; k++, hintSearch++)
             {
                 var d = ducks[hintSearch / HINT_ANGLES]; if (d.clone || d.spawnT > 0) continue;
-                float a = Mathf.Lerp(-165f, -15f, (hintSearch % HINT_ANGLES) / (HINT_ANGLES - 1f)) * Mathf.Deg2Rad;   // upward fan (sim y points down)
+                float a = (level <= LevelLibrary.Onboarding ? Mathf.Lerp(-165f, -15f, (hintSearch % HINT_ANGLES) / (HINT_ANGLES - 1f))   // upward fan (sim y points down)
+                                                             : (hintSearch % HINT_ANGLES) * (360f / HINT_ANGLES) - 180f) * Mathf.Deg2Rad;        // ducks can sit anywhere now: all round
                 var dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
                 float sc = PredictShot(d, dir, null);
                 if (sc > hintBestScore) { hintBestScore = sc; hintBestDir = dir; hintBestDuck = hintSearch / HINT_ANGLES; }
@@ -1933,10 +1946,11 @@ public class GameController : MonoBehaviour
         {
             hintShown = true;
             // marching soft dots along the suggested path
-            float total = 0; for (int i = 1; i < hintPath.Count; i++) total += Vector2.Distance(hintPath[i - 1], hintPath[i]);
+            float total = 0; for (int i = 1; i < hintPath.Count; i++) if (i != predJump) total += Vector2.Distance(hintPath[i - 1], hintPath[i]);
             const float gap = 26f; float at = 30 + Mathf.Repeat(Time.unscaledTime * 60f, gap), walked = 0; int used = 0;
             for (int i = 1; i < hintPath.Count && used < hintDots.Count; i++)
             {
+                if (i == predJump) continue;
                 Vector2 a = hintPath[i - 1], b = hintPath[i]; float seg = Vector2.Distance(a, b);
                 while (at <= walked + seg && used < hintDots.Count)
                 {
