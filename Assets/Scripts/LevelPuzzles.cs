@@ -202,7 +202,7 @@ public static partial class LevelLibrary
                 Duck(d, 70, 440); Duck(d, 70, 660, "heavy"); Duck(d, 470, 440, "heavy"); Duck(d, 470, 660);
                 return d;
             case 27:   // staircase of bath bombs; the ducks are perched in the TOP-LEFT corner above the bottom step
-                d.moves = 9; d.hint = "Vịt trên góc: châm bom bậc nào trước?";
+                d.moves = 10; d.hint = "Vịt trên góc: châm bom bậc nào trước?";
                 for (int s = 0; s < 5; s++)
                 {
                     float y = 680 - s * 85, x0 = 70 + s * 50;
