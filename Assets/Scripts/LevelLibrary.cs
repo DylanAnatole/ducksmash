@@ -227,10 +227,10 @@ public static partial class LevelLibrary
                 break;
             case 9:
                 d = L(5, "Vịt Bom: nổ ở cú chạm đầu!", (150, 810, null), (270, 810, "bomb"), (390, 810, null));
-                d.blocks.AddRange(PixelArt(ART_HEART, 270, 320, 34)); d.art = "heart"; d.blocks.Add(LZ(60, 320, "h")); d.blocks.Add(LZ(480, 252, "h"));
+                d.blocks.AddRange(PixelArt(ART_HEART, 270, 320, 28)); d.art = "heart"; d.blocks.Add(LZ(60, 300, "h")); d.blocks.Add(LZ(480, 252, "h"));
                 d.blocks.AddRange(Shelf(270, 520, 340, "glass", "vase", "glass", "vase", "glass", "vase"));
                 d.blocks.AddRange(Row("soap", 70, 590, 11, 40));
-                d.ducks.Add(new DuckDef(200, 675, "normal")); d.ducks.Add(new DuckDef(340, 675, "normal"));
+                d.ducks.Add(new DuckDef(70, 420, "normal")); d.ducks.Add(new DuckDef(470, 420, "normal"));   // two ducks beside the heart: shoot it sideways
                 break;
             case 10:
                 d = L(15, "MÀN KHÓ! Ngắm qua khe đá!", (150, 810, "heavy"), (270, 810, null), (390, 810, null));
