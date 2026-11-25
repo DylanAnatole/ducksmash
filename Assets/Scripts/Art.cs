@@ -365,7 +365,7 @@ public static class Art
         var body = Root("Body", root);
         Color c = DuckBody[kind];
         bool heavy = kind == "heavy";
-        var mb = Mat(c, heavy ? 0.9f : 0.75f, heavy ? 1 : 0, 0, 0.0028f);
+        var mb = Mat(c, heavy ? 0.95f : 0.85f, heavy ? 1 : 0, 0, 0.0018f);   // thinner ink line, glossier
         var md = Mat(Color.Lerp(c, Color.black, 0.12f), heavy ? 0.9f : 0.6f, heavy ? 1 : 0);
         var mbFlat = Mat(c, heavy ? 0.9f : 0.75f, heavy ? 1 : 0);   // same colour, no outline (inner parts)
 

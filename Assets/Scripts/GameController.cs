@@ -2591,8 +2591,8 @@ public class GameController : MonoBehaviour
     {
         if (!force && Screen.width == lastW && Screen.height == lastH) return;
         lastW = Screen.width; lastH = Screen.height;
-        cam.fieldOfView = 36;
-        var rot = Quaternion.Euler(62, 0, 0); cam.transform.rotation = rot;
+        cam.fieldOfView = 34;
+        var rot = Quaternion.Euler(55, 0, 0); cam.transform.rotation = rot;   // a bit lower: toys read as round 3D objects
         var focus = new Vector3(0, 0, -0.25f);
         float w = TW * K / 2 + 0.45f, h = TH * K / 2 + 0.45f;
         Vector3[] corners = { new Vector3(-w, 0.5f, h), new Vector3(w, 0.5f, h), new Vector3(-w, 0, -h), new Vector3(w, 0, -h) };
