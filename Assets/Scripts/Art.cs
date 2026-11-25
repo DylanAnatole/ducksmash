@@ -475,6 +475,12 @@ public static class Art
         Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.32f, 0), new Vector3(d * 0.86f, 0.56f, d * 0.86f), body);
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.34f, 0), new Vector3(d * 0.88f, 0.035f, d * 0.88f), Mat(Color.white, 0.6f));
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.22f, 0), new Vector3(d * 0.8f, 0.02f, d * 0.8f), Mat(Hex("ffd34d"), 0.6f));
+        var dotM = Mat(Hex("fff3e3"), 0.7f);
+        for (int i = 0; i < 6; i++)
+        {   // painted dots around the belly: prettier, and the vase reads at a glance
+            float an = i / 6f * Mathf.PI * 2;
+            Prim(PrimitiveType.Sphere, root, new Vector3(Mathf.Cos(an) * d * 0.4f, 0.44f, Mathf.Sin(an) * d * 0.4f), Vector3.one * d * 0.11f, dotM);
+        }
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.66f, 0), new Vector3(d * 0.36f, 0.1f, d * 0.36f), body);
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.77f, 0), new Vector3(d * 0.5f, 0.025f, d * 0.5f), body);
         return root;
