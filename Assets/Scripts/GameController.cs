@@ -1096,6 +1096,11 @@ public class GameController : MonoBehaviour
     {
         b.alive = false; shotSmash++; Sfx.Buzz(10);
         if (shotSmash == 1 && state == "play") HitStop(0.035f);
+        if (!keySolved && keyType != "" && b.type == keyType && state == "play")
+        {   // the player found the trick: say so, so the puzzle idea sticks
+            keySolved = true; keyPts.Clear();
+            PopText("ĐÚNG CHÌA KHOÁ!", b.p + new Vector2(0, -60), new Color(1f, 0.85f, 0.3f), 58); Sfx.Play("star", 0.8f, 1.5f);
+        }
         if (b.tag) { tags.Remove(b.tag); Destroy(b.tag.gameObject); b.tag = null; }
         if (state == "play")
             foreach (var tr in TIERS)
@@ -2431,12 +2436,12 @@ public class GameController : MonoBehaviour
     // ---------- puzzle clarity: point at the piece the level is built around ----------
     readonly List<Vector2> keyPts = new List<Vector2>();
     readonly List<RectTransform> keyTags = new List<RectTransform>();
-    string keyName = "";
+    string keyName = "", keyType = ""; bool keySolved;
     float keyPulse;
     void ClearKeys() { foreach (var k in keyTags) if (k) { tags.Remove(k); Destroy(k.gameObject); } keyTags.Clear(); keyPts.Clear(); }
     void MarkKeys()
     {
-        ClearKeys(); keyName = ""; keyPulse = 0;
+        ClearKeys(); keyName = ""; keyType = ""; keySolved = false; keyPulse = 0;
         if (level <= 1 || LevelLibrary.IsSandbox(level)) return;
         Vector2 dc = Vector2.zero; foreach (var d in ducks) dc += d.p; if (ducks.Count > 0) dc /= ducks.Count;
         // the closest few of one kind of block, labelled once
@@ -2444,7 +2449,7 @@ public class GameController : MonoBehaviour
         {
             var list = blocks.Where(b => b.alive && b.type == type && !Covered(b)).OrderBy(b => (b.p - dc).sqrMagnitude).Take(n).ToList();
             if (list.Count == 0) return;
-            if (keyName == "") keyName = label;
+            if (keyName == "") { keyName = label; keyType = type; }
             for (int i = 0; i < list.Count; i++)
             {
                 keyPts.Add(list[i].p);
