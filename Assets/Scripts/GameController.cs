@@ -202,7 +202,7 @@ public class GameController : MonoBehaviour
         });
     }
     void Flash(float a) => flashA = Mathf.Max(flashA, a * 0.5f);
-    Transform aimTarget, aimGrab; readonly List<Transform> pushDots = new List<Transform>(); LineRenderer band2;
+    Transform aimTarget, aimGrab; readonly List<Transform> pushDots = new List<Transform>(), frenzyDots = new List<Transform>(); LineRenderer band2;
     MaterialPropertyBlock mpb; static Material trailMat;
     Vector3 camBase; Material waterMat;
     readonly HashSet<Block> aimHits = new HashSet<Block>();
@@ -1319,7 +1319,7 @@ public class GameController : MonoBehaviour
         if (d.kind == "rainbow") d.rainbowReady = true;
         if (frenzyReady)
         {
-            frenzyReady = false; fever = 0; frenzyShot = true; d.frenzy = true; BigText("DUCK FRENZY!", new Color(1f, 0.5f, 0.75f)); Shake(0.3f); Sfx.Play("frenzy"); FxKit.StarBurst(W(d.p, 0.5f), 20);
+            frenzyReady = false; fever = 0; frenzyShot = true; d.frenzy = true; BigText("DUCK FRENZY! x5 VỊT", new Color(1f, 0.5f, 0.75f)); Shake(0.3f); Sfx.Play("frenzy"); FxKit.StarBurst(W(d.p, 0.5f), 20);
             float baseA = Mathf.Atan2(v.y, v.x), sp = v.magnitude;
             foreach (float off in new[] { -0.3f, -0.15f, 0.15f, 0.3f })
             {
@@ -1362,7 +1362,17 @@ public class GameController : MonoBehaviour
             float before = fever; fever = Mathf.Min(FEVER_MAX, fever + n);
             int gain = Mathf.RoundToInt(fever - before);
             if (gain > 0) { feverPop.text = "+" + gain + " FRENZY"; feverPopT = 1.1f; feverPop.gameObject.SetActive(true); }
-            if (fever >= FEVER_MAX) { frenzyReady = true; BigText("FRENZY SẴN SÀNG!", new Color(1f, 0.5f, 0.75f)); }
+            if (fever >= FEVER_MAX)
+            {
+                frenzyReady = true; BigText("FRENZY SẴN SÀNG!", new Color(1f, 0.5f, 0.75f));
+                if (PlayerPrefs.GetInt("ds_frenzy_tut", 0) == 0 && state == "play")
+                {   // explain it once, the first time it happens
+                    PlayerPrefs.SetInt("ds_frenzy_tut", 1); PlayerPrefs.Save();
+                    introTitle.text = "DUCK FRENZY!"; introTitle.color = new Color(1f, 0.45f, 0.72f);
+                    introBody.text = "<size=40>Thanh FRENZY đầy rồi!</size>\n\n<size=36>Phát bắn <b>tiếp theo</b>:\n<b>5 vịt</b> cùng lao ra theo hình quạt\nvà <b>xuyên qua</b> đồ dễ vỡ</size>\n\n<size=30><color=#7a4dd8>Nạp lại: mỗi món phá được +1</color></size>";
+                    introRoot.sizeDelta = new Vector2(820, 600); introMax = introTimer = 5f; introRoot.gameObject.SetActive(true); introRoot.SetAsLastSibling();
+                }
+            }
         }
     }
 
@@ -1824,6 +1834,14 @@ public class GameController : MonoBehaviour
             dt.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             dt.gameObject.SetActive(false); pushDots.Add(dt);
         }
+        frenzyDots.Clear();
+        var fm = Art.Mat(new Color(1f, 0.5f, 0.78f), 0.5f, 0, 0.9f);
+        for (int i = 0; i < 4 * 7; i++)
+        {
+            var fd = Art.Prim(PrimitiveType.Sphere, aimRoot, Vector3.zero, Vector3.one * 0.1f, fm);
+            fd.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            fd.gameObject.SetActive(false); frenzyDots.Add(fd);
+        }
         aimX = Art.Prim(PrimitiveType.Cube, aimRoot, Vector3.zero, new Vector3(0.3f, 0.05f, 0.08f), Art.Mat(Color.white, 0.5f, 0, 1f), new Vector3(0, 45, 0));
         Art.Prim(PrimitiveType.Cube, aimX, Vector3.zero, new Vector3(1, 1, 1), aimX.GetComponent<Renderer>().sharedMaterial, new Vector3(0, 90, 0)).localScale = new Vector3(1, 1, 1);
         aimX.gameObject.SetActive(false);
@@ -1864,6 +1882,7 @@ public class GameController : MonoBehaviour
         aimVisible = drag != null && !moving;
         foreach (var d in aimDots) d.gameObject.SetActive(false);
         foreach (var d in pushDots) d.gameObject.SetActive(false);
+        foreach (var d in frenzyDots) d.gameObject.SetActive(false);
         aimX.gameObject.SetActive(false); aimTarget.gameObject.SetActive(false); aimGrab.gameObject.SetActive(false);
         band.enabled = band2.enabled = false; aimCount.gameObject.SetActive(false); powerTxt.gameObject.SetActive(false);
         if (drag == null || moving) { powerStep = 0; return; }
@@ -1966,6 +1985,19 @@ public class GameController : MonoBehaviour
                 pushDots[i].gameObject.SetActive(true); pushDots[i].position = W(q, 0.32f);
                 pushDots[i].localScale = Vector3.one * Mathf.Lerp(0.13f, 0.06f, i / (float)pushDots.Count);
             }
+        }
+        // FRENZY ready: show the fan of 4 extra ducks this shot will release (same angles as Launch)
+        if (frenzyReady)
+        {
+            float baseA = Mathf.Atan2(dir.y, dir.x); int fi = 0;
+            foreach (float off in new[] { -0.3f, -0.15f, 0.15f, 0.3f })
+                for (int k = 0; k < 7; k++)
+                {
+                    var q = drag.p + new Vector2(Mathf.Cos(baseA + off), Mathf.Sin(baseA + off)) * (drag.r + 30 + k * 40 + Mathf.Repeat(Time.unscaledTime * 70f, 40f));
+                    if (q.x < TX + 10 || q.x > TX + TW - 10 || q.y < TY + 10) { fi++; continue; }
+                    var fd = frenzyDots[fi++]; fd.gameObject.SetActive(true); fd.position = W(q, 0.32f);
+                    fd.localScale = Vector3.one * Mathf.Lerp(0.24f, 0.12f, k / 6f);
+                }
         }
         // billiard preview: where the knocked duck will go
         if (hitDuck != null)
@@ -2311,7 +2343,7 @@ public class GameController : MonoBehaviour
         }
         var fl = UIKit.Outlined(UIKit.Label(feverBar, "FRENZY", 30, Color.white, TextAnchor.MiddleLeft), new Color(0.6f, 0.15f, 0.4f), 3); UIKit.Place(fl.rectTransform, 0, 0.5f, 110, 0, 200, 60);
         feverTxt = UIKit.Outlined(UIKit.Label(feverBar, "0 / 70", 36, Color.white), Ink, 3); UIKit.Place(feverTxt.rectTransform, 0.5f, 0.5f, 0, 0, 600, 60);
-        feverHint = UIKit.Label(feverBar, "đầy = bắn 5 vịt", 24, new Color(1f, 1f, 1f, 0.85f), TextAnchor.MiddleRight); UIKit.Place(feverHint.rectTransform, 1, 0.5f, -120, 0, 220, 60);
+        feverHint = UIKit.Label(feverBar, "phá 1 món = +1", 24, new Color(1f, 1f, 1f, 0.85f), TextAnchor.MiddleRight); UIKit.Place(feverHint.rectTransform, 1, 0.5f, -120, 0, 220, 60);
         feverPop = UIKit.Outlined(UIKit.Label(hud, "", 46, new Color(1f, 0.55f, 0.8f)), Color.white, 3); UIKit.Place(feverPop.rectTransform, 0.5f, 1, 300, -262, 400, 70);
         feverPop.raycastTarget = false; feverPop.gameObject.SetActive(false);
         streakTxt = UIKit.Label(topIn, "", 26, new Color(1f, 0.8f, 0.35f), TextAnchor.MiddleRight); UIKit.Place(streakTxt.rectTransform, 1, 0.5f, -265, -70, 300, 40);
@@ -2602,8 +2634,8 @@ public class GameController : MonoBehaviour
         feverGhost.anchorMax = new Vector2(Mathf.Clamp01((feverShown + ghost) / FEVER_MAX), 1);
         feverFill.GetComponent<Image>().color = frenzyReady ? Color.HSVToRGB(t * 0.8f % 1, 0.6f, 1f) : new Color(1f, 0.42f, 0.68f);
         int shownF = Mathf.RoundToInt(feverShown);
-        if (frenzyReady) { if (feverMode != 2) { feverMode = 2; feverTxt.text = "FRENZY SẴN SÀNG!"; feverHint.text = "phát sau bắn 5 vịt"; } }
-        else if (shownF != feverShownInt || feverMode != 1) { feverMode = 1; feverShownInt = shownF; feverTxt.text = shownF + " / " + (int)FEVER_MAX; feverHint.text = "đầy = bắn 5 vịt"; }
+        if (frenzyReady) { if (feverMode != 2) { feverMode = 2; feverTxt.text = "SẴN SÀNG: 5 VỊT!"; feverHint.text = "phát sau xuyên phá"; } }
+        else if (shownF != feverShownInt || feverMode != 1) { feverMode = 1; feverShownInt = shownF; feverTxt.text = shownF + " / " + (int)FEVER_MAX; feverHint.text = "phá 1 món = +1"; }
         feverBar.localScale = Vector3.one * (frenzyReady ? 1f + Mathf.Sin(Time.unscaledTime * 6f) * 0.025f : 1f);
         if (feverPopT > 0)
         {
@@ -2630,7 +2662,11 @@ public class GameController : MonoBehaviour
             var nt = NextTier(shotSmash);
             string sub = nt.kind != null ? "\n<size=44>còn " + (nt.need - shotSmash) + " → " + nt.name + "</size>"
                        : nt.maxed ? "\n<size=44>" + nt.name + "!</size>" : "";
-            comboTxt.text = "PHÁ " + shotSmash + (shotBanks > 0 ? "\n<size=44>điểm x" + (shotBanks + 1) + "</size>" : "");
+            string nextTier = "";
+            if (level > LevelLibrary.Onboarding)
+                for (int ti = TIERS.Length - 1; ti >= 0; ti--)   // TIERS run big -> small: find the smallest one not yet reached
+                    if (shotSmash < TIERS[ti].need && LevelLibrary.Unlocked(TIERS[ti].kind, level)) { nextTier = "\n<size=40>còn " + (TIERS[ti].need - shotSmash) + " → " + Cap(TIERS[ti].name) + "</size>"; break; }
+            comboTxt.text = "PHÁ " + shotSmash + nextTier + (shotBanks > 0 ? "\n<size=40>điểm x" + (shotBanks + 1) + "</size>" : "");
             }
             comboTxt.color = shotSmash >= 25 ? Color.HSVToRGB(t * 1.5f % 1f, 0.55f, 1f) : shotSmash >= 16 ? new Color(1f, 0.35f, 0.2f) : shotSmash >= 10 ? new Color(1f, 0.6f, 0.3f) : Yellow;
             comboTxt.rectTransform.localScale = Vector3.one * (1 + comboPulse * 2.5f + Mathf.Min(shotSmash, 30) * 0.006f);
