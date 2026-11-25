@@ -1220,9 +1220,17 @@ public class GameController : MonoBehaviour
         }
     }
 
+    float lastBoomT = -9f; int boomChain;
     void Explode(Vector2 p, float R, int dmg)
     {
         HitStop(0.05f); Shake(0.45f); Flash(0.28f);
+        boomChain = t - lastBoomT < 0.5f ? boomChain + 1 : 1; lastBoomT = t;
+        if (state == "play" && (boomChain == 3 || boomChain == 6 || boomChain == 10))
+        {   // chain reaction: give it a moment of slow motion so the player can enjoy it
+            BigText(boomChain >= 10 ? "SIÊU NỔ x" + boomChain + "!" : boomChain >= 6 ? "NỔ LIÊN HOÀN x" + boomChain + "!" : "NỔ DÂY CHUYỀN!", new Color(1f, 0.6f, 0.3f));
+            slowTimer = Mathf.Max(slowTimer, 0.35f + boomChain * 0.03f); camZoom = Mathf.Max(camZoom, 0.55f);
+            Sfx.Play("combo", 0.9f, 0.9f + boomChain * 0.04f);
+        }
         AddRing(p, R * 1.3f, new Color(1f, 0.75f, 0.35f, 0.5f));
         FxKit.Explosion(W(p), R * K * 0.6f);
         Debris(p, new Color(1f, 0.7f, 0.28f), 16, 1.5f); Debris(p, new Color(1f, 0.35f, 0.2f), 10, 1.2f);
