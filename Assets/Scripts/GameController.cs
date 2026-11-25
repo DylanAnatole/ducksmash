@@ -30,7 +30,7 @@ public class GameController : MonoBehaviour
         // special (combo-reward) ducks are one-use: after their power fires they turn back into a normal duck
         public RectTransform tag; public string tagKind;
         public bool inWhirl;
-        public bool special, spent, rainbowReady; public float rocketT, spawnT, stretch, pullVis, bankCd; public TrailRenderer trail; public Color ringCol = Color.clear;
+        public bool special, spent, rainbowReady; public float rocketT, spawnT, stretch, pullVis, bankCd, portalCd; public TrailRenderer trail; public Color ringCol = Color.clear;
     }
     // combo tiers: smashing this many in ONE shot hatches a special duck
     static readonly (int need, string kind, string name, Color col)[] TIERS =
@@ -65,6 +65,10 @@ public class GameController : MonoBehaviour
     readonly List<Bumper> bumpers = new List<Bumper>();
     class Whirl { public Vector2 p; public float r; public Transform view; public float spin; }
     readonly List<Whirl> whirls = new List<Whirl>();
+    class Portal { public Vector2 a, b; public Transform sa, sb; public Color c; }
+    readonly List<Portal> portals = new List<Portal>();
+    const float PORTAL_R = 24f;
+    bool portalTaught;
     const float WHIRL_TURN = 11f;   // rad/s at the centre: a full-power pass bends ~25-30 deg, a soft one much more
     // how fast (rad/s) the water turns a moving duck at this point; 0 outside every whirlpool
     float WhirlTurn(Vector2 p, out float depth)
@@ -89,7 +93,7 @@ public class GameController : MonoBehaviour
     int level, moves, startMoves, shotSmash, streak, pushes, score, stars, reward;
     static float fever; static bool frenzyReady;
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { fever = 0; frenzyReady = false; trailMat = null; pipMat = null; contactMat = null; tagDuckIcon = null; templates.Clear(); tplRoot = null; }
+    static void ResetStatics() { fever = 0; frenzyReady = false; trailMat = null; pipMat = null; contactMat = null; portalHole = null; tagDuckIcon = null; templates.Clear(); tplRoot = null; }
 
     // Building a block from primitives + baking it costs ~0.5 ms; cloning a cached template is ~20x cheaper.
     // Every block/duck kind is built ONCE (under an inactive root) and Instantiate()d afterwards.
@@ -265,7 +269,7 @@ public class GameController : MonoBehaviour
         world = new GameObject("World").transform; fx = new GameObject("FX").transform;
         foreach (var bt in bits) if (bt.t) { bt.t.gameObject.SetActive(false); bitPools[bt.type].Push(bt.t); }   // debris pool persists across levels
         foreach (var w in whirls) if (w.view) Destroy(w.view.gameObject);
-        whirls.Clear();
+        whirls.Clear(); portals.Clear(); portalTaught = false;
         ducks.Clear(); blocks.Clear(); bumpers.Clear(); timers.Clear(); bits.Clear(); bitPool.Clear(); rings.Clear(); zaps.Clear(); dying.Clear();
         foreach (var c in coins) if (c.rt) Destroy(c.rt.gameObject);
         coins.Clear(); slowTimer = camZoom = rushTimer = 0; rushLeft = rushCoins = 0; movesAtClear = -1; displayScore = 0;
@@ -338,6 +342,13 @@ public class GameController : MonoBehaviour
             w.view = Art.Prim(PrimitiveType.Quad, world, W(w.p, 0.025f), new Vector3(w.r * 2 * K, w.r * 2 * K, 1f), Art.SwirlMat(), new Vector3(90, 0, 0));
             var sh = w.view.GetComponent<Renderer>(); sh.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; sh.receiveShadows = false;
             whirls.Add(w);
+        }
+        int pIdx = 0;
+        foreach (var pd in L.portals)
+        {
+            var pt = new Portal { a = new Vector2(pd.x, pd.y), b = new Vector2(pd.z, pd.w), c = pIdx++ % 2 == 0 ? new Color(1f, 0.62f, 0.3f) : new Color(0.35f, 0.82f, 1f) };
+            pt.sa = PortalView(pt.a, pt.c); pt.sb = PortalView(pt.b, pt.c);
+            portals.Add(pt);
         }
         if (aimRoot == null) BuildAim(); else aimVisible = true;
         ShowIntro(L);
@@ -867,6 +878,23 @@ public class GameController : MonoBehaviour
                 if (om <= 0) { d.inWhirl = false; continue; }
                 if (!d.inWhirl) { d.inWhirl = true; Sfx.Play("splash", 0.6f, 0.7f); FxKit.Ripple(W(d.p), 0.9f); FxKit.Splash(W(d.p), 4, 0.7f); }
                 d.v = Rot(d.v, om * dt) * Mathf.Exp(-1.6f * dep * dt);   // turn + a little drag so nobody circles forever
+            }
+        if (portals.Count > 0)
+            for (int di = 0; di < ducks.Count; di++)
+            {
+                var d = ducks[di]; d.portalCd = Mathf.Max(0, d.portalCd - dt);
+                if (d.portalCd > 0 || d.v.sqrMagnitude < 60 * 60) continue;
+                foreach (var pt in portals)
+                {
+                    bool inA = (d.p - pt.a).sqrMagnitude < PORTAL_R * PORTAL_R, inB = !inA && (d.p - pt.b).sqrMagnitude < PORTAL_R * PORTAL_R;
+                    if (!inA && !inB) continue;
+                    Vector2 from = inA ? pt.a : pt.b, to = inA ? pt.b : pt.a;
+                    d.p = to + d.v.normalized * 4f; d.portalCd = 0.6f; d.squash = 0.25f;
+                    if (d.trail) d.trail.Clear();
+                    TeleportFx(from, to, pt.c);
+                    if (!portalTaught) { portalTaught = true; PopText("CHUI CỐNG!", to + new Vector2(0, -50), pt.c, 52); }
+                    break;
+                }
             }
         for (int di = 0; di < ducks.Count; di++)
         {
@@ -1959,7 +1987,7 @@ public class GameController : MonoBehaviour
         aimPath.Clear(); aimPath.Add(drag.p);
         float aimSpeed = Mathf.Max(300f, MAX_SPEED * Mathf.Pow(Mathf.Max(pv.z, 18) / MAX_PULL, 0.8f));
         Vector2 gp = drag.p, gv = dir; float len = (260 + pv.z * 4.5f) * (level <= 5 ? 1.45f : 1f), stepL = 5; Duck hitDuck = null; Vector2? firstContact = null; Block hitRing = null;
-        aimHits.Clear(); int dmg = drag.kind == "rocket" ? 3 : drag.Dmg; bool pierce = frenzyReady;
+        aimHits.Clear(); int dmg = drag.kind == "rocket" ? 3 : drag.Dmg; bool pierce = frenzyReady; int jumpIdx = -1;
         bool rocketAim = drag.kind == "rocket" && !drag.spent;
         if (rocketAim) { len = ROCKET_SPEED * ROCKET_TIME * 0.85f; pc = new Color(1f, 0.55f, 0.2f); }   // rocket flies full thrust whatever the pull
         for (float s = 0; s < len; s += stepL)
@@ -1968,6 +1996,14 @@ public class GameController : MonoBehaviour
             if (whirls.Count > 0 && drag.kind != "rocket") { float om = WhirlTurn(gp, out _); if (om > 0) gv = Rot(gv, om * stepL / aimSpeed * 1.1f); }
             if (TubWalls(ref gp, ref gv, drag.r, 1f)) aimPath.Add(gp);
             gv.Normalize();
+            if (jumpIdx < 0 && s > 10)
+                foreach (var pt in portals)
+                {
+                    bool inA = (gp - pt.a).sqrMagnitude < PORTAL_R * PORTAL_R, inB = !inA && (gp - pt.b).sqrMagnitude < PORTAL_R * PORTAL_R;
+                    if (!inA && !inB) continue;
+                    aimPath.Add(gp); gp = (inA ? pt.b : pt.a) + gv * 4f; jumpIdx = aimPath.Count; aimPath.Add(gp);
+                    break;
+                }
             foreach (var o in ducks) if (o != drag && Vector2.Distance(o.p, gp) < o.r + drag.r) { hitDuck = o; break; }
             bool stop = hitDuck != null;
             if (!stop)
@@ -1993,10 +2029,11 @@ public class GameController : MonoBehaviour
         aimPath.Add(gp);
 
         // marching dots along the path (they flow toward the target)
-        float total = 0; for (int i = 1; i < aimPath.Count; i++) total += Vector2.Distance(aimPath[i - 1], aimPath[i]);
+        float total = 0; for (int i = 1; i < aimPath.Count; i++) if (i != jumpIdx) total += Vector2.Distance(aimPath[i - 1], aimPath[i]);
         const float gap = 22f; float at = drag.r + 8 + Mathf.Repeat(Time.unscaledTime * 80f, gap), walked = 0; int used = 0;
         for (int i = 1; i < aimPath.Count && used < aimDots.Count; i++)
         {
+            if (i == jumpIdx) continue;   // the hop through the pipe is not drawn
             Vector2 a = aimPath[i - 1], b = aimPath[i]; float seg = Vector2.Distance(a, b);
             while (at <= walked + seg && used < aimDots.Count)
             {
@@ -2220,6 +2257,11 @@ public class GameController : MonoBehaviour
             }
             else dd.t.localScale = dd.s0 * (f < 0.4f ? Mathf.Lerp(1f, 1.35f, f / 0.4f) : Mathf.Lerp(1.35f, 0f, (f - 0.4f) / 0.6f));   // quick puff-up then vanish
         }
+        foreach (var pt in portals)
+        {
+            if (pt.sa) pt.sa.Rotate(0, 200f * dt, 0, Space.World);
+            if (pt.sb) pt.sb.Rotate(0, 200f * dt, 0, Space.World);
+        }
         foreach (var w in whirls)
             if (w.view)
             {
@@ -2228,6 +2270,32 @@ public class GameController : MonoBehaviour
                 if (UnityEngine.Random.value < dt * (App.Mobile ? 0.8f : 2f)) FxKit.Bubble(W(w.p + UnityEngine.Random.insideUnitCircle * 8f));   // bubbles well up from the eye
             }
         foreach (var m in bumpers) { m.pulse = Mathf.Max(0, m.pulse - dt); m.view.localScale = new Vector3(1 + m.pulse * 2, 1, 1); }
+    }
+
+    // a drain-pipe mouth on the water: dark swirling hole + a coloured glow ring (each pair shares a colour)
+    Transform PortalView(Vector2 p, Color c)
+    {   // dark hole + spinning foam swirl + solid coloured rim (each pair shares a colour) + soft glow
+        float D = PORTAL_R * 2f * K;
+        var hole = Art.Prim(PrimitiveType.Quad, world, W(p, 0.028f), new Vector3(D * 1.05f, D * 1.05f, 1f), PortalHoleMat(), new Vector3(90, 0, 0));
+        var swirl = Art.Prim(PrimitiveType.Quad, world, W(p, 0.031f), new Vector3(D, D, 1f), Art.SwirlMat(), new Vector3(90, 0, 0));
+        var rim = Art.Prim(PrimitiveType.Quad, world, W(p, 0.034f), new Vector3(D * 1.3f, D * 1.3f, 1f), Art.RingShared(new Color(c.r, c.g, c.b, 1f)), new Vector3(90, 0, 0));
+        var glow = Art.Prim(PrimitiveType.Quad, world, W(p, 0.036f), new Vector3(D * 1.75f, D * 1.75f, 1f), Art.Glow(new Color(c.r, c.g, c.b, 0.55f)), new Vector3(90, 0, 0));
+        foreach (var t in new[] { hole, swirl, rim, glow }) { var r = t.GetComponent<Renderer>(); r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false; }
+        return swirl;
+    }
+    static Material portalHole;
+    static Material PortalHoleMat()
+    {
+        if (portalHole == null) { portalHole = Art.Fade(new Color(0.04f, 0.07f, 0.2f, 0.9f)); portalHole.mainTexture = BlobTex(); portalHole.renderQueue = 2985; }
+        return portalHole;
+    }
+
+    void TeleportFx(Vector2 from, Vector2 to, Color c)
+    {
+        FxKit.Splash(W(from), 5, 0.8f); FxKit.Splash(W(to), 7, 1.1f);
+        var cc = c; cc.a = 0.85f; FxKit.Shockwave(W(from), 1.6f, cc, 0.25f); FxKit.Shockwave(W(to), 2.2f, cc, 0.3f);
+        FxKit.Sparkle(W(to, 0.3f), c, 6);
+        Sfx.Play("pop", 0.7f, 0.6f); Sfx.Play("splash", 0.6f, 1.4f);
     }
 
     void Splash(Vector2 p, int n) => FxKit.Splash(W(p), Mathf.Max(3, n), n > 12 ? 1.4f : 1f);
@@ -2620,6 +2688,7 @@ public class GameController : MonoBehaviour
         sb.Append("\n• Nảy tường rồi phá: điểm x2\n• Đầy FRENZY: phát sau bắn 5 vịt");
         if (level >= 17 && !LevelLibrary.IsSandbox(level)) sb.Append("\n• Phao bơi: bắn trúng → trượt húc vỡ đồ");
         if (whirls.Count > 0) sb.Append("\n• Xoáy nước: bẻ cong đường bay (bắn nhẹ cong nhiều)");
+        if (portals.Count > 0) sb.Append("\n• Cống nước: chui vào 1 đầu, trồi ra đầu cùng màu");
         if (blocks.Any(b => b.type == "ice" && b.alive)) sb.Append("\n• Đồ đóng băng: cú đầu vỡ băng, cú sau mới vỡ");
         if (blocks.Any(b => b.type == "gold" && b.mvAmp > 0 && b.alive)) sb.Append("\n• Bánh vàng trôi ở mép trên: trúng = +1 lượt");
         guideBody.text = sb.ToString();

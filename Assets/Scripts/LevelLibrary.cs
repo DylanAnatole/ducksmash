@@ -20,6 +20,7 @@ public class LevelDef
     public List<BlockDef> blocks = new List<BlockDef>();
     public List<BumperDef> bumpers = new List<BumperDef>();
     public List<Vector3> whirls = new List<Vector3>();   // whirlpools: x, y, radius (sim px) - bend passing ducks
+    public List<Vector4> portals = new List<Vector4>();  // drain pipes: (ax, ay, bx, by) - a duck that swims into one end pops out of the other
 }
 
 // 25 levels: 1-5 onboarding (one new idea each), 6-25 gameplay (boss at 10/15/20/25).

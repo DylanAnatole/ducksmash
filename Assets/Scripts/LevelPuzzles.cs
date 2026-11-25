@@ -53,6 +53,7 @@ public static partial class LevelLibrary
     // "bait" ducks parked out on the water: shoot a duck into them and they fly off and smash too (billiards)
     static void Bait(LevelDef d, params float[] xy) { for (int i = 0; i + 1 < xy.Length; i += 2) d.ducks.Add(new DuckDef(xy[i], xy[i + 1], "normal")); }
     static void Whirl(LevelDef d, float x, float y, float r) => d.whirls.Add(new Vector3(x, y, r));
+    static void Pipe(LevelDef d, float ax, float ay, float bx, float by) => d.portals.Add(new Vector4(ax, ay, bx, by));
     static LevelDef Ducks(LevelDef d, params string[] kinds)
     {
         var spots = kinds.Length <= 3 ? new[] { (150f, 805f), (270f, 805f), (390f, 805f) }
@@ -114,11 +115,11 @@ public static partial class LevelLibrary
                 Duck(d, 62, 455, "heavy"); Duck(d, 478, 455); Duck(d, 62, 570, "zap"); Duck(d, 478, 570);
                 return d;
             case 19:   // ducks on the LEFT behind a long wall; the whirlpool at its foot curls shots round to the right
-                d.moves = 7; d.hint = "Vịt sau tường: vòng qua xoáy nước hoặc bay qua đỉnh tường";
+                d.moves = 6; d.hint = "Cống nước: chui vào 1 đầu, trồi ra đầu kia!";
                 Pic(d, "boat", 13);
                 StoneCol(d, 210, 400, 640);
                 Mix(d, 290, 470, 400, 640, "soap", "glass", "vase", "glass", "plates");
-                Whirl(d, 230, 740, 62);
+                Pipe(d, 110, 760, 380, 340);   // the pipe under the ducks comes out right above the pile
                 Duck(d, 110, 440); Duck(d, 110, 530, "heavy"); Duck(d, 110, 620);
                 return d;
             case 20:   // HARD: the ducks start in the MIDDLE; the mess is all around the edges - shoot every direction
@@ -197,8 +198,9 @@ public static partial class LevelLibrary
                     d.blocks.Add(B("bathbomb", x0 + 120, y));
                 }
                 Mix(d, 430, 470, 220, 260, "plates", "glass");
+                Pipe(d, 465, 822, 300, 230);   // bottom-right corner pipe pops out at the top step
                 Duck(d, 80, 240); Duck(d, 160, 240, "heavy"); Duck(d, 80, 330);
-                Bait(d, 380, 800, 450, 800);
+                Bait(d, 370, 800);
                 return d;
             case 28:   // ducks on the SIDE WALLS and at the bottom, two ice lanes across the middle
                 d.moves = 8; d.hint = "Vịt khắp nơi: bắn ngang phá băng, đẩy phao lên";
@@ -206,6 +208,7 @@ public static partial class LevelLibrary
                 Ring(d, 190, 330); Ring(d, 350, 330);
                 Fill(d, "ice", 150, 390, 410, 410); Fill(d, "ice", 150, 390, 630, 630);
                 Mix(d, 150, 390, 470, 570, "glass", "vase", "soap", "plates");
+                Pipe(d, 270, 700, 270, 330);   // straight up through the ice lanes
                 Duck(d, 70, 520); Duck(d, 470, 520, "zap"); Duck(d, 270, 790, "heavy");
                 return d;
             case 29:   // everything at once; two ducks stand in the alley between the pile and the fort
