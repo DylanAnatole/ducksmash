@@ -781,9 +781,9 @@ public class GameController : MonoBehaviour
                 float mx = 0; for (int i = 0; i < ducks.Count; i++) mx = Mathf.Max(mx, ducks[i].v.sqrMagnitude);
                 if (mx < 70 * 70) { float k = Mathf.Exp(-6f * dt); for (int i = 0; i < ducks.Count; i++) ducks[i].v *= k; }
                 shotClock += dt;
-                if (shotClock > 8f)
-                {   // safety net: currents / pads must never keep a turn going forever
-                    float k = Mathf.Exp(-2.5f * (shotClock - 8f) * dt);
+                if (shotClock > 6f)
+                {   // safety net: currents / pads must never keep a turn going forever (brakes harder the longer it runs)
+                    float k = Mathf.Exp(-(1.5f + 4f * (shotClock - 6f)) * dt);
                     for (int i = 0; i < ducks.Count; i++) ducks[i].v *= k;
                     for (int i = 0; i < blocks.Count; i++) if (blocks[i].alive) blocks[i].vel *= k;
                 }
@@ -938,7 +938,7 @@ public class GameController : MonoBehaviour
                 if (!d.inWhirl) { d.inWhirl = true; Sfx.Play("splash", 0.6f, 0.7f); FxKit.Ripple(W(d.p), 0.9f); FxKit.Splash(W(d.p), 4, 0.7f); }
                 d.v = Rot(d.v, om * dt) * Mathf.Exp(-1.6f * dep * dt);   // turn + a little drag so nobody circles forever
             }
-        if (flows.Count > 0)
+        if (flows.Count > 0 && (!moving || shotClock < 3.5f))   // after a few seconds the current lets go, so a turn never drags on
             for (int di = 0; di < ducks.Count; di++)
             {   // currents carry moving ducks along (resting ducks stay put so aiming is fair)
                 var d = ducks[di]; if (d.v.sqrMagnitude < 30 * 30 || d.rocketT > 0) continue;

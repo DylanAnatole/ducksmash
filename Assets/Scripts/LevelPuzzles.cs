@@ -132,15 +132,16 @@ public static partial class LevelLibrary
                 Pipe(d, 110, 760, 380, 340);   // the pipe under the ducks comes out right above the pile
                 Duck(d, 110, 440); Duck(d, 110, 530, "heavy"); Duck(d, 110, 620);
                 return d;
-            case 20:   // HARD: the ducks start in the MIDDLE; the mess is all around the edges - shoot every direction
-                d.moves = 10; d.hint = "MÀN KHÓ! Vịt ở giữa: bắn tỏa ra 4 phía";
-                Mix(d, 70, 470, 200, 240, "vase", "glass", "soap");
-                Mix(d, 70, 470, 780, 820, "glass", "soap", "vase");
-                Mix(d, 70, 110, 300, 740, "glass", "vase", "soap", "glass"); Mix(d, 430, 470, 300, 740, "soap", "glass", "vase", "glass");
-                d.blocks.Add(B("chest", 190, 300)); d.blocks.Add(B("chest", 350, 720));
-                d.blocks.Add(B("bathbomb", 190, 740)); d.blocks.Add(B("bathbomb", 350, 300));
-                d.blocks.Add(B("stone", 190, 520)); d.blocks.Add(B("stone", 350, 520));
-                Duck(d, 230, 470, "heavy"); Duck(d, 310, 470); Duck(d, 270, 560, "bomb");
+            case 20:   // HARD: the ducks sit in the MIDDLE of a ring of currents that runs round the bath; the mess is all around the edges
+                d.moves = 10; d.hint = "MÀN KHÓ! Dòng nước chạy vòng: thả vịt vào cho nước cuốn đi!";
+                Flow(d, 270, 360, 300, 56, "right"); Flow(d, 420, 505, 56, 234, "down");
+                Flow(d, 270, 650, 300, 56, "left"); Flow(d, 120, 505, 56, 234, "up");
+                Mix(d, 70, 470, 200, 260, "vase", "glass", "soap");
+                Mix(d, 70, 470, 740, 820, "glass", "soap", "vase");
+                Mix(d, 70, 70, 320, 680, "glass", "vase", "soap"); Mix(d, 470, 470, 320, 680, "soap", "glass", "vase");
+                d.blocks.Add(B("chest", 170, 300)); d.blocks.Add(B("chest", 370, 700));
+                d.blocks.Add(B("bathbomb", 370, 300)); d.blocks.Add(B("bathbomb", 170, 700));
+                Duck(d, 230, 490, "heavy"); Duck(d, 310, 490); Duck(d, 270, 570, "bomb");
                 return d;
             case 21:   // a duck sits INSIDE the laser grid, two more wait on the side walls
                 d.moves = 5; d.hint = "Vịt nằm giữa lưới laser: chạm laser, cả hàng nổ!";
