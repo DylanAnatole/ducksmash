@@ -51,7 +51,8 @@ public class GameController : MonoBehaviour
         public bool Goal => !Hard;   // single objective: smash EVERYTHING breakable in the tub (only stone + shelf boards stay)
         public bool Hard => type == "stone" || type == "plank";
     }
-    class Bumper { public float x, y, w, h, pulse; public Transform view; }
+    class Bumper { public float x, y, w, h, pulse, x0, y0, amp, speed; public bool vertical; public Transform view; }
+    float padClock;   // sim time that drives sliding pads (advances only in Step, so the sim stays deterministic)
     class Timer { public float t; public Action fn; }
     class Bit { public PrimitiveType type; public Transform t; public Vector3 v, spin, scale0; public float life, max; public bool grav; }
     class Ring { public Transform t; public Material m; public float life, max, r0, r1; public Color c; }
@@ -282,6 +283,7 @@ public class GameController : MonoBehaviour
         whirls.Clear(); portals.Clear(); portalTaught = false;
         foreach (var fl in flows) { if (fl.m) Destroy(fl.m); if (fl.mesh) Destroy(fl.mesh); }
         flows.Clear();
+        padClock = 0;
         ducks.Clear(); blocks.Clear(); bumpers.Clear(); timers.Clear(); bits.Clear(); bitPool.Clear(); rings.Clear(); zaps.Clear(); dying.Clear();
         foreach (var c in coins) if (c.rt) Destroy(c.rt.gameObject);
         coins.Clear(); slowTimer = camZoom = rushTimer = 0; rushLeft = rushCoins = 0; movesAtClear = -1; displayScore = 0;
@@ -344,7 +346,7 @@ public class GameController : MonoBehaviour
         BuildLines();
         foreach (var bd in L.bumpers)
         {
-            var bu = new Bumper { x = bd.x, y = bd.y, w = bd.w, h = bd.h };
+            var bu = new Bumper { x = bd.x, y = bd.y, w = bd.w, h = bd.h, x0 = bd.x, y0 = bd.y, amp = bd.amp, speed = bd.speed, vertical = bd.vertical };
             bu.view = Art.Bumper(world, bd.w * K, bd.h * K); bu.view.position = W(bd.x + bd.w / 2, bd.y + bd.h / 2);
             bumpers.Add(bu);
         }
@@ -895,6 +897,13 @@ public class GameController : MonoBehaviour
 
     void Step(float dt)
     {
+        padClock += dt;
+        foreach (var m in bumpers)
+            if (m.amp > 0)
+            {
+                float o = Mathf.Sin(padClock * m.speed) * m.amp;
+                if (m.vertical) m.y = m.y0 + o; else m.x = m.x0 + o;
+            }
         SlideRings(dt);
         if (whirls.Count > 0)
             for (int di = 0; di < ducks.Count; di++)
@@ -2031,6 +2040,8 @@ public class GameController : MonoBehaviour
             if (whirls.Count > 0 && drag.kind != "rocket") { float om = WhirlTurn(gp, out _); if (om > 0) gv = Rot(gv, om * stepL / aimSpeed * 1.1f); }
             if (flows.Count > 0 && drag.kind != "rocket") { var fdir = FlowAt(gp); if (fdir != Vector2.zero) gv = (gv * aimSpeed + fdir * FLOW_ACC * stepL / aimSpeed).normalized; }
             if (TubWalls(ref gp, ref gv, drag.r, 1f)) aimPath.Add(gp);
+            foreach (var m in bumpers)
+                if (CircleRect(gp, drag.r, m, out var bh)) { gp += bh.n * bh.pen; Reflect(ref gv, bh.n, 1f); aimPath.Add(gp); }
             gv.Normalize();
             if (jumpIdx < 0 && s > 10)
                 foreach (var pt in portals)
@@ -2306,7 +2317,11 @@ public class GameController : MonoBehaviour
                 if (UnityEngine.Random.value < dt * 1.2f) FxKit.Ripple(W(w.p + UnityEngine.Random.insideUnitCircle * w.r * 0.5f), 0.5f);
                 if (UnityEngine.Random.value < dt * (App.Mobile ? 0.8f : 2f)) FxKit.Bubble(W(w.p + UnityEngine.Random.insideUnitCircle * 8f));   // bubbles well up from the eye
             }
-        foreach (var m in bumpers) { m.pulse = Mathf.Max(0, m.pulse - dt); m.view.localScale = new Vector3(1 + m.pulse * 2, 1, 1); }
+        foreach (var m in bumpers)
+        {
+            m.pulse = Mathf.Max(0, m.pulse - dt); m.view.localScale = new Vector3(1 + m.pulse * 2, 1, 1);
+            if (m.amp > 0) m.view.position = W(m.x + m.w / 2, m.y + m.h / 2);
+        }
     }
 
     // a drain-pipe mouth on the water: dark swirling hole + a coloured glow ring (each pair shares a colour)

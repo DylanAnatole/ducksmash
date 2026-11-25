@@ -10,7 +10,7 @@ public class BlockDef
     public bool shelf;   // plank drawn as a shelf: things it covers stand ON it and crash down when its legs go
 }
 public class DuckDef { public float x, y; public string kind; public DuckDef(float x, float y, string kind = "normal") { this.x = x; this.y = y; this.kind = kind; } }
-public class BumperDef { public float x, y, w, h; }
+public class BumperDef { public float x, y, w, h, amp, speed; public bool vertical; }   // amp > 0: the pad slides back and forth
 public class LevelDef
 {
     public int moves; public string hint = ""; public bool boss;

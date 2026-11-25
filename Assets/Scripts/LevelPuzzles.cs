@@ -49,6 +49,9 @@ public static partial class LevelLibrary
     static void Duck(LevelDef d, float x, float y, string k = "normal") => d.ducks.Add(new DuckDef(x, y, k));
     // rubber pad (bouncy bumper) given by its centre and size
     static void Pad(LevelDef d, float cx, float cy, float w, float h) => d.bumpers.Add(new BumperDef { x = cx - w / 2, y = cy - h / 2, w = w, h = h });
+    // sliding rubber pad: moves +-amp px along x (or y) at `speed` rad/s
+    static void MovingPad(LevelDef d, float cx, float cy, float w, float h, float amp, float speed = 1.6f, bool vertical = false)
+        => d.bumpers.Add(new BumperDef { x = cx - w / 2, y = cy - h / 2, w = w, h = h, amp = amp, speed = speed, vertical = vertical });
     static void Ring(LevelDef d, float x, float y) => d.blocks.Add(B("ring", x, y));
     // "bait" ducks parked out on the water: shoot a duck into them and they fly off and smash too (billiards)
     static void Bait(LevelDef d, params float[] xy) { for (int i = 0; i + 1 < xy.Length; i += 2) d.ducks.Add(new DuckDef(xy[i], xy[i + 1], "normal")); }
@@ -173,8 +176,9 @@ public static partial class LevelLibrary
                 Duck(d, 90, 520, "heavy"); Duck(d, 90, 430); Duck(d, 270, 830);
                 return d;
             case 24:   // the ducks sit at the TOP; everything is below them - shoot down into the bath
-                d.moves = 7; d.hint = "Vịt ở trên cao: kéo lên, bắn xuống!";
+                d.moves = 8; d.hint = "Vịt trên cao: canh đệm trượt rồi bắn xuống cửa!";
                 Fort(d, 270, 600, "up");
+                MovingPad(d, 270, 390, 110, 14, 150, 1.2f);   // a sliding pad guards the door: wait for the gap
                 Mix(d, 70, 150, 420, 780, "glass", "vase", "soap"); Mix(d, 390, 470, 420, 780, "soap", "glass", "vase");
                 Fill(d, "soap", 190, 350, 790, 790);
                 Duck(d, 150, 260); Duck(d, 270, 240, "heavy"); Duck(d, 390, 260);
@@ -188,12 +192,12 @@ public static partial class LevelLibrary
                 Duck(d, 62, 630, "heavy"); Duck(d, 478, 630); Duck(d, 270, 800, "bomb");
                 return d;
             case 26:   // ducks on BOTH SIDE WALLS, a tall pile in the middle, rubber pads top and bottom for bank shots
-                d.moves = 8; d.hint = "Vịt ở hai bên: bắn ngang, nảy đệm cao su";
+                d.moves = 8; d.hint = "Vịt hai bên: canh đệm cao su trượt để bắn nảy!";
                 Pic(d, "star", 13, 200f);
                 Mix(d, 190, 350, 380, 740, "vase", "glass", "soap", "glass", "plates");
                 d.blocks.Add(B("stone", 270, 460)); d.blocks.Add(B("stone", 270, 660));
                 d.blocks.Add(B("bathbomb", 190, 560)); d.blocks.Add(B("bathbomb", 350, 560));
-                Pad(d, 270, 820, 200, 14);
+                MovingPad(d, 270, 820, 150, 14, 110, 1.4f);   // sliding pad: time the bank shot
                 Duck(d, 70, 440); Duck(d, 70, 660, "heavy"); Duck(d, 470, 440, "heavy"); Duck(d, 470, 660);
                 return d;
             case 27:   // staircase of bath bombs; the ducks are perched in the TOP-LEFT corner above the bottom step
