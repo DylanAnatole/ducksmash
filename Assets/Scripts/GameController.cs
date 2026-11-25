@@ -772,6 +772,13 @@ public class GameController : MonoBehaviour
             {   // pacing: once every duck is just drifting, brake harder so the turn ends without a dull wait
                 float mx = 0; for (int i = 0; i < ducks.Count; i++) mx = Mathf.Max(mx, ducks[i].v.sqrMagnitude);
                 if (mx < 70 * 70) { float k = Mathf.Exp(-6f * dt); for (int i = 0; i < ducks.Count; i++) ducks[i].v *= k; }
+                shotClock += dt;
+                if (shotClock > 8f)
+                {   // safety net: currents / pads must never keep a turn going forever
+                    float k = Mathf.Exp(-2.5f * (shotClock - 8f) * dt);
+                    for (int i = 0; i < ducks.Count; i++) ducks[i].v *= k;
+                    for (int i = 0; i < blocks.Count; i++) if (blocks[i].alive) blocks[i].vel *= k;
+                }
             }
             if (moving && timers.Count == 0 && AllStill()) { foreach (var d in ducks) d.v = Vector2.zero; EndShot(); }
             if (state == "play" && !moving && timers.Count == 0)
@@ -1227,7 +1234,7 @@ public class GameController : MonoBehaviour
         }
     }
 
-    float lastBoomT = -9f; int boomChain;
+    float lastBoomT = -9f, shotClock; int boomChain;
     void Explode(Vector2 p, float R, int dmg)
     {
         HitStop(0.05f); Shake(0.45f); Flash(0.28f);
@@ -1431,7 +1438,7 @@ public class GameController : MonoBehaviour
     // ---------- shooting ----------
     void Launch(Duck d, Vector2 v)
     {
-        d.v = v; d.hot = true; moves--; moving = true; shotSmash = 0; hint = ""; pushes = 0; frenzyShot = false; shotBanks = 0; shotClears = 0; dominoFalls = 0;
+        d.v = v; d.hot = true; moves--; moving = true; shotClock = 0; shotSmash = 0; hint = ""; pushes = 0; frenzyShot = false; shotBanks = 0; shotClears = 0; dominoFalls = 0;
         foreach (var k in ducks) k.charged = true;
         d.stretch = 0.22f; d.pullVis = 0;
         Sfx.Play("shoot"); Sfx.Play("squeak", 0.5f, 1.3f); Sfx.Buzz(18);
@@ -1562,7 +1569,7 @@ public class GameController : MonoBehaviour
             rushCoins += 5; SpawnCoin(d.p); SpawnCoin(d.p + Vector2.one * 10); FxKit.StarBurst(W(d.p, 0.5f), 10); Sfx.Play("coin", 0.6f, 1.1f);
         }
         d.v = dir * 1300; d.hot = true; d.frenzy = true; d.charged = true;
-        moving = true; shotSmash = 0; pushes = 0;
+        moving = true; shotClock = 0; shotSmash = 0; pushes = 0;
         Sfx.Play("shoot"); Sfx.Play("squeak", 0.5f, 1.4f); FxKit.Splash(W(d.p), 6);
         PopText("+" + (moves + 1), d.p, new Color(1f, 0.85f, 0.3f), 50);
         rushTimer = 0.12f;
