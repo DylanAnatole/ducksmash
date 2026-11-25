@@ -340,6 +340,12 @@ public class GameController : MonoBehaviour
             waterMat.SetColor("_Shift", LevelLibrary.IsSandbox(level) || level <= 12 ? new Color(1, 1, 1, 0)
                 : hardLevel ? new Color(0.25f, 0.35f, 0.8f, 0.45f)
                 : level <= 18 ? new Color(0.3f, 0.85f, 0.78f, 0.6f) : level <= 25 ? new Color(0.72f, 0.5f, 1f, 0.55f) : new Color(1f, 0.55f, 0.68f, 0.5f));
+        if (floorMat != null)
+        {   // the bathroom tiles follow the chapter too (subtle tint, so the screen doesn't look the same for 30 levels)
+            var fc = LevelLibrary.IsSandbox(level) || level <= 12 ? Color.white : hardLevel ? new Color(0.9f, 0.92f, 1f)
+                   : level <= 18 ? new Color(0.9f, 1f, 0.95f) : level <= 25 ? new Color(0.95f, 0.91f, 1f) : new Color(1f, 0.92f, 0.94f);
+            floorMat.color = fc; if (floorMat.HasProperty("_Color")) floorMat.SetColor("_Color", fc);
+        }
         boosterBusy = false; if (boosterCo != null) { StopCoroutine(boosterCo); boosterCo = null; }
         swoop = 1f; flashA = 0; curtainA = 1f; goalTotal = GoalsLeft(); shownLeft = -1; halfShown = false; idleT = 0; hintReady = false; hintSearch = -1; HideHint(); shownMoves = shownScore = shownStreak = -1; levelArt = L.art; hudTick = 0; comboShown = -1;
         bossBlock = blocks.FirstOrDefault(b => b.type == "boss");
@@ -400,13 +406,14 @@ public class GameController : MonoBehaviour
         }
     }
 
+    Material floorMat;
     void BuildTub()
     {
         // floor outside
         var ground = Art.NewPrim(PrimitiveType.Quad);
         ground.transform.SetParent(world, false); ground.transform.position = new Vector3(0, -0.35f, 0); ground.transform.eulerAngles = new Vector3(90, 0, 0); ground.transform.localScale = new Vector3(90, 90, 1);
         var gm = Art.Toon(Color.white, Art.TileTex(new Color(1f, 0.93f, 0.9f), new Color(0.96f, 0.88f, 0.87f)), new Vector2(22.5f, 22.5f), 0f);
-        ground.GetComponent<Renderer>().sharedMaterial = gm;
+        ground.GetComponent<Renderer>().sharedMaterial = gm; floorMat = gm;
         // soft shadow under the tub so it sits on the floor instead of floating on it
         var tubShadow = Art.NewPrim(PrimitiveType.Quad); tubShadow.transform.SetParent(world, false);
         tubShadow.transform.position = new Vector3(0.25f, -0.33f, -0.35f); tubShadow.transform.eulerAngles = new Vector3(90, 0, 0);
