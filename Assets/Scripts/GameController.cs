@@ -364,7 +364,7 @@ public class GameController : MonoBehaviour
         // floor outside
         var ground = Art.NewPrim(PrimitiveType.Quad);
         ground.transform.SetParent(world, false); ground.transform.position = new Vector3(0, -0.35f, 0); ground.transform.eulerAngles = new Vector3(90, 0, 0); ground.transform.localScale = new Vector3(90, 90, 1);
-        var gm = Art.Toon(Color.white, Art.TileTex(new Color(1f, 0.93f, 0.9f), new Color(0.93f, 0.82f, 0.82f)), new Vector2(22.5f, 22.5f), 0f);
+        var gm = Art.Toon(Color.white, Art.TileTex(new Color(1f, 0.93f, 0.9f), new Color(0.96f, 0.88f, 0.87f)), new Vector2(22.5f, 22.5f), 0f);
         ground.GetComponent<Renderer>().sharedMaterial = gm;
         // soft shadow under the tub so it sits on the floor instead of floating on it
         var tubShadow = Art.NewPrim(PrimitiveType.Quad); tubShadow.transform.SetParent(world, false);
