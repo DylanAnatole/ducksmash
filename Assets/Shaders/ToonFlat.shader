@@ -66,7 +66,7 @@ Shader "DuckSmash/ToonFlat"
 
                 half ndl = dot(n, l);
                 half atten = SHADOW_ATTENUATION(i);
-                half lit = smoothstep(0.0, 0.06, ndl) * smoothstep(0.3, 0.6, atten);
+                half lit = smoothstep(-0.08, 0.32, ndl) * smoothstep(0.3, 0.6, atten);
 
                 half3 c = col.rgb * lerp(_ShadowTint.rgb, half3(1,1,1), lit) * (0.55 + 0.5 * _LightColor0.rgb);
                 half3 h = normalize(l + v);

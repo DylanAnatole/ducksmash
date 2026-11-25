@@ -66,7 +66,7 @@ Shader "DuckSmash/Toon"
 
                 float ndl = dot(n, l);
                 float atten = SHADOW_ATTENUATION(i);
-                float lit = smoothstep(0.0, 0.06, ndl) * smoothstep(0.3, 0.6, atten);
+                float lit = smoothstep(-0.08, 0.32, ndl) * smoothstep(0.3, 0.6, atten);
 
                 float3 shade = lerp(_ShadowTint.rgb, float3(1,1,1), lit);
                 float3 c = col.rgb * shade * (0.55 + 0.5 * _LightColor0.rgb);
