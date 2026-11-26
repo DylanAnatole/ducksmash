@@ -529,6 +529,8 @@ public class GameController : MonoBehaviour
             Art.Prim(PrimitiveType.Sphere, root, new Vector3(x, 0.15f + hgt, top), new Vector3(0.55f, 0.3f, 0.55f), Art.Mat(body, 0.8f));
             Art.Prim(PrimitiveType.Cylinder, root, new Vector3(x, 0.32f + hgt, top), new Vector3(0.26f, 0.14f, 0.26f), Art.Mat(cap, 0.7f));
             Art.Prim(PrimitiveType.Cube, root, new Vector3(x, 0.15f + hgt * 0.5f, top - 0.27f), new Vector3(0.34f, hgt * 0.45f, 0.02f), Art.Mat(Color.white, 0.3f));   // label
+            var fh = Art.Root("DecorFace", root); fh.localPosition = new Vector3(x, 0.15f + hgt * 0.5f, top);
+            Art.Face(fh, new Vector3(0, -0.06f, -0.5f), 0.36f);   // the bathroom bottles are characters too
         }
         Bottle(-3.4f, new Color(0.55f, 0.82f, 1f), new Color(0.25f, 0.45f, 0.85f), 1.2f);
         Bottle(-2.7f, new Color(1f, 0.7f, 0.82f), new Color(0.9f, 0.35f, 0.55f), 0.9f);
@@ -539,6 +541,7 @@ public class GameController : MonoBehaviour
         Art.Prim(PrimitiveType.Cylinder, root, new Vector3(-1.5f, 0.95f, top), new Vector3(0.07f, 0.35f, 0.07f), Art.Mat(new Color(1f, 0.5f, 0.6f), 0.6f), new Vector3(0, 0, -10));
         // potted plant on the right
         Art.Prim(PrimitiveType.Cylinder, root, new Vector3(3.6f, 0.5f, top), new Vector3(0.8f, 0.35f, 0.8f), Art.Mat(new Color(0.93f, 0.55f, 0.4f), 0.4f));
+        { var ph = Art.Root("DecorFace", root); ph.localPosition = new Vector3(3.6f, 0.45f, top); Art.Face(ph, new Vector3(0, -0.05f, -0.65f), 0.46f); }
         var leaf = Art.Mat(new Color(0.45f, 0.8f, 0.45f), 0.5f); var leaf2 = Art.Mat(new Color(0.35f, 0.68f, 0.4f), 0.5f);
         for (int i = 0; i < 7; i++)
         {
