@@ -397,6 +397,7 @@ public class GameController : MonoBehaviour
         }
         if (aimRoot == null) BuildAim(); else aimVisible = true;
         MarkKeys();
+        bumpTeach = level > LevelLibrary.Onboarding && ducks.Count >= 3 && PlayerPrefs.GetInt("ds_bump_tut", 0) == 0;
         if (level > LevelLibrary.Onboarding && keyName != "" && !LevelLibrary.IsSandbox(level)) hint = "Câu đố: " + levelTip.Replace("MÀN KHÓ! ", "").Replace("SIÊU KHÓ! ", "");
         ShowIntro(L);
         popupRoot.gameObject.SetActive(false);
@@ -1056,7 +1057,8 @@ public class GameController : MonoBehaviour
                         a.v = Rot(a.v, UnityEngine.Random.Range(-0.06f, 0.06f)) * 1.08f; b.v = Rot(b.v, UnityEngine.Random.Range(-0.06f, 0.06f)) * 1.08f;
                         if (a.v.sqrMagnitude > cap * cap) a.v = a.v.normalized * cap; if (b.v.sqrMagnitude > cap * cap) b.v = b.v.normalized * cap;
                         a.hot = b.hot = true; a.squash = b.squash = 0.2f; var mid = (a.p + b.p) / 2;
-                        bool newBoost = !a.boost || !b.boost; a.boost = b.boost = true;   // both ducks are powered up: they now break 2 hits per touch
+                        bool newBoost = !a.boost || !b.boost; a.boost = b.boost = true;
+                        if (bumpTeach) { bumpTeach = false; PlayerPrefs.SetInt("ds_bump_tut", 1); PlayerPrefs.Save(); }   // both ducks are powered up: they now break 2 hits per touch
                         if (newBoost) { FxKit.Shockwave(W(mid), 2.6f, new Color(1f, 0.85f, 0.3f, 0.9f), 0.35f); FxKit.StarBurst(W(mid, 0.4f), 8); }
                         Splash(mid, 8); FxKit.Sparkle(W(mid), Color.white, 8); AddRing(mid, 38 + Mathf.Min(pushes, 6) * 6, new Color(0.55f, 0.95f, 1f, 0.75f)); Shake(0.15f); HitStop(0.03f); pushes++; shotSmash++; comboPulse = 0.18f;
                         PopText(LevelLibrary.Unlocked("zap", level) && pushes == ZAP_PUSHES ? "ĐỦ 3 CỐC → VỊT SÉT!" : pushes == 1 ? "TIẾP SỨC! phá x2" : LevelLibrary.Unlocked("zap", level) && pushes < ZAP_PUSHES ? "CỐC! " + pushes + "/" + ZAP_PUSHES : "CỐC x" + pushes + "!", mid, pushes == 1 ? new Color(1f, 0.85f, 0.3f) : Color.white, 46 + Mathf.Min(20, pushes * 4));
@@ -1959,9 +1961,25 @@ public class GameController : MonoBehaviour
 
     void HideHint() { hintShown = false; foreach (var h in hintDots) if (h.gameObject.activeSelf) h.gameObject.SetActive(false); }
 
+    bool bumpTeach;
     void UpdateHint(float rdt)
     {
         UpdateKeys(rdt);
+        if (bumpTeach && state == "play" && !moving && drag == null && introTimer <= 0 && shotsTaken == 0 && !Input.GetMouseButton(0) && ducks.Count >= 2)
+        {   // one-time lesson: show a shot from one duck straight into another (why there are several ducks)
+            int ia = -1, ib = -1; float best = 1e9f;
+            for (int i = 0; i < ducks.Count; i++) for (int j = 0; j < ducks.Count; j++)
+                {
+                    if (i == j) continue; var dl = ducks[j].p - ducks[i].p; float dd = dl.sqrMagnitude;
+                    if (dl.y < -20 && dd > 60 * 60 && dd < best) { best = dd; ia = i; ib = j; }   // the other duck sits in front (towards the blocks)
+                }
+            if (ia >= 0)
+            {
+                hintBestDuck = ia; hintBestDir = (ducks[ib].p - ducks[ia].p).normalized; PredictShot(ducks[ia], hintBestDir, hintPath);
+                hintReady = true; hintSearch = -1; idleT = Mathf.Max(idleT, 20f);
+                hint = "Thử bắn vịt HÚC vịt → vịt bị húc được TIẾP SỨC (phá x2)!";
+            }
+        }
         bool can = state == "play" && !moving && drag == null && introTimer <= 0 && target == null && ducks.Count > 0
                    && !popupRoot.gameObject.activeSelf && (guideRoot == null || !guideRoot.gameObject.activeSelf) && Time.timeScale > 0;
         if (!can || Input.GetMouseButton(0)) { idleT = 0; hintReady = false; hintSearch = -1; if (hintShown) HideHint(); return; }
