@@ -45,7 +45,7 @@ public class GameController : MonoBehaviour
     const int ZAP_PUSHES = 3;   // 3+ billiard knocks in one shot -> lightning duck
     class Block
     {
-        public Renderer[] faces; public bool scared, blinking; public float blinkT = UnityEngine.Random.Range(1f, 7f);
+        public Renderer[] faces; public bool scared, blinking; public float ouch; public float blinkT = UnityEngine.Random.Range(1f, 7f);
         public string type; public Vector2 p; public float w, h, r; public bool rect; public int hp, max; public bool alive = true;
         public float hit, falling; public Block under, plankRef; public List<Block> screws; public string dir; public Color color;
         public float mvCx, mvAmp, mvSp; public int pid; public Transform view; public Vector3 baseScale = Vector3.one;
@@ -1088,6 +1088,7 @@ public class GameController : MonoBehaviour
         }
         if (b.type == "boss") { dmg = Mathf.Min(dmg, 4); PopText("-" + dmg, b.p + new Vector2(UnityEngine.Random.Range(-40, 40), -60), new Color(1f, 0.35f, 0.2f), 56); Shake(0.2f); Sfx.Play("push", 1, 0.7f); }
         b.hp -= dmg; b.hit = 0.15f; UpdatePips(b);
+        if (b.hp > 0) Ouch(b, 0.5f);
         if (b.hp <= 0) { DestroyBlock(b); return true; }
         if (b.type == "ice")
         {
@@ -1274,6 +1275,7 @@ public class GameController : MonoBehaviour
     {
         HitStop(0.05f); Shake(0.45f); Flash(0.28f);
         boomChain = t - lastBoomT < 0.5f ? boomChain + 1 : 1; lastBoomT = t;
+        foreach (var nb in blocks) if (nb.alive && (nb.p - p).sqrMagnitude < (R + 110) * (R + 110)) Ouch(nb, 0.6f);
         if (state == "play" && (boomChain == 3 || boomChain == 6 || boomChain == 10))
         {   // chain reaction: give it a moment of slow motion so the player can enjoy it
             BigText(boomChain >= 10 ? "SIÊU NỔ x" + boomChain + "!" : boomChain >= 6 ? "NỔ LIÊN HOÀN x" + boomChain + "!" : "NỔ DÂY CHUYỀN!", new Color(1f, 0.6f, 0.3f));
@@ -2107,7 +2109,7 @@ public class GameController : MonoBehaviour
         if (drag == null || moving)
         {
             powerStep = 0;
-            foreach (var b in blocks) if (b.scared && b.faces != null) { b.scared = false; foreach (var f in b.faces) if (f) f.sharedMaterial = Art.FaceNormal(); }
+            foreach (var b in blocks) if (b.scared && b.faces != null && b.ouch <= 0) { b.scared = false; foreach (var f in b.faces) if (f) f.sharedMaterial = Art.FaceNormal(); }
             return;
         }
         // smoothed finger: the band and the dotted line glide instead of jittering
@@ -2260,7 +2262,7 @@ public class GameController : MonoBehaviour
         // the toys in the line of fire look worried
         foreach (var b in blocks)
         {
-            bool sc = b.alive && aimHits.Contains(b);
+            bool sc = b.alive && (aimHits.Contains(b) || b.ouch > 0);
             if (sc != b.scared && b.faces != null) { b.scared = sc; b.blinking = false; foreach (var f in b.faces) if (f) f.sharedMaterial = sc ? Art.FaceScared() : Art.FaceNormal(); }
         }
         bool rbAim = drag.kind == "rainbow" && !drag.spent;
@@ -2428,6 +2430,11 @@ public class GameController : MonoBehaviour
             }
             if (b.type == "plank" && b.falling > 0) { float f = Mathf.Min(1, b.falling / 0.35f); b.view.position = W(b.p, -f * 0.6f); }
             if (b.type == "laser") b.view.Find("Arrow").localScale = Vector3.one * (1 + Mathf.Sin(t * 8) * 0.08f);
+            if (b.ouch > 0)
+            {
+                b.ouch -= dt;
+                if (b.ouch <= 0 && b.scared && (drag == null || !aimHits.Contains(b))) { b.scared = false; foreach (var f in b.faces) if (f) f.sharedMaterial = Art.FaceNormal(); }
+            }
             if (b.faces != null && b.faces.Length > 0 && !b.scared)
             {   // the props blink now and then
                 b.blinkT -= dt;
@@ -2563,6 +2570,13 @@ public class GameController : MonoBehaviour
         keyPulse -= rdt; if (keyPulse > 0) return;
         keyPulse = 0.9f;
         foreach (var p in keyPts) FxKit.Shockwave(W(p, 0.05f), 2.4f, new Color(1f, 0.92f, 0.45f, 0.85f), 0.6f);
+    }
+
+    void Ouch(Block b, float time)
+    {
+        if (b.faces == null || b.faces.Length == 0) return;
+        b.ouch = Mathf.Max(b.ouch, time); b.blinking = false;
+        if (!b.scared) { b.scared = true; foreach (var f in b.faces) if (f) f.sharedMaterial = Art.FaceScared(); }
     }
 
     void Splash(Vector2 p, int n) => FxKit.Splash(W(p), Mathf.Max(3, n), n > 12 ? 1.4f : 1f);
