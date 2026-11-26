@@ -2326,12 +2326,13 @@ public class GameController : MonoBehaviour
                 : spd < 20 ? Quaternion.Euler(Mathf.Sin(t * 2.3f + d.p.y) * 4, Mathf.Sin(t * 1.7f + d.p.x) * 12, 0) : Quaternion.Euler(Mathf.Min(10, spd / 90f), 0, 0);
             // squash on hits, stretch along the shot on launch, squish down + elongate while being pulled
             d.body.localScale = new Vector3((1 + s) * (1 - st * 0.35f) * (1 - pw * 0.12f), (1 - s) * (1 - pw * 0.1f), (1 + s) * (1 + st) * (1 + pw * 0.22f));
-            d.ring.gameObject.SetActive(selectable || d.frenzy || (frenzyReady && !moving));
+            d.ring.gameObject.SetActive(selectable || d.frenzy || d.boost || (frenzyReady && !moving));
             if (d.ring.gameObject.activeSelf)
             {
                 float pulse = 1.8f + Mathf.Sin(t * 5 + d.p.x) * 0.08f + (dragged ? 0.25f + pw * 0.25f : 0);
                 d.ring.localScale = new Vector3(pulse, 0.01f, pulse);
-                Color rc = frenzyReady || d.frenzy ? new Color(1f, 0.5f, 0.75f, 0.6f)
+                Color rc = d.boost ? new Color(1f, 0.78f, 0.2f, 0.85f)   // powered up by a bump: gold ring
+                         : frenzyReady || d.frenzy ? new Color(1f, 0.5f, 0.75f, 0.6f)
                          : dragged ? (Color)(Color32)Color.Lerp(new Color(1, 1, 1, 0.7f), new Color(1f, 0.45f, 0.3f, 0.75f), powerStep / 4f)
                          : d.special ? new Color(1f, 0.8f, 0.3f, 0.6f) : new Color(0.45f, 0.9f, 0.55f, 0.42f);
                 if (d.ringCol != rc) { d.ringCol = rc; d.ring.GetComponent<Renderer>().sharedMaterial = Art.RingShared(rc); }   // only when the colour changes (the cache key is a string)
