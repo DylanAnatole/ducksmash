@@ -2853,7 +2853,6 @@ public class GameController : MonoBehaviour
             lbl.rectTransform.offsetMin = new Vector2(84, lbl.rectTransform.offsetMin.y);   // room for the icon
             var bIcon = UIKit.Rect("Icon", b.transform).gameObject.AddComponent<RawImage>(); bIcon.raycastTarget = false;
             UIKit.Place(bIcon.rectTransform, 0, 0.5f, 54, 4, 76, 76); bIcon.texture = BoosterIcon(k);
-            UIKit.Gloss(b.transform, 0.3f);
             boostTxt[k] = lbl; boostImg[k] = b.GetComponent<Image>();
         }
         // popup

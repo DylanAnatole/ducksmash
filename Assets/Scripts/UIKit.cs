@@ -236,8 +236,10 @@ public static class UIKit
     public static Button Btn(Transform parent, string label, Color bg, Color fg, int size, Action onClick, string name = "Button")
     {
         var img = Panel(parent, bg, name);
-        var sh = img.gameObject.AddComponent<Shadow>();
-        sh.effectColor = new Color(0, 0, 0, 0.25f); sh.effectDistance = new Vector2(0, -8);
+        var sh = img.gameObject.AddComponent<Shadow>();   // a darker lip of the same colour under the button: chunky, toy-like
+        var lip = Color.Lerp(bg, new Color(0.2f, 0.12f, 0.35f), 0.45f); lip.a = 1f;
+        sh.effectColor = lip; sh.effectDistance = new Vector2(0, -9);
+        Gloss(img.transform, 0.26f);
         var b = img.gameObject.AddComponent<Button>();
         var cb = b.colors; cb.pressedColor = new Color(0.85f, 0.85f, 0.85f); b.colors = cb;
         Label(img.transform, label, size, fg);

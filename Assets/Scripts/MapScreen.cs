@@ -66,8 +66,14 @@ public class MapScreen : MonoBehaviour
             var sh = img.gameObject.AddComponent<Shadow>(); sh.effectColor = new Color(0, 0, 0, 0.25f); sh.effectDistance = new Vector2(0, -10);
             var btn = img.gameObject.AddComponent<Button>(); btn.onClick.AddListener(() => { if (lvl <= SaveData.MaxLevel) { Sfx.Play("click"); App.StartLevel(lvl); } });
             var inner = UIKit.Dot(img.transform, Color.white, "Inner"); UIKit.Stretch(inner.rectTransform, 12, 12, 12, 12); inner.raycastTarget = false;
+            {   // glossy cap: the node reads as a shiny round candy instead of a flat disc
+                var gl = UIKit.Dot(inner.transform, new Color(1f, 1f, 1f, 0.3f), "Gloss"); gl.raycastTarget = false;
+                var grt = gl.rectTransform; grt.anchorMin = new Vector2(0.17f, 0.52f); grt.anchorMax = new Vector2(0.83f, 0.92f); grt.offsetMin = grt.offsetMax = Vector2.zero;
+                var sp = UIKit.Dot(inner.transform, new Color(1f, 1f, 1f, 0.75f), "Shine"); sp.raycastTarget = false;
+                var srt = sp.rectTransform; srt.anchorMin = srt.anchorMax = new Vector2(0.3f, 0.76f); srt.sizeDelta = new Vector2(size * 0.13f, size * 0.09f); srt.localEulerAngles = new Vector3(0, 0, 35);
+            }
             var num = UIKit.Outlined(UIKit.Label(img.transform, n.ToString(), boss ? 64 : 58, Color.white), Ink, 3);
-            var tag = UIKit.Label(img.transform, boss ? (LevelLibrary.IsSuperHard(n) ? "SIÊU KHÓ" : "KHÓ") : LevelLibrary.NewSpecialAt(n) != null ? "VỊT MỚI" : n == 19 ? "CỐNG NƯỚC" : n == 23 ? "DÒNG CHẢY" : n == 13 || n == 26 ? "BỒN MỚI" : "", 28, Color.white); tag.rectTransform.offsetMin = new Vector2(0, -size * 0.75f); tag.rectTransform.offsetMax = new Vector2(0, -size * 0.55f);
+            var tag = UIKit.Label(img.transform, boss ? (LevelLibrary.IsSuperHard(n) ? "SIÊU KHÓ" : "KHÓ") : LevelLibrary.NewSpecialAt(n) != null ? "VỊT MỚI" : n == 19 ? "CỐNG NƯỚC" : n == 23 ? "DÒNG CHẢY" : n == 13 || n == 26 ? "BỒN MỚI" : "", 28, Color.white); UIKit.Outlined(tag, Ink, 2); tag.rectTransform.offsetMin = new Vector2(0, -size * 0.75f); tag.rectTransform.offsetMax = new Vector2(0, -size * 0.55f);
             var st = UIKit.Outlined(UIKit.Label(img.transform, "", 44, Yellow), Ink, 2); st.rectTransform.offsetMin = new Vector2(0, size * 0.62f); st.rectTransform.offsetMax = new Vector2(0, size * 0.62f);
             nodes.Add((inner, num, st, tag, n));
             // picture levels show their pixel picture as a badge (silhouette until collected)
