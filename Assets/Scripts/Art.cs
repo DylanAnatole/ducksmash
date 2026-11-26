@@ -429,10 +429,11 @@ public static class Art
         var white = Mat(Color.white, 0.95f); var pupil = Mat(Eye, 1f, 0, 0, 0f); var shine = Mat(Color.white, 1f, 0, 0.8f, 0f);
         foreach (int s in new[] { -1, 1 })
         {
-            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.19f, 1.0f, 0.5f), new Vector3(0.2f, 0.25f, 0.12f), white);
-            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.19f, 0.99f, 0.56f), new Vector3(0.15f, 0.19f, 0.07f), pupil);
-            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.16f, 1.05f, 0.6f), Vector3.one * 0.06f, shine);
-            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.22f, 0.95f, 0.6f), Vector3.one * 0.028f, shine);
+            var tilt = new Vector3(-35, s * -12, 0);   // eyes lean back toward the camera (it looks down at 55 deg)
+            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.18f, 1.06f, 0.47f), new Vector3(0.24f, 0.3f, 0.13f), white, tilt);
+            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.18f, 1.06f, 0.52f), new Vector3(0.18f, 0.24f, 0.08f), pupil, tilt);
+            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.15f, 1.13f, 0.53f), Vector3.one * 0.07f, shine);
+            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.21f, 1.02f, 0.57f), Vector3.one * 0.032f, shine);
             Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.3f, 0.84f, 0.48f), new Vector3(0.14f, 0.07f, 0.06f), Mat(Cheek, 0.3f, 0, 0, 0f));
         }
 
@@ -767,7 +768,7 @@ public static class Art
     {
         var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear };
         var px = new Color[size * size];
-        Color deep = Hex("2f86c8"), light = Hex("3b9ad6"), line = Hex("8fd0f2");   // calmer + deeper: less glare, more contrast
+        Color deep = Hex("2a9fd6"), light = Hex("45b8e6"), line = Hex("a8e6fa");   // clean pool turquoise: the toys pop against it   // calmer + deeper: less glare, more contrast
         float k = Mathf.PI * 2 / size;
         for (int y = 0; y < size; y++)
             for (int x = 0; x < size; x++)
