@@ -49,7 +49,7 @@ public static class App
         RenderSettings.ambientLight = new Color(0.62f, 0.6f, 0.72f);
         QualitySettings.shadowDistance = 32; QualitySettings.shadowCascades = 1;            // whole tub fits in one cascade
         QualitySettings.shadowResolution = Mobile ? ShadowResolution.Low : ShadowResolution.Medium; QualitySettings.shadowProjection = ShadowProjection.StableFit;
-        QualitySettings.antiAliasing = Mobile ? 0 : QualitySettings.antiAliasing;
+        QualitySettings.antiAliasing = Mobile ? 0 : 4;   // smooth edges on PC (phones render at 2x instead)
         QualitySettings.pixelLightCount = 1; QualitySettings.softParticles = false;
 
         if (Object.FindObjectOfType<EventSystem>() == null) new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));

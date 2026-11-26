@@ -650,7 +650,7 @@ public class GameController : MonoBehaviour
             if (b.type == "plates")   // each plate: one baked, instanced mesh
                 for (int i = 1; i <= 3; i++) { var pc = v.Find("Plate" + i); if (pc) Art.Bake(pc, "plate_" + Mathf.RoundToInt(b.r * 2), 0.9f, 0.003f); }
             if (App.Mobile) foreach (var r in v.GetComponentsInChildren<Renderer>(true)) { r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false; }
-            if (b.type != "pixel" && b.type != "plank" && b.type != "screw" && b.type != "domino")
+            if (b.type != "pixel" && b.type != "plank" && b.type != "screw" && (b.type != "domino" || App.Mobile))   // phones have no realtime shadows: dominoes get the blob too
             {   // soft contact shadow on the water: blocks sit IN the bath instead of hovering, and read apart from the caustics
                 if (contactMat == null) { contactMat = Art.Fade(new Color(0.06f, 0.1f, 0.3f, 0.34f)); contactMat.mainTexture = BlobTex(); }
                 float sx = (b.rect ? b.w : b.r * 2) * K * 1.45f, sz = (b.rect ? b.h : b.r * 2) * K * 1.45f;

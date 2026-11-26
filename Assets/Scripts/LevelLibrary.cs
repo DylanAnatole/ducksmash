@@ -57,15 +57,15 @@ public static partial class LevelLibrary
     public static Texture2D ArtTexture(string id, bool locked)
     {
         var rows = ArtRows(id); int h = rows.Length, w = 0; foreach (var r in rows) w = Mathf.Max(w, r.Length);
-        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
+        var src = new Color[w * h];
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
                 Color c = new Color(0, 0, 0, 0);
                 if (x < rows[y].Length && PAL.TryGetValue(rows[y][x], out var pc)) c = locked ? new Color(0.62f, 0.58f, 0.72f, 0.55f) : pc;
-                tex.SetPixel(x, h - 1 - y, c);
+                src[(h - 1 - y) * w + x] = c;
             }
-        tex.Apply(); return tex;
+        return UIKit.SmoothPixels(src, w, h, w > 24 ? 5 : 8);   // smooth, rounded picture instead of blocky pixels
     }
 
     // Combo special ducks are introduced one at a time, after the player has learned the basics.

@@ -142,11 +142,55 @@ public static class UIKit
     public static Texture2D PixelIcon(string[] rows, System.Collections.Generic.Dictionary<char, Color> pal)
     {
         int h = rows.Length, w = 0; foreach (var r in rows) w = Mathf.Max(w, r.Length);
-        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
+        var src = new Color[w * h];
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
-                tex.SetPixel(x, h - 1 - y, x < rows[y].Length && pal.TryGetValue(rows[y][x], out var c) ? c : new Color(0, 0, 0, 0));
-        tex.Apply(); return tex;
+                src[(h - 1 - y) * w + x] = x < rows[y].Length && pal.TryGetValue(rows[y][x], out var c) ? c : new Color(0, 0, 0, 0);
+        return SmoothPixels(src, w, h);
+    }
+
+    // Turns a tiny pixel grid into a smooth, rounded, anti-aliased picture (no blocky "retro" stair-steps):
+    // every colour region gets a bilinear mask, each output pixel takes the strongest region, and the
+    // margin to the runner-up gives a 1-pixel soft edge.
+    public static Texture2D SmoothPixels(Color[] src, int w, int h, int scale = 8)
+    {
+        var cols = new System.Collections.Generic.List<Color> { new Color(0, 0, 0, 0) };
+        var idx = new int[w * h];
+        for (int i = 0; i < src.Length; i++)
+        {
+            var c = src[i]; if (c.a <= 0.01f) { idx[i] = 0; continue; }
+            int k = cols.IndexOf(c); if (k < 0) { k = cols.Count; cols.Add(c); }
+            idx[i] = k;
+        }
+        int W = w * scale, H = h * scale; var outPx = new Color[W * H]; var m = new float[cols.Count];
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+            {
+                float sx = (x + 0.5f) / scale - 0.5f, sy = (y + 0.5f) / scale - 0.5f;
+                int x0 = Mathf.FloorToInt(sx), y0 = Mathf.FloorToInt(sy); float fx = sx - x0, fy = sy - y0;
+                System.Array.Clear(m, 0, m.Length);
+                float tw = 0;
+                for (int j = -1; j < 3; j++)
+                    for (int i = -1; i < 3; i++)
+                    {   // round kernel (radius 1.5 px): shapes come out as soft blobs, diagonals lose their stair-steps
+                        int xx = x0 + i, yy = y0 + j;
+                        float dx = xx - sx, dy = yy - sy, q = 1f - Mathf.Sqrt(dx * dx + dy * dy) / 1.5f;
+                        if (q <= 0) continue; q *= q;
+                        int k = xx < 0 || yy < 0 || xx >= w || yy >= h ? 0 : idx[yy * w + xx];
+                        m[k] += q; tw += q;
+                    }
+                if (tw > 0) for (int k = 0; k < m.Length; k++) m[k] /= tw;
+                int b1 = 0, b2 = -1;
+                for (int k = 1; k < m.Length; k++) if (m[k] > m[b1]) b1 = k;
+                for (int k = 0; k < m.Length; k++) if (k != b1 && (b2 < 0 || m[k] > m[b2])) b2 = k;
+                Color c1 = cols[b1], c2 = b2 >= 0 ? cols[b2] : c1;
+                float e = b2 >= 0 ? Mathf.Clamp01((m[b1] - m[b2]) * scale * 0.35f + 0.5f) : 1f;
+                float a = Mathf.Lerp(c2.a, c1.a, e);
+                Color rgb = a > 0.001f ? (c1 * (c1.a * e) + c2 * (c2.a * (1 - e))) / a : c1;
+                rgb.a = a; outPx[y * W + x] = rgb;
+            }
+        var tex = new Texture2D(W, H, TextureFormat.RGBA32, true) { filterMode = FilterMode.Trilinear, wrapMode = TextureWrapMode.Clamp };
+        tex.SetPixels(outPx); tex.Apply(true, true); return tex;
     }
 
     public static Image Panel(Transform parent, Color c, string name = "Panel", bool rounded = true)
