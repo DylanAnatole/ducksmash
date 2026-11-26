@@ -1124,7 +1124,7 @@ public class GameController : MonoBehaviour
                     if (-vn > 220)
                     {   // billiards feel: a bit of extra energy and a small random spread, so a pack of ducks bursts apart
                         float cap = MAX_SPEED * 1.1f;
-                        a.v = Rot(a.v, UnityEngine.Random.Range(-0.06f, 0.06f)) * 1.08f; b.v = Rot(b.v, UnityEngine.Random.Range(-0.06f, 0.06f)) * 1.08f;
+                        a.v *= 1.08f; b.v *= 1.08f;   // no random spread: the same shot always plays out the same way
                         if (a.v.sqrMagnitude > cap * cap) a.v = a.v.normalized * cap; if (b.v.sqrMagnitude > cap * cap) b.v = b.v.normalized * cap;
                         a.hot = b.hot = true; a.squash = b.squash = 0.2f; var mid = (a.p + b.p) / 2;
                         bool newBoost = !a.boost || !b.boost; a.boost = b.boost = true;
@@ -1681,6 +1681,29 @@ public class GameController : MonoBehaviour
         }
     }
 
+    // ---------- aim help: forgiving power + a magnet onto the pieces that matter ----------
+    // even a short pull sends the duck a fair way (a weak flick used to stop dead and feel random)
+    static float EffPull(float z) => Mathf.Lerp(MAX_PULL * 0.4f, MAX_PULL, Mathf.Clamp01(z / MAX_PULL));
+    Vector2? assistPt;
+    // aiming within a few degrees of a key piece (bath bomb, laser, domino, pipe, chest, a parked duck...) snaps straight onto it
+    Vector2 AimAssist(Duck d, Vector2 dir, float pull)
+    {
+        assistPt = null; if (d == null) return dir;
+        float reach = 260 + pull * 4.5f + 120f;
+        float best = 4f; Vector2 res = dir;
+        void Try(Vector2 at)
+        {
+            var to = at - d.p; float dist = to.magnitude; if (dist < 35 || dist > reach) return;
+            float a = Mathf.Abs(Vector2.SignedAngle(dir, to));
+            if (a < best) { best = a; res = to / dist; assistPt = at; }
+        }
+        foreach (var b in blocks)
+            if (b.alive && !Covered(b) && (b.type == "bathbomb" || b.type == "laser" || b.type == "domino" || b.type == "chest" || b.type == "tnt" || b.type == "ring" || b.type == "gold" || b.type == "screw")) Try(b.p);
+        foreach (var pt in portals) { Try(pt.a); Try(pt.b); }
+        foreach (var o in ducks) if (o != d && !o.clone) Try(o.p);
+        return res;
+    }
+
     // ---------- shooting ----------
     void Launch(Duck d, Vector2 v)
     {
@@ -1734,7 +1757,7 @@ public class GameController : MonoBehaviour
         foreach (var d in ducks) d.spent = false;
         moving = false;
         if (state == "play" && moves > 0) LoadDuck(false);
-        int n = shotSmash;
+        int n = shotSmash; lastShotWeak = n < 3;
         if (pushes >= 3 && state == "play")
         {   // a good carom gets its own little celebration
             PopText((pushes >= 5 ? "BI-A THẦN SẦU! x" : "BI-A ĐẸP! x") + pushes, new Vector2(270, 470), new Color(0.45f, 0.9f, 1f), 66 + Mathf.Min(pushes, 8) * 3);
@@ -2126,7 +2149,7 @@ public class GameController : MonoBehaviour
         if (drag != null && Input.GetMouseButtonUp(0))
         {
             var pv = Pull(); var d = drag; drag = null; d.pullVis = 0;
-            if (pv.z >= 18) { float sp = MAX_SPEED * Mathf.Pow(pv.z / MAX_PULL, 0.8f); Launch(d, new Vector2(pv.x, pv.y) * sp); }
+            if (pv.z >= 18) { float sp = MAX_SPEED * Mathf.Pow(EffPull(pv.z) / MAX_PULL, 0.8f); Launch(d, AimAssist(d, new Vector2(pv.x, pv.y), EffPull(pv.z)) * sp); }
             else
             {   // a tap (or too-short pull) still answers: the duck quacks, and a short pull gets a nudge
                 d.squash = 0.2f; Sfx.Play("quack", 0.6f, UnityEngine.Random.Range(1.1f, 1.3f));
@@ -2204,7 +2227,7 @@ public class GameController : MonoBehaviour
 
     void HideHint() { hintShown = false; foreach (var h in hintDots) if (h.gameObject.activeSelf) h.gameObject.SetActive(false); }
 
-    bool bumpTeach; int bumpMoves;
+    bool bumpTeach; int bumpMoves; int hintBestDock; bool lastShotWeak; Vector2? lastAssist;
     void UpdateHint(float rdt)
     {
         UpdateKeys(rdt);
@@ -2227,23 +2250,31 @@ public class GameController : MonoBehaviour
                    && !popupRoot.gameObject.activeSelf && (guideRoot == null || !guideRoot.gameObject.activeSelf) && Time.timeScale > 0;
         if (!can || Input.GetMouseButton(0)) { idleT = 0; hintReady = false; hintSearch = -1; if (hintShown) HideHint(); return; }
         idleT += rdt;
-        float hintAt = level <= LevelLibrary.Onboarding || level == 19 || level == 23 || level == 24 ? 5f : 9f;
-        if (idleT > hintAt && hintSearch < 0 && !hintReady) { hintSearch = 0; hintBestScore = 0; hintBestDuck = -1; }
-        if (hintSearch >= 0)
-        {   // a few candidates per frame so the search never causes a hitch
-            int total = ducks.Count * HINT_ANGLES;
+        // help arrives early: before the first shot and right after a weak one (so a stuck player always learns where to aim)
+        float hintAt = shotsTaken == 0 || lastShotWeak ? 2.5f : 6f;
+        if (idleT > hintAt && hintSearch < 0 && !hintReady && loaded != null && loaded.spawnT <= 0) { hintSearch = 0; hintBestScore = 0; hintBestDuck = -1; hintBestDock = dock; }
+        if (hintSearch >= 0 && loaded != null)
+        {   // a few candidates per frame so the search never causes a hitch; tries every dock
+            int total = docks.Count * HINT_ANGLES; var home = loaded.p;
             for (int k = 0; k < 4 && hintSearch < total; k++, hintSearch++)
             {
-                var d = ducks[hintSearch / HINT_ANGLES]; if (d.clone || d.spawnT > 0 || d != loaded) continue;
+                int di = hintSearch / HINT_ANGLES;
                 float a = (level <= LevelLibrary.Onboarding ? Mathf.Lerp(-165f, -15f, (hintSearch % HINT_ANGLES) / (HINT_ANGLES - 1f))   // upward fan (sim y points down)
                                                              : (hintSearch % HINT_ANGLES) * (360f / HINT_ANGLES) - 180f) * Mathf.Deg2Rad;        // ducks can sit anywhere now: all round
                 var dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
-                float sc = PredictShot(d, dir, null);
-                if (sc > hintBestScore) { hintBestScore = sc; hintBestDir = dir; hintBestDuck = hintSearch / HINT_ANGLES; }
+                loaded.p = docks[di];
+                float sc = PredictShot(loaded, dir, null) + (di == dock ? 0.5f : 0f);   // a tie stays on the current dock
+                loaded.p = home;
+                if (sc > hintBestScore) { hintBestScore = sc; hintBestDir = dir; hintBestDock = di; hintBestDuck = ducks.IndexOf(loaded); }
             }
-            if (hintSearch >= total) { hintSearch = -1; hintReady = hintBestDuck >= 0; if (hintReady) PredictShot(ducks[hintBestDuck], hintBestDir, hintPath); }
+            if (hintSearch >= total)
+            {
+                hintSearch = -1; hintReady = hintBestDuck >= 0;
+                if (hintReady && hintBestDock != dock) { MoveToDock(hintBestDock); hintReady = true; idleT = hintAt + 1f; PopText("Thử bến này!", loaded.p + new Vector2(0, -70), new Color(0.6f, 1f, 0.6f), 44); }
+                if (hintReady) { hintBestDuck = ducks.IndexOf(loaded); loaded.p = docks[dock]; PredictShot(loaded, hintBestDir, hintPath); }
+            }
         }
-        if (hintReady && idleT > hintAt + 3f && hintBestDuck < ducks.Count)
+        if (hintReady && idleT > hintAt + 1.5f && hintBestDuck >= 0 && hintBestDuck < ducks.Count)
         {
             hintShown = true;
             // marching soft dots along the suggested path
@@ -2299,7 +2330,7 @@ public class GameController : MonoBehaviour
             fd.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             fd.gameObject.SetActive(false); frenzyDots.Add(fd);
         }
-        aimX = Art.Prim(PrimitiveType.Cube, aimRoot, Vector3.zero, new Vector3(0.3f, 0.05f, 0.08f), Art.Mat(Color.white, 0.5f, 0, 1f), new Vector3(0, 45, 0));
+        aimX = Art.Prim(PrimitiveType.Cube, aimRoot, Vector3.zero, new Vector3(0.3f, 0.05f, 0.08f), Art.Mat(new Color(1f, 0.78f, 0.15f), 0.5f, 0, 1f), new Vector3(0, 45, 0));
         Art.Prim(PrimitiveType.Cube, aimX, Vector3.zero, new Vector3(1, 1, 1), aimX.GetComponent<Renderer>().sharedMaterial, new Vector3(0, 90, 0)).localScale = new Vector3(1, 1, 1);
         aimX.gameObject.SetActive(false);
         band = MakeLine("BandL", 2); band2 = MakeLine("BandR", 2);
@@ -2355,7 +2386,14 @@ public class GameController : MonoBehaviour
         float pw = pv.z / MAX_PULL;
         drag.pullVis = Mathf.Lerp(drag.pullVis, pv.z < 12 ? 0 : pw, 1 - Mathf.Exp(-20f * udt));
         if (pv.z < 12) { powerStep = 0; return; }
-        var dir = new Vector2(pv.x, pv.y); dragDir = dir; drag.face = Mathf.Atan2(dir.y, dir.x);
+        var dir = AimAssist(drag, new Vector2(pv.x, pv.y), EffPull(pv.z)); dragDir = dir; drag.face = Mathf.Atan2(dir.y, dir.x);
+        if (assistPt.HasValue)
+        {   // locked on: a gold cross on the piece the shot is aimed at
+            aimX.gameObject.SetActive(true); aimX.position = W(assistPt.Value, 0.5f);
+            aimX.localScale = new Vector3(0.3f, 0.05f, 0.08f) * (1.6f + Mathf.Sin(Time.unscaledTime * 10f) * 0.2f);
+            if (lastAssist != assistPt) Sfx.Play("click", 0.3f, 1.6f);
+        }
+        lastAssist = assistPt;
         int step = Mathf.Min(4, Mathf.FloorToInt(pw * 4.999f));
         if (step != powerStep) { Sfx.Play("click", 0.22f, 0.8f + step * 0.14f); if (step > powerStep) Sfx.Buzz(6 + step * 2); powerStep = step; }
         Color pc = PowerColor(pw);
@@ -2375,8 +2413,8 @@ public class GameController : MonoBehaviour
 
         // trajectory: bounce off the walls, carve through what it will break, stop at the first thing it won't
         aimPath.Clear(); aimPath.Add(drag.p);
-        float aimSpeed = Mathf.Max(300f, MAX_SPEED * Mathf.Pow(Mathf.Max(pv.z, 18) / MAX_PULL, 0.8f));
-        Vector2 gp = drag.p, gv = dir; float len = (260 + pv.z * 4.5f) * (level <= 5 ? 1.45f : 1f), stepL = 5; Duck hitDuck = null; Vector2? firstContact = null; Block hitRing = null;
+        float aimSpeed = Mathf.Max(300f, MAX_SPEED * Mathf.Pow(EffPull(pv.z) / MAX_PULL, 0.8f));
+        Vector2 gp = drag.p, gv = dir; float len = (260 + EffPull(pv.z) * 4.5f) * (level <= 5 ? 1.45f : 1f), stepL = 5; int ghostIdx = -1; Vector2? stopPt = null; Duck hitDuck = null; Vector2? firstContact = null; Block hitRing = null;
         aimHits.Clear(); int dmg = drag.kind == "rocket" ? 3 : drag.Dmg; bool pierce = frenzyReady; int jumpIdx = -1;
         bool rocketAim = drag.kind == "rocket" && !drag.spent;
         if (rocketAim) { len = ROCKET_SPEED * ROCKET_TIME * 0.85f; pc = new Color(1f, 0.55f, 0.2f); }   // rocket flies full thrust whatever the pull
@@ -2415,7 +2453,14 @@ public class GameController : MonoBehaviour
                     bool breaks = !b.Hard && b.type != "boss" && (b.type != "chest" || dmg >= 3) && (pierce ? b.hp <= 2 : b.hp <= dmg);
                     if (firstContact == null) firstContact = gp;
                     if (b.type == "ring" && b.hp > 1 && drag.kind != "rocket" && !pierce) { hitRing = b; stop = true; break; }
-                    if (breaks) { aimHits.Add(b); if (drag.kind != "rocket") len -= 10; } else { stop = true; break; }
+                    if (breaks) { if (ghostIdx < 0) aimHits.Add(b); if (drag.kind != "rocket") len -= 10; }
+                    else if (ghostIdx < 0 && b.type != "boss")
+                    {   // won't break it: show where the duck goes NEXT (one faded bounce) so the rest of the shot isn't a mystery
+                        Collide(gp, drag.r, b, out var gh); gp += gh.n * gh.pen; Reflect(ref gv, gh.n, 1f); gv.Normalize();
+                        stopPt = gp; aimPath.Add(gp); ghostIdx = aimPath.Count; len = s + Mathf.Min(220f, (len - s) * 0.6f);
+                        break;
+                    }
+                    else { stop = true; break; }
                 }
             if (stop) break;
         }
@@ -2433,8 +2478,9 @@ public class GameController : MonoBehaviour
                 var q = Vector2.Lerp(a, b, seg > 0 ? (at - walked) / seg : 0);
                 var dot = aimDots[used++]; dot.gameObject.SetActive(true); dot.position = W(q, 0.32f);
                 float f = at / Mathf.Max(1, total);
-                dot.localScale = new Vector3(1, 0.6f, 1) * Mathf.Lerp(0.22f, 0.12f, f);
-                var c = Color.Lerp(pc, Color.white, f * 0.5f);
+                bool ghost = ghostIdx > 0 && i >= ghostIdx;
+                dot.localScale = new Vector3(1, 0.6f, 1) * Mathf.Lerp(0.22f, 0.12f, f) * (ghost ? 0.7f : 1f);
+                var c = ghost ? new Color(0.85f, 0.9f, 1f) : Color.Lerp(pc, Color.white, f * 0.5f);
                 mpb.SetColor("_Color", c); mpb.SetColor("_Emission", c * 0.45f); dot.GetComponent<Renderer>().SetPropertyBlock(mpb);
                 at += gap;
             }
@@ -2442,7 +2488,7 @@ public class GameController : MonoBehaviour
         }
 
         // landing / impact ring
-        aimTarget.gameObject.SetActive(true); aimTarget.position = W(gp, 0.08f);
+        aimTarget.gameObject.SetActive(true); aimTarget.position = W(stopPt ?? gp, 0.08f);
         aimTarget.localScale = Vector3.one * drag.r * K * (1.05f + Mathf.Sin(Time.unscaledTime * 9) * 0.06f);
         if (drag.kind == "bomb" && drag.charged && firstContact != null)
         {   // bomb duck: show the blast radius where it first touches something
