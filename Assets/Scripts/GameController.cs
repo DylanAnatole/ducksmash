@@ -1543,7 +1543,7 @@ public class GameController : MonoBehaviour
                 {   // explain it once, the first time it happens
                     PlayerPrefs.SetInt("ds_frenzy_tut", 1); PlayerPrefs.Save();
                     introTitle.text = "DUCK FRENZY!"; introTitle.color = new Color(1f, 0.45f, 0.72f);
-                    introBody.text = "<size=40>Thanh FRENZY đầy rồi!</size>\n\n<size=36>Phát bắn <b>tiếp theo</b>:\n<b>5 vịt</b> cùng lao ra theo hình quạt\nvà <b>xuyên qua</b> đồ dễ vỡ</size>\n\n<size=30><color=#7a4dd8>Nạp lại: mỗi món phá được +1</color></size>";
+                    introBody.text = "<size=46><b>FRENZY đầy!</b></size>\n\n<size=42>Phát sau: <b>5 vịt</b> lao ra\nvà <b>xuyên qua</b> đồ vật</size>\n\n<size=36><color=#5b3cc4>Phá 1 món = +1 thanh</color></size>";
                     introRoot.sizeDelta = new Vector2(820, 600); introMax = introTimer = 5f; introRoot.gameObject.SetActive(true); introRoot.SetAsLastSibling();
                 }
             }
@@ -1641,7 +1641,7 @@ public class GameController : MonoBehaviour
         if (nw != null)
         {
             introTitle.text = "VỊT MỚI!";
-            introBody.text = "<size=58><color=#ff7a3d>" + nw.name + "</color></size>\n\n<size=38>" + nw.use + "</size>\n<size=32><color=#7a4dd8>Có khi: " + nw.how.ToLower() + "</color></size>";
+            introBody.text = "<size=58><color=#d4520f>" + nw.name + "</color></size>\n\n<size=38>" + nw.use + "</size>\n<size=32><color=#7a4dd8>Có khi: " + nw.how.ToLower() + "</color></size>";
             introRoot.sizeDelta = new Vector2(820, 520);
             introMax = introTimer = 6f;
             var pool = ducks.Where(x => x.kind == "normal").ToList(); if (pool.Count == 0) pool = ducks.Where(x => !x.special).ToList();
@@ -2922,15 +2922,15 @@ public class GameController : MonoBehaviour
             bool ok = LevelLibrary.Unlocked(sp.kind, level);
             string need = sp.kind == "bomb" ? "10 món" : sp.kind == "zap" ? "cốc 3 vịt" : sp.kind == "rocket" ? "16 món" : "25 món";
             string use = sp.kind == "bomb" ? "nổ tung" : sp.kind == "zap" ? "phóng sét" : sp.kind == "rocket" ? "xuyên thẳng" : "sét 16 món";
-            sb.Append(ok ? "• <b>" + Cap(sp.name) + "</b> (" + need + "): " + use + "\n" : "• <color=#9a94ad>" + Cap(sp.name) + " – mở ở màn " + sp.level + "</color>\n");
+            sb.Append(ok ? "• <b>" + Cap(sp.name) + "</b> (" + need + "): " + use + "\n" : "• <color=#6f6890>" + Cap(sp.name) + " – màn " + sp.level + "</color>\n");
         }
-        sb.Append("\n• Nảy tường rồi phá: điểm x2\n• Đầy FRENZY: phát sau bắn 5 vịt");
-        if (level >= 17 && !LevelLibrary.IsSandbox(level)) sb.Append("\n• Phao bơi: bắn trúng → trượt húc vỡ đồ");
-        if (whirls.Count > 0) sb.Append("\n• Xoáy nước: bẻ cong đường bay (bắn nhẹ cong nhiều)");
-        if (flows.Count > 0) sb.Append("\n• Dòng chảy: đẩy vịt trôi theo mũi tên");
-        if (portals.Count > 0) sb.Append("\n• Cống nước: chui vào 1 đầu, trồi ra đầu cùng màu");
-        if (blocks.Any(b => b.type == "ice" && b.alive)) sb.Append("\n• Đồ đóng băng: cú đầu vỡ băng, cú sau mới vỡ");
-        if (blocks.Any(b => b.type == "gold" && b.mvAmp > 0 && b.alive)) sb.Append("\n• Bánh vàng trôi ở mép trên: trúng = +1 lượt");
+        sb.Append("\n• Húc vịt: phá x2 · húc 2 con: +1 lượt\n• Nảy tường: điểm x2\n• Đầy FRENZY: bắn 5 vịt");
+        if (level >= 17 && !LevelLibrary.IsSandbox(level)) sb.Append("\n• Phao: bắn trúng là trượt đi");
+        if (whirls.Count > 0) sb.Append("\n• Xoáy nước: bẻ cong đường bay");
+        if (flows.Count > 0) sb.Append("\n• Dòng chảy: đẩy vịt theo mũi tên");
+        if (portals.Count > 0) sb.Append("\n• Cống: vào 1 đầu, ra đầu kia");
+        if (blocks.Any(b => b.type == "ice" && b.alive)) sb.Append("\n• Băng: cần 2 cú");
+        if (blocks.Any(b => b.type == "gold" && b.mvAmp > 0 && b.alive)) sb.Append("\n• Xu vàng trôi: trúng = +1 lượt");
         guideBody.text = sb.ToString();
         guideRoot.gameObject.SetActive(true); guideRoot.SetAsLastSibling(); Time.timeScale = 0f;
     }
@@ -3066,8 +3066,8 @@ public class GameController : MonoBehaviour
             if (leftAtWin > 0) bonus.Add("Lượt dư +" + leftAtWin * 5);
             if (hardLevel) bonus.Add("Màn khó +80");
             var keep = new List<string>();
-            if (newArt) keep.Add("<color=#ffe066>Tranh mới vào Album!</color>");
-            if (bossKilled) keep.Insert(0, "<color=#ffe066>Đã hạ Vua Bánh Quy!</color>");
+            if (newArt) keep.Add("<color=#a14a00>Tranh mới vào Album!</color>");
+            if (bossKilled) keep.Insert(0, "<color=#a14a00>Đã hạ Vua Bánh Quy!</color>");
             popBody.text = "Điểm " + score.ToString("N0") + (bonus.Count > 0 ? "\n<size=32>" + string.Join(" · ", bonus) + " xu</size>" : "")
                 + (keep.Count > 0 ? "\n<size=32>" + string.Join(" · ", keep) + "</size>" : "");
             popBody.verticalOverflow = VerticalWrapMode.Overflow;

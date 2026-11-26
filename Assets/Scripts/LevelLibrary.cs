@@ -73,10 +73,10 @@ public static partial class LevelLibrary
     public class SpecialInfo { public string kind, name, how, use; public int level; }
     public static readonly SpecialInfo[] Specials =
     {
-        new SpecialInfo { kind = "bomb",    level = 12, name = "VỊT BOM",      how = "Phá 10+ khối trong 1 phát",         use = "Nổ tung khi chạm khối đầu tiên" },
-        new SpecialInfo { kind = "zap",     level = 14, name = "VỊT SÉT",      how = "Bắn vịt va đẩy 3 lần trong 1 phát", use = "Mỗi lần va chạm phóng sét sang khối gần" },
-        new SpecialInfo { kind = "rocket",  level = 16, name = "VỊT TÊN LỬA",  how = "Phá 16+ khối trong 1 phát",         use = "Lao thẳng, xuyên qua mọi khối phá được" },
-        new SpecialInfo { kind = "rainbow", level = 18, name = "VỊT CẦU VỒNG", how = "Phá 25+ khối trong 1 phát",         use = "Chạm khối đầu tiên → sét cầu vồng đánh 16 khối" },
+        new SpecialInfo { kind = "bomb",    level = 12, name = "VỊT BOM",      how = "Phá 10 món trong 1 phát", use = "Nổ ở cú chạm đầu" },
+        new SpecialInfo { kind = "zap",     level = 14, name = "VỊT SÉT",      how = "Húc vịt 3 lần trong 1 phát", use = "Va chạm là phóng sét" },
+        new SpecialInfo { kind = "rocket",  level = 16, name = "VỊT TÊN LỬA",  how = "Phá 16 món trong 1 phát", use = "Lao thẳng, xuyên khối" },
+        new SpecialInfo { kind = "rainbow", level = 18, name = "VỊT CẦU VỒNG", how = "Phá 25 món trong 1 phát", use = "Chạm là sét đánh 16 món" },
     };
     public static bool Unlocked(string kind, int n)
     {
