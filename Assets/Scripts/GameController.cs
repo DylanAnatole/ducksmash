@@ -2691,7 +2691,7 @@ public class GameController : MonoBehaviour
         var mframe = UIKit.Panel(topIn, Yellow, "MovesFrame").rectTransform; UIKit.Place(mframe, 0, 0.5f, 125, 18, 206, 196);
         var mb = UIKit.Panel(topIn, Color.white, "Moves").rectTransform; UIKit.Place(mb, 0, 0.5f, 125, 18, 186, 176);
         movesTxt = UIKit.Label(mb, "10", 100, Ink); movesTxt.rectTransform.offsetMin = new Vector2(0, 26);
-        var ml = UIKit.Label(mb, "LƯỢT BẮN", 26, PurpleDark); ml.rectTransform.offsetMax = new Vector2(0, -122);
+        var ml = UIKit.Label(mb, "LƯỢT BẮN", 30, PurpleDark); ml.fontStyle = FontStyle.Bold; ml.rectTransform.offsetMax = new Vector2(0, -122);
         var sp = UIKit.Rect("StarPreview", topIn); UIKit.Place(sp, 0, 0.5f, 125, -100, 170, 36);
         starPreview = UIKit.StarRow(sp, 3, 36, 6);
         aimCount = UIKit.Outlined(UIKit.Label(hud, "", 64, Color.white), Ink, 4); aimCount.verticalOverflow = VerticalWrapMode.Overflow; aimCount.horizontalOverflow = HorizontalWrapMode.Overflow; aimCount.lineSpacing = 0.85f;
@@ -2703,7 +2703,7 @@ public class GameController : MonoBehaviour
         var ob = UIKit.Panel(topIn, new Color(0.23f, 0.18f, 0.42f, 0.55f), "ObjBar").rectTransform; UIKit.Place(ob, 0, 0.5f, 480, -78, 420, 26);
         objFill = UIKit.Panel(ob, new Color(0.45f, 0.95f, 0.5f), "Fill").rectTransform;
         objFill.anchorMin = Vector2.zero; objFill.anchorMax = new Vector2(0, 1); objFill.offsetMin = objFill.offsetMax = Vector2.zero; objFill.pivot = new Vector2(0, 0.5f);
-        levelTxt = UIKit.Label(topIn, "", 34, Color.white, TextAnchor.MiddleRight); UIKit.Place(levelTxt.rectTransform, 1, 0.5f, -265, 50, 260, 60);
+        levelTxt = UIKit.Outlined(UIKit.Label(topIn, "", 36, Color.white, TextAnchor.MiddleRight), new Color(0.25f, 0.2f, 0.45f), 2); UIKit.Place(levelTxt.rectTransform, 1, 0.5f, -265, 50, 260, 60);
         scoreTxt = UIKit.Label(topIn, "", 40, Yellow, TextAnchor.MiddleRight); UIKit.Place(scoreTxt.rectTransform, 1, 0.5f, -265, -20, 260, 60);
         var gear = UIKit.Btn(topIn, "II", Yellow, Ink, 44, () => App.OpenSettings(true), "Settings");
         UIKit.Place((RectTransform)gear.transform, 1, 0.5f, -65, 10, 100, 100);
