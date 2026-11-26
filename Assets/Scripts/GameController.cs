@@ -27,6 +27,7 @@ public class GameController : MonoBehaviour
         public Vector2 p, v; public float r; public string kind; public bool hot, charged = true, frenzy, clone;
         public float squash, zapCd, face = Mathf.PI / 2; public Transform view, ring, body;
         public bool boost;   // bumped by another duck this shot: hits harder
+        public float cheer;
         public Transform[] eyes; public float blink = 2f;
         public int Dmg => (kind == "heavy" ? 3 : 1) + (boost ? 1 : 0);
         // special (combo-reward) ducks are one-use: after their power fires they turn back into a normal duck
@@ -44,6 +45,7 @@ public class GameController : MonoBehaviour
     const int ZAP_PUSHES = 3;   // 3+ billiard knocks in one shot -> lightning duck
     class Block
     {
+        public Renderer[] faces; public bool scared, blinking; public float blinkT = UnityEngine.Random.Range(1f, 7f);
         public string type; public Vector2 p; public float w, h, r; public bool rect; public int hp, max; public bool alive = true;
         public float hit, falling; public Block under, plankRef; public List<Block> screws; public string dir; public Color color;
         public float mvCx, mvAmp, mvSp; public int pid; public Transform view; public Vector3 baseScale = Vector3.one;
@@ -629,7 +631,8 @@ public class GameController : MonoBehaviour
         return v;
     }
 
-    void MakeView(Block b)
+    void MakeView(Block b) { MakeViewInner(b); if (b.view) b.faces = b.view.GetComponentsInChildren<Renderer>(true).Where(r => r.name == "Face").ToArray(); }
+    void MakeViewInner(Block b)
     {
         // one shared mesh per block kind (instanced), one template per kind (cloned)
         string key = b.type + "_" + Mathf.RoundToInt(b.r * 2) + "_" + Mathf.RoundToInt(b.w) + "x" + Mathf.RoundToInt(b.h)
@@ -1530,6 +1533,7 @@ public class GameController : MonoBehaviour
             PopText("+" + bonus + " LƯỢT!", new Vector2(130, 175), new Color(0.45f, 0.95f, 0.5f), 72);
             Sfx.Play("star", 1f, 1.2f); FxKit.StarBurst(W(270, 200, 0.5f), 16);
         }
+        if (n >= 10 && state == "play") foreach (var dk in ducks) { dk.cheer = 0.9f + UnityEngine.Random.value * 0.2f; }   // the whole gang celebrates
         if (n >= 6) { streak++; Sfx.Play("combo", 0.8f, 1f + streak * 0.06f); if (streak >= 1) PopText("Chuỗi " + (streak + 1) + " phát · Điểm x" + (streak + 1), new Vector2(270, 620), new Color(1f, 0.7f, 0.28f), 64); }
         else if (streak > 0) { PopText("Mất chuỗi…", new Vector2(270, 620), new Color(0.8f, 0.84f, 0.9f), 44); streak = 0; }
         if (!frenzyShot && !frenzyReady && (level > 2 || LevelLibrary.IsSandbox(level)))
@@ -2100,7 +2104,12 @@ public class GameController : MonoBehaviour
         foreach (var d in frenzyDots) d.gameObject.SetActive(false);
         aimX.gameObject.SetActive(false); aimTarget.gameObject.SetActive(false); aimGrab.gameObject.SetActive(false);
         band.enabled = band2.enabled = false; aimCount.gameObject.SetActive(false); powerTxt.gameObject.SetActive(false);
-        if (drag == null || moving) { powerStep = 0; return; }
+        if (drag == null || moving)
+        {
+            powerStep = 0;
+            foreach (var b in blocks) if (b.scared && b.faces != null) { b.scared = false; foreach (var f in b.faces) if (f) f.sharedMaterial = Art.FaceNormal(); }
+            return;
+        }
         // smoothed finger: the band and the dotted line glide instead of jittering
         float udt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
         dragSm = Vector2.Lerp(dragSm, dragPt, 1 - Mathf.Exp(-26f * udt));
@@ -2248,6 +2257,12 @@ public class GameController : MonoBehaviour
                 if (stop2) break;
             }
         }
+        // the toys in the line of fire look worried
+        foreach (var b in blocks)
+        {
+            bool sc = b.alive && aimHits.Contains(b);
+            if (sc != b.scared && b.faces != null) { b.scared = sc; b.blinking = false; foreach (var f in b.faces) if (f) f.sharedMaterial = sc ? Art.FaceScared() : Art.FaceNormal(); }
+        }
         bool rbAim = drag.kind == "rainbow" && !drag.spent;
         if (hitDuck != null && aimHits.Count == 0 && !rbAim)
         {
@@ -2311,6 +2326,13 @@ public class GameController : MonoBehaviour
             // victory: every duck hops and spins
             float hop = 0;
             if (state == "win") { hop = Mathf.Abs(Mathf.Sin(t * 7f + d.p.x * 0.05f)) * 0.55f; d.face += dt * 4f; }
+            else if (d.cheer > 0)
+            {   // happy double hop + a little spin
+                d.cheer -= dt; float ck = 1f - d.cheer;
+                hop = Mathf.Abs(Mathf.Sin(ck * Mathf.PI * 2.2f)) * 0.42f * Mathf.Clamp01(d.cheer * 2f);
+                if (d.cheer > 0.85f && UnityEngine.Random.value < 0.05f) PopText("Quạc!", d.p + new Vector2(0, -44), Color.white, 32);
+            }
+            else if (moves == 1 && state == "play" && !moving) hop = -0.04f + Mathf.Sin(t * 2f + d.p.x) * 0.02f;   // last move: the ducks sink a little, nervous
             d.view.position = W(d.p + lean + jit) + Vector3.up * (Mathf.Sin(t * 3 + d.p.x) * 0.02f + drop + hop);
             // sim y is down, world z is up: direction (cos, -sin)
             d.view.rotation = Quaternion.Euler(0, Mathf.Atan2(Mathf.Cos(d.face), -Mathf.Sin(d.face)) * Mathf.Rad2Deg, 0);
@@ -2406,6 +2428,12 @@ public class GameController : MonoBehaviour
             }
             if (b.type == "plank" && b.falling > 0) { float f = Mathf.Min(1, b.falling / 0.35f); b.view.position = W(b.p, -f * 0.6f); }
             if (b.type == "laser") b.view.Find("Arrow").localScale = Vector3.one * (1 + Mathf.Sin(t * 8) * 0.08f);
+            if (b.faces != null && b.faces.Length > 0 && !b.scared)
+            {   // the props blink now and then
+                b.blinkT -= dt;
+                if (!b.blinking && b.blinkT < 0) { b.blinking = true; foreach (var f in b.faces) if (f) f.sharedMaterial = Art.FaceBlink(); }
+                else if (b.blinking && b.blinkT < -0.13f) { b.blinking = false; b.blinkT = UnityEngine.Random.Range(3f, 8f); foreach (var f in b.faces) if (f) f.sharedMaterial = Art.FaceNormal(); }
+            }
             if (b.tag) b.tag.anchoredPosition = WorldToHud(W(b.p, 1.2f)) + new Vector2(0, (b.type == "gold" ? -70 : 58) + Mathf.Sin(t * 3f + b.p.x) * 6f);   // gold sits under the HUD: label goes below it
             if (b.type == "screw") b.view.localEulerAngles = new Vector3(0, t * 30 + b.p.x, 0);
         }

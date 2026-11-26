@@ -333,11 +333,17 @@ public static class Art
         return m;
     }
 
-    static Texture2D faceTex; static Material faceMat;
-    static Material FaceMat()
+    static Texture2D faceTex; static Material faceMat, faceScared;
+    static Material FaceMat() { if (faceMat == null) faceMat = MakeFace(false); return faceMat; }
+    // "uh-oh" face: wide eyes with tiny pupils and an O mouth - shown on whatever the player is aiming at
+    public static Material FaceScared() { if (faceScared == null) faceScared = MakeFace(true); return faceScared; }
+    public static Material FaceNormal() => FaceMat();
+    static Material faceBlink;
+    public static Material FaceBlink() { if (faceBlink == null) faceBlink = MakeFace(false, true); return faceBlink; }
+    static Material MakeFace(bool scared, bool blink = false)
     {
-        if (faceMat != null) return faceMat;
-        const int S = 128; faceTex = new Texture2D(S, S, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+        Material faceMat;
+        const int S = 128; var faceTex = new Texture2D(S, S, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
         var px = new Color[S * S]; var ink = new Color(0.16f, 0.1f, 0.22f, 1f);
         for (int y = 0; y < S; y++)
             for (int x = 0; x < S; x++)
@@ -347,16 +353,32 @@ public static class Art
                 {
                     float ex = 0.5f + e * 0.2f, ey = 0.58f;
                     float d = Mathf.Sqrt(Mathf.Pow((u - ex) / 0.085f, 2) + Mathf.Pow((v - ey) / 0.11f, 2));
-                    if (d < 1f) c = ink;
-                    if (Mathf.Sqrt(Mathf.Pow((u - ex + 0.03f) / 0.03f, 2) + Mathf.Pow((v - ey - 0.04f) / 0.035f, 2)) < 1f) c = Color.white;   // eye shine
+                    if (scared)
+                    {   // white eye with a small pupil
+                        float ew = Mathf.Sqrt(Mathf.Pow((u - ex) / 0.1f, 2) + Mathf.Pow((v - ey) / 0.12f, 2));
+                        if (ew < 1f) c = Color.white; if (ew >= 1f && ew < 1.22f) c = ink;
+                        if (Mathf.Sqrt(Mathf.Pow((u - ex) / 0.035f, 2) + Mathf.Pow((v - ey) / 0.045f, 2)) < 1f) c = ink;
+                    }
+                    else if (blink)
+                    {   // closed eyes: little happy arcs
+                        float arc = Mathf.Abs(Mathf.Sqrt(Mathf.Pow((u - ex) / 1f, 2) + Mathf.Pow((v - ey + 0.05f) * 1.2f, 2)) - 0.07f);
+                        if (arc < 0.014f && v > ey - 0.02f) c = ink;
+                    }
+                    else
+                    {
+                        if (d < 1f) c = ink;
+                        if (Mathf.Sqrt(Mathf.Pow((u - ex + 0.03f) / 0.03f, 2) + Mathf.Pow((v - ey - 0.04f) / 0.035f, 2)) < 1f) c = Color.white;   // eye shine
+                    }
                     float bd = Mathf.Sqrt(Mathf.Pow((u - (0.5f + e * 0.31f)) / 0.08f, 2) + Mathf.Pow((v - 0.4f) / 0.045f, 2));
                     if (bd < 1f && c.a == 0) c = new Color(1f, 0.55f, 0.65f, 0.75f);                                                     // blush
                 }
                 float sm = Mathf.Abs(Mathf.Sqrt(Mathf.Pow(u - 0.5f, 2) + Mathf.Pow((v - 0.47f) * 1.3f, 2)) - 0.085f);
-                if (sm < 0.016f && v < 0.43f) c = ink;                                                                                    // little smile
+                if (!scared && sm < 0.016f && v < 0.43f) c = ink;                                                                         // little smile
+                if (scared && Mathf.Sqrt(Mathf.Pow((u - 0.5f) / 0.05f, 2) + Mathf.Pow((v - 0.34f) / 0.065f, 2)) < 1f) c = ink;              // "O" mouth
                 px[y * S + x] = c;
             }
         faceTex.SetPixels(px); faceTex.Apply();
+        if (!scared && !blink) Art.faceTex = faceTex;
         var ui = Shader.Find("UI/Default");
         if (ui != null)
         {   // UI shader: lets us switch the depth test off so the face is never swallowed by the round body
