@@ -25,6 +25,7 @@ public class GameController : MonoBehaviour
     class Duck
     {
         public Vector2 p, v; public float r; public string kind; public bool hot, charged = true, frenzy, clone;
+        public float dizzy;
         public float squash, zapCd, face = Mathf.PI / 2; public Transform view, ring, body;
         public bool boost;   // bumped by another duck this shot: hits harder
         public float cheer;
@@ -45,7 +46,7 @@ public class GameController : MonoBehaviour
     const int ZAP_PUSHES = 3;   // 3+ billiard knocks in one shot -> lightning duck
     class Block
     {
-        public Renderer[] faces; public bool scared, blinking; public float ouch; public float blinkT = UnityEngine.Random.Range(1f, 7f);
+        public Renderer[] faces; public bool scared, blinking, shiver; public float ouch; public float blinkT = UnityEngine.Random.Range(1f, 7f);
         public string type; public Vector2 p; public float w, h, r; public bool rect; public int hp, max; public bool alive = true;
         public float hit, falling; public Block under, plankRef; public List<Block> screws; public string dir; public Color color;
         public float mvCx, mvAmp, mvSp; public int pid; public Transform view; public Vector3 baseScale = Vector3.one;
@@ -990,7 +991,7 @@ public class GameController : MonoBehaviour
             else if (sp > 0) { float ns = Mathf.Max(0, sp * Mathf.Exp(-DRAG * dt) - (sp < 150 ? 108 : FRICTION) * dt); d.v *= ns / sp; }
             if (TubWalls(ref d.p, ref d.v, d.r) && sp > 200)
             {
-                d.squash = 0.15f; Splash(d.p, 5); Sfx.Play("splash", Mathf.Clamp01(sp / 1200f) * 0.6f, UnityEngine.Random.Range(0.9f, 1.15f));
+                d.squash = 0.15f; if (sp > 1050) { d.squash = 0.26f; d.dizzy = 1.1f; } Splash(d.p, 5); Sfx.Play("splash", Mathf.Clamp01(sp / 1200f) * 0.6f, UnityEngine.Random.Range(0.9f, 1.15f));
                 // bank shot: the shot duck gets a kick off the wall and the rest of the shot scores more
                 if (moving && d.hot && !d.clone && sp > 380 && d.bankCd <= 0 && shotBanks < 3)
                 {
@@ -1156,6 +1157,7 @@ public class GameController : MonoBehaviour
         // material read: soap fizzes into bubbles, glass and china throw bright glints
         if (b.type == "soap") { int nb = App.Mobile ? 2 : 4; for (int i = 0; i < nb; i++) FxKit.Bubble(W(b.p + UnityEngine.Random.insideUnitCircle * 14f, 0.2f)); }
         else if (b.type == "glass" || b.type == "vase" || b.type == "plates") FxKit.Sparkle(W(b.p, 0.45f), new Color(0.9f, 0.97f, 1f), App.Mobile ? 3 : 5);
+        if (b.faces != null) foreach (var f in b.faces) if (f) f.sharedMaterial = Art.FaceScared();   // "aaah!" on the way down
         if (b.view)
         {
             bool tall = b.Prop || b.type == "domino" || b.type == "bathbomb" || b.type == "tnt" || b.type == "pixel" || b.type == "gold" || b.type == "chest";   // tip over + sink
@@ -2304,8 +2306,11 @@ public class GameController : MonoBehaviour
     // =====================================================================
     // VIEWS + FX
     // =====================================================================
+    Duck shotDuckView;
     void UpdateViews(float dt)
     {
+        if (moving) { float best = 300 * 300; Duck fd = null; foreach (var d in ducks) { float s2 = d.v.sqrMagnitude; if (s2 > best) { best = s2; fd = d; } } if (fd != null) shotDuckView = fd; }
+        else shotDuckView = null;
         bool selectable = state == "play" && !moving && target == null;
         foreach (var d in ducks)
         {
@@ -2316,6 +2321,11 @@ public class GameController : MonoBehaviour
             {   // bystanders turn to watch the duck being aimed (cute, and it reads "everyone's waiting on this shot")
                 var lk = drag.p - d.p;
                 if (lk.sqrMagnitude > 1) d.face = Mathf.LerpAngle(d.face * Mathf.Rad2Deg, Mathf.Atan2(lk.y, lk.x) * Mathf.Rad2Deg, 1 - Mathf.Exp(-6 * dt)) * Mathf.Deg2Rad;
+            }
+            else if (moving && shotDuckView != null && shotDuckView != d)
+            {   // everyone watches the duck that's flying
+                var lk = shotDuckView.p - d.p;
+                if (lk.sqrMagnitude > 400) d.face = Mathf.LerpAngle(d.face * Mathf.Rad2Deg, Mathf.Atan2(lk.y, lk.x) * Mathf.Rad2Deg, 1 - Mathf.Exp(-8 * dt)) * Mathf.Deg2Rad;
             }
             else if (drag == null && !moving && state == "play")
             {   // resting ducks turn to face the player (3/4 view): you see their faces, not their tails
@@ -2343,6 +2353,7 @@ public class GameController : MonoBehaviour
                 hop = Mathf.Abs(Mathf.Sin(ck * Mathf.PI * 2.2f)) * 0.42f * Mathf.Clamp01(d.cheer * 2f);
                 if (d.cheer > 0.85f && UnityEngine.Random.value < 0.05f) PopText("Quạc!", d.p + new Vector2(0, -44), Color.white, 32);
             }
+            else if (state == "lose") hop = -0.07f;
             else if (moves == 1 && state == "play" && !moving) hop = -0.04f + Mathf.Sin(t * 2f + d.p.x) * 0.02f;   // last move: the ducks sink a little, nervous
             d.view.position = W(d.p + lean + jit) + Vector3.up * (Mathf.Sin(t * 3 + d.p.x) * 0.02f + drop + hop);
             // sim y is down, world z is up: direction (cos, -sin)
@@ -2352,7 +2363,8 @@ public class GameController : MonoBehaviour
             {   // blink every few seconds: the toys feel alive
                 d.blink -= dt; float sy = 1f;
                 if (d.blink < 0) { float bt = -d.blink; sy = bt < 0.07f ? 1f - bt / 0.07f * 0.88f : 0.12f + (bt - 0.07f) / 0.07f * 0.88f; if (bt > 0.14f) { d.blink = UnityEngine.Random.Range(2f, 5f); sy = 1f; } }
-                if (d == drag && !moving) sy = Mathf.Min(sy, 0.55f);                       // aiming: narrowed, focused eyes
+                if (state == "lose" || d.cheer > 0.15f || state == "win") sy = Mathf.Min(sy, state == "lose" ? 0.45f : 0.3f);   // sad droop / happy squint
+                else if (d == drag && !moving) sy = Mathf.Min(sy, 0.55f);                       // aiming: narrowed, focused eyes
                 else if (d.v.sqrMagnitude > 500 * 500) sy = Mathf.Max(sy, 1.18f);          // flying: wide eyes
                 foreach (var e in d.eyes) if (e) e.localScale = new Vector3(1f, sy, 1f);
             }
@@ -2371,6 +2383,11 @@ public class GameController : MonoBehaviour
                          : dragged ? (Color)(Color32)Color.Lerp(new Color(1, 1, 1, 0.7f), new Color(1f, 0.45f, 0.3f, 0.75f), powerStep / 4f)
                          : d.special ? new Color(1f, 0.8f, 0.3f, 0.6f) : new Color(0.45f, 0.9f, 0.55f, 0.42f);
                 if (d.ringCol != rc) { d.ringCol = rc; d.ring.GetComponent<Renderer>().sharedMaterial = Art.RingShared(rc); }   // only when the colour changes (the cache key is a string)
+            }
+            if (d.dizzy > 0)
+            {   // smacked the tub wall hard: little stars circle its head
+                d.dizzy -= dt;
+                if (UnityEngine.Random.value < dt * (App.Mobile ? 10f : 18f)) { float a = t * 9f + UnityEngine.Random.value; FxKit.Sparkle(W(d.p + new Vector2(Mathf.Cos(a), Mathf.Sin(a) * 0.6f) * 16f, 1.35f), new Color(1f, 0.9f, 0.35f), 1); }
             }
             var spark = d.body.Find("Spark"); if (spark) spark.gameObject.SetActive((d.charged || d.special) && Mathf.Sin(t * 14) > -0.3f);
             if (spd > 120 && UnityEngine.Random.value < 0.5f) FxKit.Wake(W(d.p - d.v.normalized * d.r));
@@ -2398,6 +2415,11 @@ public class GameController : MonoBehaviour
                 b.wob = Mathf.Max(0, b.wob - dt * 1.6f);
                 b.view.localEulerAngles = new Vector3(Mathf.Sin(t * 37f + b.p.x) * b.wob * 40f, 0, Mathf.Sin(t * 43f + b.p.y) * b.wob * 40f);
             }
+            if (b.scared && b.wob <= 0 && b.under == null && b.type != "boss" && b.type != "screw" && b.type != "ring" && b.appear >= 1)
+            {   // shivering with fear while the shot is lined up on it
+                b.view.localEulerAngles = new Vector3(0, 0, Mathf.Sin(Time.unscaledTime * 46f + b.p.x) * 2.6f); b.shiver = true;
+            }
+            else if (b.shiver) { b.shiver = false; if (b.wob <= 0 && b.under == null && b.type != "boss") b.view.localEulerAngles = Vector3.zero; }
             if (b.type == "boss") b.view.localEulerAngles = new Vector3(0, 0, b.hit > 0 ? Mathf.Sin(t * 60f) * b.hit * 60f : 0);   // the king wobbles when struck
             // floating goodies bob gently on the bath water
             // everything afloat bobs gently on the bath water (slow, small: calm motion, not visual noise)
