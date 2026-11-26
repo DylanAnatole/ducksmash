@@ -1771,7 +1771,13 @@ public class GameController : MonoBehaviour
         return lp;
     }
 
-    void Lose() { state = "lose"; Sfx.Play("lose"); ShowPopup(false); }
+    void Lose()
+    {
+        state = "lose"; Sfx.Play("lose");
+        foreach (var b in blocks)   // the leftovers grin at you: try again!
+            if (b.alive && b.faces != null && b.faces.Length > 0) { b.scared = false; b.blinking = true; b.blinkT = 999f; foreach (var f in b.faces) if (f) f.sharedMaterial = Art.FaceBlink(); }
+        ShowPopup(false);
+    }
 
     // ---------- boosters ----------
     void UseBooster(string k)
@@ -2343,6 +2349,8 @@ public class GameController : MonoBehaviour
             {   // blink every few seconds: the toys feel alive
                 d.blink -= dt; float sy = 1f;
                 if (d.blink < 0) { float bt = -d.blink; sy = bt < 0.07f ? 1f - bt / 0.07f * 0.88f : 0.12f + (bt - 0.07f) / 0.07f * 0.88f; if (bt > 0.14f) { d.blink = UnityEngine.Random.Range(2f, 5f); sy = 1f; } }
+                if (d == drag && !moving) sy = Mathf.Min(sy, 0.55f);                       // aiming: narrowed, focused eyes
+                else if (d.v.sqrMagnitude > 500 * 500) sy = Mathf.Max(sy, 1.18f);          // flying: wide eyes
                 foreach (var e in d.eyes) if (e) e.localScale = new Vector3(1f, sy, 1f);
             }
             float s = d.squash * 1.6f, st = d.stretch * 1.8f;
@@ -3144,7 +3152,7 @@ public class GameController : MonoBehaviour
         if (state == "win") { if (HasNext) StartLevel(level + 1); else App.ShowMap(); }
         else if (state == "lose" && SaveData.Coins >= CONTINUE_PRICE)
         {
-            SaveData.Coins -= CONTINUE_PRICE; moves = 5; state = "play"; popupRoot.gameObject.SetActive(false); Sfx.Play("coin");
+            SaveData.Coins -= CONTINUE_PRICE; moves = 5; state = "play"; foreach (var b in blocks) b.blinkT = 0.05f; popupRoot.gameObject.SetActive(false); Sfx.Play("coin");
         }
     }
 
