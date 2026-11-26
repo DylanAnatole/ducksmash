@@ -571,8 +571,9 @@ public static class Art
         {
             float a = i / 10f * Mathf.PI * 2;
             Prim(PrimitiveType.Sphere, root, new Vector3(Mathf.Cos(a) * d * 0.34f, 0.2f, Mathf.Sin(a) * d * 0.34f), new Vector3(d * 0.34f, d * 0.26f, d * 0.34f),
-                Mat(i % 2 == 0 ? Hex("ff7f78") : Color.white, 0.6f, 0, 0, 0.003f));
+                Mat(i % 2 == 0 ? Hex("ff7f78") : Color.white, 0.85f, 0, 0, 0.003f));
         }
+        Face(root, new Vector3(0, 0.22f, -d * 0.42f), d * 0.42f);
         return root;
     }
 
@@ -657,6 +658,7 @@ public static class Art
         Prim(PrimitiveType.Cube, root, new Vector3(w * 0.32f, 0.36f, 0), new Vector3(0.08f, 0.74f, h * 1.05f), gold);
         Prim(PrimitiveType.Cube, root, new Vector3(0, 0.42f, -h * 0.53f), new Vector3(0.2f, 0.24f, 0.06f), gold);   // lock
         Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.82f, 0), Vector3.one * 0.18f, Mat(Gold, 1f, 1, 0.6f));   // gem on top
+        Face(root, new Vector3(0, 0.22f, -h * 0.5f), Mathf.Min(w, h) * 0.55f);
         return root;
     }
 
