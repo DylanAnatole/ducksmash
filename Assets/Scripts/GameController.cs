@@ -515,12 +515,25 @@ public class GameController : MonoBehaviour
     {
         var root = Art.Root("Decor", world);
         float top = h / 2 + rim + 1.0f, bottom = -h / 2 - rim - 1.3f;
-        // fluffy bath mat with stripes below the tub
-        var mat = Art.Mat(new Color(0.62f, 0.84f, 0.95f), 0.1f);
-        Art.Prim(PrimitiveType.Cube, root, new Vector3(0, -0.3f, bottom), new Vector3(6.4f, 0.12f, 2.0f), mat);
-        foreach (float x in new[] { -3.2f, 3.2f }) Art.Prim(PrimitiveType.Cylinder, root, new Vector3(x, -0.3f, bottom), new Vector3(2.0f, 0.06f, 2.0f), mat);
-        var stripe = Art.Mat(new Color(1f, 1f, 1f), 0.1f);
-        for (int i = -2; i <= 2; i++) Art.Prim(PrimitiveType.Cube, root, new Vector3(i * 1.2f, -0.235f, bottom), new Vector3(0.28f, 0.02f, 1.7f), stripe);
+        // fluffy bath rug below the tub: soft pastel stadium shape with a scalloped fringe and dotted pattern
+        var mat = Art.Mat(new Color(1f, 0.74f, 0.82f), 0.25f);
+        var fringe = Art.Mat(new Color(1f, 0.86f, 0.9f), 0.25f);
+        Art.Prim(PrimitiveType.Cube, root, new Vector3(0, -0.3f, bottom), new Vector3(6.4f, 0.14f, 2.0f), mat);
+        foreach (float x in new[] { -3.2f, 3.2f }) Art.Prim(PrimitiveType.Cylinder, root, new Vector3(x, -0.3f, bottom), new Vector3(2.0f, 0.07f, 2.0f), mat);
+        for (int i = 0; i <= 12; i++)
+        {   // scallops along the long edges
+            float x = -3.6f + i * 0.6f;
+            foreach (float zz in new[] { -1.02f, 1.02f }) Art.Prim(PrimitiveType.Cylinder, root, new Vector3(x, -0.31f, bottom + zz), new Vector3(0.62f, 0.06f, 0.62f), fringe);
+        }
+        for (int i = 0; i < 9; i++)
+        {   // ...and round the ends
+            float a = -Mathf.PI / 2 + i / 8f * Mathf.PI;
+            foreach (float s in new[] { -1f, 1f }) Art.Prim(PrimitiveType.Cylinder, root, new Vector3(s * (3.2f + Mathf.Cos(a) * 1.02f), -0.31f, bottom + Mathf.Sin(a) * 1.02f), new Vector3(0.62f, 0.06f, 0.62f), fringe);
+        }
+        var dot = Art.Mat(new Color(1f, 0.95f, 0.97f), 0.2f);
+        for (int i = 0; i < 9; i++)
+            for (int j = 0; j < 3; j++)
+                if ((i + j) % 2 == 0) Art.Prim(PrimitiveType.Cylinder, root, new Vector3(-3.2f + i * 0.8f, -0.225f, bottom - 0.6f + j * 0.6f), new Vector3(0.3f, 0.01f, 0.3f), dot);
         // shelf behind the faucet: bottles, cup, plant, towels
         var shelf = Art.Mat(new Color(0.98f, 0.95f, 0.92f), 0.6f);
         Art.Prim(PrimitiveType.Cube, root, new Vector3(0, -0.1f, top + 0.3f), new Vector3(w + 2.5f, 0.5f, 1.6f), shelf);
@@ -554,9 +567,19 @@ public class GameController : MonoBehaviour
         Art.Prim(PrimitiveType.Capsule, root, new Vector3(1.2f, 0.45f, top), new Vector3(0.6f, 0.55f, 0.6f), towelA, new Vector3(0, 0, 90));
         Art.Prim(PrimitiveType.Capsule, root, new Vector3(1.6f, 0.45f, top - 0.1f), new Vector3(0.6f, 0.55f, 0.6f), towelB, new Vector3(0, 0, 90));
         Art.Prim(PrimitiveType.Capsule, root, new Vector3(1.4f, 0.95f, top - 0.05f), new Vector3(0.55f, 0.5f, 0.55f), towelA, new Vector3(0, 0, 90));
-        // slippers on the mat
-        var slip = Art.Mat(new Color(1f, 0.85f, 0.45f), 0.3f);
-        foreach (float x in new[] { 3.6f, 4.3f }) Art.Prim(PrimitiveType.Capsule, root, new Vector3(x, -0.15f, bottom + 0.2f), new Vector3(0.5f, 0.55f, 0.25f), slip, new Vector3(90, 0, 0));
+        // duck slippers on the rug: sole, puffy yellow duck head on top, little beak
+        var sole = Art.Mat(new Color(1f, 0.62f, 0.45f), 0.3f);
+        var slip = Art.Mat(new Color(1f, 0.86f, 0.3f), 0.6f);
+        var beak = Art.Mat(new Color(1f, 0.55f, 0.2f), 0.5f);
+        foreach (var (x, yaw) in new[] { (2.75f, -12f), (3.55f, 10f) })
+        {
+            var sl = Art.Root("Slipper", root); sl.localPosition = new Vector3(x, -0.2f, bottom + 0.05f); sl.localEulerAngles = new Vector3(0, yaw, 0);
+            Art.Prim(PrimitiveType.Capsule, sl, new Vector3(0, 0, 0), new Vector3(0.55f, 0.55f, 0.16f), sole, new Vector3(90, 0, 0));
+            Art.Prim(PrimitiveType.Sphere, sl, new Vector3(0, 0.2f, -0.18f), new Vector3(0.55f, 0.38f, 0.62f), slip);
+            Art.Prim(PrimitiveType.Sphere, sl, new Vector3(0, 0.26f, -0.5f), new Vector3(0.24f, 0.1f, 0.2f), beak);
+            var fh = Art.Root("DecorFace", sl); fh.localPosition = new Vector3(0, 0.36f, -0.2f);
+            Art.Face(fh, new Vector3(0, 0, -0.25f), 0.3f);
+        }
         Art.Bake(root, "decor", 0.5f, 0.002f);
     }
 
