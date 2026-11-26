@@ -245,11 +245,10 @@ public static partial class LevelLibrary
                 Duck(d, 235, 800, "heavy"); Duck(d, 305, 800, "bomb"); Duck(d, 270, 845);
                 Fort(d, 270, 460, "up", "plates");                                       // door faces UP: come at it from the top
                 Mix(d, 150, 390, 240, 240, "glass", "soap", "vase", "plates");          // top row, swept by a corner bounce
-                Mix(d, 70, 110, 300, 620, "plates", "vase", "glass");                   // side towers
-                Mix(d, 430, 470, 300, 620, "vase", "plates", "glass");
-                foreach (var b in d.blocks) if ((b.x == 110 || b.x == 430) && b.y == 460) { b.type = "laser"; b.dir = "h"; b.r = 16; }   // lasers in line with the fort's bomb
-                Mix(d, 70, 110, 700, 820, "soap", "glass", "vase");                     // pockets beside the cage
-                Mix(d, 430, 470, 700, 820, "vase", "soap", "glass");
+                Mix(d, 70, 70, 340, 620, "plates", "vase", "glass");                    // one-column side towers: the lane beside them is the way down
+                Mix(d, 470, 470, 340, 620, "vase", "plates", "glass");
+                d.blocks.Add(B("bathbomb", 70, 290)); d.blocks.Add(B("bathbomb", 470, 290));   // right under each pipe's exit: the first thing a pipe shot sets off
+                foreach (var b in d.blocks) if ((b.x == 70 || b.x == 470) && b.y == 460) { b.type = "laser"; b.dir = "h"; b.r = 16; }   // lasers in line with the fort's bomb: one row-blast cracks it open
                 return d;
         }
     }

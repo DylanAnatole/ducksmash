@@ -1293,9 +1293,10 @@ public class GameController : MonoBehaviour
                 HitStop(0.06f); Shake(0.3f); PopText("+2 Vịt!", b.p, new Color(1f, 0.88f, 0.3f), 56); Sfx.Play("coin"); FxKit.StarBurst(W(b.p, 0.5f));
                 for (int i = 0; i < 2; i++)
                 {
-                    var nd = NewDuck(b.p + new Vector2(i == 0 ? -14 : 14, 0), "normal");
+                    var nd = NewDuck(b.p + new Vector2(i == 0 ? -14 : 14, 0), "normal"); nd.passive = true; nd.hot = true;   // they burst out and smash, then pop like the rest
                     float a = Mathf.PI / 2 + (i == 0 ? 0.6f : -0.6f); nd.v = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * 420;
                 }
+                if (state == "play") { moves += 2; movesPulse = 0.45f; trayDirty = true; trayPulse = 1f; }   // ...and two more ducks land in the tray
                 break;
             case "boss":
                 HitStop(0.15f); Shake(0.9f); slowTimer = 1f; Flash(0.7f); camZoom = 1f; BigText("HẠ VUA BÁNH QUY!", new Color(1f, 0.88f, 0.3f)); FxKit.Confetti(W(b.p, 1f), 3f, 80); bossKilled = true; Sfx.Play("boom"); Sfx.Vibrate();
@@ -1715,6 +1716,17 @@ public class GameController : MonoBehaviour
 
     void EndShot()
     {
+        // Duckies-Pop style clean-up: the duck that was fired, and any parked duck it knocked into, pop and vanish -
+        // the tub never fills up with spent ducks. Untouched parked ducks stay for later shots.
+        foreach (var gd in ducks.Where(x => x.passive && x.hot && !x.clone).ToList())
+        {
+            Splash(gd.p, 8); FxKit.Sparkle(W(gd.p, 0.5f), new Color(1f, 0.95f, 0.6f), App.Mobile ? 4 : 8); FxKit.Ripple(W(gd.p), 1f);
+            if (gd.tag) { tags.Remove(gd.tag); Destroy(gd.tag.gameObject); gd.tag = null; }
+            if (gd.trail) gd.trail.emitting = false;
+            dying.Add(new Dying { t = gd.view, life = 0.3f, max = 0.3f, s0 = gd.view.localScale });   // puff up, then gone
+            ducks.Remove(gd);
+        }
+        Sfx.Play("squeak", 0.35f, 1.7f);
         foreach (var d in ducks) { d.hot = false; d.frenzy = false; d.rocketT = 0; d.rainbowReady = false; d.boost = false; }
         foreach (var c in ducks.Where(d => d.clone).ToList()) { Splash(c.p, 10); Destroy(c.view.gameObject); ducks.Remove(c); }
         // one-use special ducks that fired turn back into plain ducks
