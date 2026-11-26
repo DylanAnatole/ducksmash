@@ -77,7 +77,7 @@ public static partial class LevelLibrary
         switch (n)
         {
             case 14:   // the ducks stand BETWEEN two fortresses whose doors face them: shoot sideways into the doors
-                d.moves = 8; d.hint = "Bắn ngang vào cửa pháo đài";
+                d.moves = 9; d.hint = "Bắn ngang vào cửa pháo đài";
                 Pic(d, "flower", 13);
                 Fort(d, 130, 500, "right"); Fort(d, 410, 500, "left");
                 Fill(d, "soap", 110, 430, 700, 700);
