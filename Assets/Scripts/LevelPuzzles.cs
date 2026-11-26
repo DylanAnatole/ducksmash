@@ -136,10 +136,10 @@ public static partial class LevelLibrary
                 d.moves = 10; d.hint = "Thả vịt vào dòng nước vòng";
                 Flow(d, 270, 360, 300, 56, "right"); Flow(d, 420, 505, 56, 234, "down");
                 Flow(d, 270, 650, 300, 56, "left"); Flow(d, 120, 505, 56, 234, "up");
-                Mix(d, 70, 470, 200, 260, "vase", "glass", "soap");
-                Mix(d, 70, 470, 740, 820, "glass", "soap", "vase");
-                Mix(d, 70, 70, 320, 680, "glass", "vase", "soap"); Mix(d, 470, 470, 320, 680, "soap", "glass", "vase");
-                d.blocks.Add(B("chest", 170, 300)); d.blocks.Add(B("chest", 370, 700));
+                Mix(d, 70, 470, 200, 260, "vase", "plates", "soap", "vase");   // tougher pieces: the current alone won't clear them
+                Mix(d, 70, 470, 740, 820, "plates", "soap", "vase", "glass");
+                Mix(d, 70, 70, 320, 680, "vase", "plates", "soap"); Mix(d, 470, 470, 320, 680, "soap", "vase", "plates");
+                d.blocks.Add(B("stone", 170, 300)); d.blocks.Add(B("stone", 370, 700));
                 d.blocks.Add(B("bathbomb", 370, 300)); d.blocks.Add(B("bathbomb", 170, 700));
                 Duck(d, 230, 490, "heavy"); Duck(d, 310, 490); Duck(d, 270, 570, "bomb");
                 return d;
@@ -236,15 +236,20 @@ public static partial class LevelLibrary
                 Pipe(d, 110, 790, 460, 330);   // bottom-left pipe pops out above the fort
                 Duck(d, 255, 430); Duck(d, 255, 530, "bomb"); Duck(d, 270, 800, "heavy");
                 return d;
-            default:   // 30 - SUPER HARD: the ducks are boxed in by rubber pads; get out through the corners or bounce out
-                d.moves = 14; d.hint = "Bắn chéo thoát lồng cao su";
-                Pad(d, 270, 405, 100, 14); Pad(d, 270, 615, 100, 14); Pad(d, 175, 510, 14, 100); Pad(d, 365, 510, 14, 100);
-                Mix(d, 70, 470, 200, 280, "glass", "vase", "soap");
-                Mix(d, 70, 470, 740, 820, "soap", "glass", "vase");
-                Mix(d, 70, 110, 340, 680, "glass", "soap", "vase"); Mix(d, 430, 470, 340, 680, "vase", "glass", "soap");
-                d.blocks.Add(B("bathbomb", 270, 240)); d.blocks.Add(B("bathbomb", 270, 780));
-                d.blocks.Add(LZ(90, 510, "v")); d.blocks.Add(LZ(450, 510, "v"));
-                Duck(d, 235, 510, "heavy"); Duck(d, 305, 510, "bomb"); Duck(d, 270, 460); Duck(d, 270, 560);
+            default:   // 30 - SUPER HARD finale: the ducks are locked in a stone cage. The ONLY ways out are the two pipes
+                       // in the cage corners; they pop out in the top corners, and the duck keeps its heading - so the
+                       // angle you shoot INTO the pipe decides where it bounces next (top row, side lanes, or the fort door)
+                d.moves = 9; d.hint = "Vịt bị nhốt: chui cống mới thoát!";
+                StoneRow(d, 150, 390, 690); StoneCol(d, 150, 730, 850); StoneCol(d, 390, 730, 850);   // the cage
+                Pipe(d, 195, 735, 70, 215); Pipe(d, 345, 735, 470, 215);
+                Duck(d, 235, 800, "heavy"); Duck(d, 305, 800, "bomb"); Duck(d, 270, 845);
+                Fort(d, 270, 460, "up", "plates");                                       // door faces UP: come at it from the top
+                Mix(d, 150, 390, 240, 240, "glass", "soap", "vase", "plates");          // top row, swept by a corner bounce
+                Mix(d, 70, 110, 300, 620, "plates", "vase", "glass");                   // side towers
+                Mix(d, 430, 470, 300, 620, "vase", "plates", "glass");
+                foreach (var b in d.blocks) if ((b.x == 110 || b.x == 430) && b.y == 460) { b.type = "laser"; b.dir = "h"; b.r = 16; }   // lasers in line with the fort's bomb
+                Mix(d, 70, 110, 700, 820, "soap", "glass", "vase");                     // pockets beside the cage
+                Mix(d, 430, 470, 700, 820, "vase", "soap", "glass");
                 return d;
         }
     }

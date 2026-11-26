@@ -353,7 +353,7 @@ public class GameController : MonoBehaviour
             floorMat.color = fc; if (floorMat.HasProperty("_Color")) floorMat.SetColor("_Color", fc);
         }
         boosterBusy = false; if (boosterCo != null) { StopCoroutine(boosterCo); boosterCo = null; }
-        swoop = 1f; flashA = 0; curtainA = 1f; goalTotal = GoalsLeft(); shownLeft = -1; halfShown = false; idleT = 0; hintReady = false; hintSearch = -1; HideHint(); shownMoves = shownScore = shownStreak = -1; levelArt = L.art; hudTick = 0; comboShown = -1;
+        swoop = 1f; flashA = 0; curtainA = 1f; goalTotal = GoalsLeft(); shownLeft = -1; halfShown = false; idleT = 0; hintReady = false; hintSearch = -1; bumpMoves = 0; HideHint(); shownMoves = shownScore = shownStreak = -1; levelArt = L.art; hudTick = 0; comboShown = -1;
         bossBlock = blocks.FirstOrDefault(b => b.type == "boss");
         RefreshComboLabels(); comboShownFill = comboShownGhost = -1; if (guideRoot && guideRoot.gameObject.activeSelf) { guideRoot.gameObject.SetActive(false); Time.timeScale = 1f; }
         BuildLines();
@@ -791,6 +791,23 @@ public class GameController : MonoBehaviour
     public Vector2 DebugDuckPos(int i) => ducks[i].p;
     public Vector2 DebugRandomTarget() { var a = blocks.Where(b => b.alive && !Covered(b) && !b.Hard).ToList(); return a.Count == 0 ? new Vector2(270, 300) : a[UnityEngine.Random.Range(0, a.Count)].p; }
     public bool DebugMoving => moving;
+    public float DebugMaxSpeed => MAX_SPEED;
+    // "smart" test bot: the same search the in-game hint uses, over a finer fan of angles
+    public Vector3 DebugBestShot(int angles = 48)
+    {
+        float best = -1; int bd = 0; Vector2 bdir = Vector2.up;
+        for (int i = 0; i < ducks.Count; i++)
+        {
+            if (ducks[i].clone || ducks[i].spawnT > 0) continue;
+            for (int k = 0; k < angles; k++)
+            {
+                float a = (k * 360f / angles - 180f) * Mathf.Deg2Rad; var dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                float sc = PredictShot(ducks[i], dir, null) + UnityEngine.Random.value * 0.5f;
+                if (sc > best) { best = sc; bd = i; bdir = dir; }
+            }
+        }
+        return new Vector3(bd, bdir.x, bdir.y);
+    }
     public string DebugState => state;
 
     void Tick(float dt)
@@ -1093,9 +1110,9 @@ public class GameController : MonoBehaviour
                         if (newBoost) { FxKit.Shockwave(W(mid), 2.6f, new Color(1f, 0.85f, 0.3f, 0.9f), 0.35f); FxKit.StarBurst(W(mid, 0.4f), 8); }
                         Splash(mid, 8); FxKit.Sparkle(W(mid), Color.white, 8); AddRing(mid, 38 + Mathf.Min(pushes, 6) * 6, new Color(0.55f, 0.95f, 1f, 0.75f)); Shake(0.15f); HitStop(0.03f); pushes++; shotSmash++; comboPulse = 0.18f;
                         PopText(LevelLibrary.Unlocked("zap", level) && pushes == ZAP_PUSHES ? "ĐỦ 3 CỐC → VỊT SÉT!" : pushes == 1 ? "PHÁ x2!" : LevelLibrary.Unlocked("zap", level) && pushes < ZAP_PUSHES ? "CỐC! " + pushes + "/" + ZAP_PUSHES : "CỐC x" + pushes + "!", mid, pushes == 1 ? new Color(1f, 0.85f, 0.3f) : Color.white, 46 + Mathf.Min(20, pushes * 4));
-                        if (pushes == 2 && state == "play" && moving)
-                        {   // reward real billiards: two ducks bumped in one shot gives the move back
-                            moves++; movesPulse = 0.45f; PopText("+1 LƯỢT!", mid + new Vector2(0, -70), new Color(0.45f, 0.95f, 0.5f), 56); Sfx.Play("coin", 0.9f, 1.3f);
+                        if (pushes == 2 && state == "play" && moving && bumpMoves < 2 && !LevelLibrary.IsHard(level))
+                        {   // reward real billiards: two ducks bumped in one shot gives the move back (twice per level: packed ducks can't farm it)
+                            bumpMoves++; moves++; movesPulse = 0.45f; PopText("+1 LƯỢT!", mid + new Vector2(0, -70), new Color(0.45f, 0.95f, 0.5f), 56); Sfx.Play("coin", 0.9f, 1.3f);
                         }
                         Sfx.Play(pushes % 2 == 1 ? "quack" : "squeak", 0.9f, 1f + pushes * 0.08f); Sfx.Play("thud", 0.5f, 1.35f);   // the "clack" has weight
                     }
@@ -1556,7 +1573,7 @@ public class GameController : MonoBehaviour
             foreach (var tr in TIERS) if (n >= tr.need && LevelLibrary.Unlocked(tr.kind, level)) { HatchSpecial(tr.kind, tr.name, tr.col); given = true; break; }
             if (!given && pushes >= ZAP_PUSHES && LevelLibrary.Unlocked("zap", level)) HatchSpecial("zap", "VỊT SÉT", new Color(0.45f, 0.85f, 1f));
         }
-        int bonus = n >= 30 ? 1 : 0;
+        int bonus = n >= 30 && !LevelLibrary.IsHard(level) ? 1 : 0;   // hard levels: the move budget is the puzzle, no refunds
         if (bonus > 0 && state == "play" && GoalsLeft() > 0)
         {
             moves += bonus; movesPulse = 0.35f;
@@ -1666,7 +1683,8 @@ public class GameController : MonoBehaviour
         {   // one short line about what's special here (shelves, rings, hard level...), then the goal
             introBody.text = "<size=40><color=#5b3cc4><b>" + (level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? "MỚI" : "CÂU ĐỐ") + "</b></color></size>\n<size=52><color=#2e2450><b>" + L.hint + "</b></color></size>"
                 + (keyName != "" && level > LevelLibrary.Onboarding ? "\n<size=40><color=#a14a00>Chìa khoá: <b>" + keyName.Split(':')[0] + "</b></color></size>" : "")
-                + (ducks.Count >= 3 && level > LevelLibrary.Onboarding ? "\n<size=40><color=#16703d>Húc vịt = phá <b>x2</b></color></size>" : "")
+                + (LevelLibrary.IsHard(level) ? "\n<size=40><color=#b0283c><b>Màn khó: không tặng thêm lượt!</b></color></size>"
+                   : ducks.Count >= 3 && level > LevelLibrary.Onboarding ? "\n<size=40><color=#16703d>Húc vịt = phá <b>x2</b></color></size>" : "")
                 + "\n\n<size=42><color=#2e2450>Phá <b>" + GoalsLeft() + "</b> món · <b>" + moves + "</b> lượt</color></size>";
             introRoot.sizeDelta = new Vector2(820, 560); introMax = introTimer = level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? 5f : 4.5f;
         }
@@ -2002,7 +2020,7 @@ public class GameController : MonoBehaviour
 
     void HideHint() { hintShown = false; foreach (var h in hintDots) if (h.gameObject.activeSelf) h.gameObject.SetActive(false); }
 
-    bool bumpTeach;
+    bool bumpTeach; int bumpMoves;
     void UpdateHint(float rdt)
     {
         UpdateKeys(rdt);

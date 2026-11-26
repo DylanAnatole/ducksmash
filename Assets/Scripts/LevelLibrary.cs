@@ -151,6 +151,13 @@ public static partial class LevelLibrary
     static BumperDef BumperL(float y, float h = 140) => new BumperDef { x = 32, y = y, w = 12, h = h };
     static BumperDef BumperR(float y, float h = 140) => new BumperDef { x = 496, y = y, w = 12, h = h };
 
+    static readonly Dictionary<int, int> MovesTable = new Dictionary<int, int>
+    {
+        { 6, 5 }, { 7, 10 }, { 8, 9 }, { 9, 5 }, { 10, 10 }, { 11, 8 }, { 12, 4 }, { 13, 6 }, { 14, 7 }, { 15, 8 },
+        { 16, 5 }, { 17, 9 }, { 18, 6 }, { 19, 5 }, { 20, 4 }, { 21, 4 }, { 22, 5 }, { 23, 5 }, { 24, 8 }, { 25, 7 },
+        { 26, 6 }, { 27, 7 }, { 28, 7 }, { 29, 5 }, { 30, 7 },
+    };
+
     static LevelDef L(int moves, string hint, params (float x, float y, string k)[] ducks)
     {
         var d = new LevelDef { moves = moves, hint = hint };
@@ -280,6 +287,9 @@ public static partial class LevelLibrary
         // unlock levels gift one special by transforming a plain duck: make sure there is one
         if (NewSpecialAt(n) != null && !d.ducks.Exists(x => x.kind == "normal") && d.ducks.Count > 0) d.ducks[d.ducks.Count - 1].kind = "normal";
         if (n > Onboarding && !IsSandbox(n)) d.moves += 1;   // playtest feedback: too hard -> one more move everywhere after the tutorial
+        // final move budgets, tuned with bot runs (random aim vs. hint-search aim): normal levels leave ~2 spare
+        // moves over a random player, hard ones about none - you have to find the key shot
+        if (MovesTable.TryGetValue(n, out var mv)) d.moves = mv;
         d.moves = Mathf.Max(3, d.moves);
         return d;
     }
