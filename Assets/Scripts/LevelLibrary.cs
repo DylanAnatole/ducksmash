@@ -211,7 +211,7 @@ public static partial class LevelLibrary
                 d.bumpers.Add(BumperL(600)); d.bumpers.Add(BumperR(600));
                 break;
             case 4:
-                d = L(15, "Chấm = số cú. Rương: +2 vịt", (150, 800, null), (270, 800, null), (390, 800, null), (270, 690, null));
+                d = L(12, "Vịt Sắt phá đĩa 3 lớp 1 phát", (270, 800, "heavy"));   // tray lesson: pick the right duck for the job
                 for (int i = 0; i < 5; i++) d.blocks.Add(B("plates", 110 + i * 80, 240));   // tutorial: fewer 3-hit plates
                 d.blocks.AddRange(Row("vase", 70, 320, 11, 40)); d.blocks.Add(B("chest", 270, 400));
                 d.blocks.AddRange(Cluster("glass", 270, 480, 2, 11, 40));

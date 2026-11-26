@@ -253,7 +253,7 @@ public static class Art
 
     public static void Bake(Transform root, string key, float gloss, float outline, params string[] keep)
     {
-        if (App.Mobile && !key.StartsWith("duck_")) outline = 0f;   // phones: only ducks keep a silhouette outline
+        // same outline on PC and phones (it used to be ducks-only on phones, everything on PC: inconsistent)
         var parts = new List<MeshFilter>();
         foreach (var mf in root.GetComponentsInChildren<MeshFilter>(true))
         {
@@ -267,17 +267,25 @@ public static class Art
         {
             var toRoot = root.worldToLocalMatrix;
             var combine = new List<CombineInstance>();
+            // overall size, so tiny details (eyes, studs, buttons) can opt out of the outline
+            float total = 0.001f;
+            foreach (var mf in parts) total = Mathf.Max(total, PartSize(toRoot * mf.transform.localToWorldMatrix, mf.sharedMesh));
             foreach (var mf in parts)
             {
                 var src = mf.sharedMesh; var m = Object.Instantiate(src);
                 var c = mf.GetComponent<Renderer>().sharedMaterial.color;
                 var cols = new Color[m.vertexCount]; for (int i = 0; i < cols.Length; i++) cols[i] = c;
                 m.colors = cols;
-                combine.Add(new CombineInstance { mesh = m, transform = toRoot * mf.transform.localToWorldMatrix });
+                var mtx = toRoot * mf.transform.localToWorldMatrix;
+                float flag = PartSize(mtx, src) < total * 0.22f ? 0f : 1f;   // w = outline on/off for this part
+                var f4 = new List<Vector4>(m.vertexCount); for (int i = 0; i < m.vertexCount; i++) f4.Add(new Vector4(0, 0, 0, flag));
+                m.SetUVs(3, f4);
+                combine.Add(new CombineInstance { mesh = m, transform = mtx });
             }
             mesh = new Mesh { name = "Baked_" + key, indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
             mesh.CombineMeshes(combine.ToArray(), true, true);
             foreach (var ci in combine) Object.Destroy(ci.mesh);
+            SmoothOutlineNormals(mesh);
             baked[key] = mesh;
         }
         foreach (var mf in parts) Object.DestroyImmediate(mf.gameObject);   // immediate: baked roots get cloned as templates right after
@@ -285,6 +293,29 @@ public static class Art
         go.transform.SetParent(root, false);
         go.AddComponent<MeshFilter>().sharedMesh = mesh;
         go.AddComponent<MeshRenderer>().sharedMaterial = BakedMat(gloss, outline, key != "decor");   // room decor is not in the water
+    }
+
+    static float PartSize(Matrix4x4 m, Mesh mesh)
+    {
+        var s = mesh.bounds.size;
+        return Mathf.Max(s.x * m.GetColumn(0).magnitude, Mathf.Max(s.y * m.GetColumn(1).magnitude, s.z * m.GetColumn(2).magnitude));
+    }
+    // outline normals: averaged over every vertex sharing a position, so the inverted hull of a cube / box / plate
+    // stays one closed shell instead of cracking open at every hard edge (stored in uv3.xyz, uv3.w = outline flag)
+    static void SmoothOutlineNormals(Mesh mesh)
+    {
+        var verts = mesh.vertices; var norms = mesh.normals; var uv = new List<Vector4>(); mesh.GetUVs(3, uv);
+        if (norms == null || norms.Length != verts.Length) return;
+        if (uv.Count != verts.Length) { uv.Clear(); for (int i = 0; i < verts.Length; i++) uv.Add(new Vector4(0, 0, 0, 1)); }
+        var sum = new Dictionary<Vector3Int, Vector3>();
+        Vector3Int Key(Vector3 p) => new Vector3Int(Mathf.RoundToInt(p.x * 2000f), Mathf.RoundToInt(p.y * 2000f), Mathf.RoundToInt(p.z * 2000f));
+        for (int i = 0; i < verts.Length; i++) { var k = Key(verts[i]); sum.TryGetValue(k, out var s); sum[k] = s + norms[i]; }
+        for (int i = 0; i < verts.Length; i++)
+        {
+            var n = sum[Key(verts[i])]; n = n.sqrMagnitude > 1e-6f ? n.normalized : norms[i];
+            uv[i] = new Vector4(n.x, n.y, n.z, uv[i].w);
+        }
+        mesh.SetUVs(3, uv);
     }
 
     static bool IsKept(Transform t, Transform root, string[] keep)

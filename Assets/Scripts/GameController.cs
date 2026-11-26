@@ -75,6 +75,7 @@ public class GameController : MonoBehaviour
     class Portal { public Vector2 a, b; public Transform sa, sb; public Color c; }
     readonly List<Portal> portals = new List<Portal>();
     const float PORTAL_R = 24f;
+    const float OUTLINE_W = 0.0017f;   // shared silhouette width (baked toys use smoothed normals, so boxes don't crack)
     class Flow { public Rect r; public Vector2 dir; public Material m; public Mesh mesh; public float tu, tv; readonly Vector2[] uv = new Vector2[4];
         // the shared material ignores tiling/offset, so the chevrons are tiled + scrolled through the quad's own UVs
         public void Scroll(float off) { if (!mesh) return; uv[0] = new Vector2(off, 0); uv[1] = new Vector2(off + tu, 0); uv[2] = new Vector2(off, tv); uv[3] = new Vector2(off + tu, tv); mesh.uv = uv; } }
@@ -368,7 +369,7 @@ public class GameController : MonoBehaviour
             floorMat.color = fc; if (floorMat.HasProperty("_Color")) floorMat.SetColor("_Color", fc);
         }
         boosterBusy = false; if (boosterCo != null) { StopCoroutine(boosterCo); boosterCo = null; }
-        swoop = 1f; flashA = 0; curtainA = 1f; goalTotal = GoalsLeft(); shownLeft = -1; halfShown = false; idleT = 0; hintReady = false; hintSearch = -1; bumpMoves = 0; HideHint(); shownMoves = shownScore = shownStreak = -1; levelArt = L.art; hudTick = 0; comboShown = -1;
+        swoop = 1f; flashA = 0; curtainA = 1f; goalTotal = GoalsLeft(); shownLeft = -1; halfShown = false; idleT = 0; hintReady = false; hintSearch = -1; bumpMoves = 0; tutKind = tutDock = false; HideHint(); shownMoves = shownScore = shownStreak = -1; levelArt = L.art; hudTick = 0; comboShown = -1;
         bossBlock = blocks.FirstOrDefault(b => b.type == "boss");
         RefreshComboLabels(); comboShownFill = comboShownGhost = -1; if (guideRoot && guideRoot.gameObject.activeSelf) { guideRoot.gameObject.SetActive(false); Time.timeScale = 1f; }
         BuildLines();
@@ -595,7 +596,7 @@ public class GameController : MonoBehaviour
             var fh = Art.Root("DecorFace", sl); fh.localPosition = new Vector3(0, 0.36f, -0.2f);
             Art.Face(fh, new Vector3(0, 0, -0.25f), 0.3f);
         }
-        Art.Bake(root, "decor", 0.5f, 0.002f);
+        Art.Bake(root, "decor", 0.5f, OUTLINE_W);
     }
 
     // Build the templates of the common block + duck kinds one per frame right after boot,
@@ -682,11 +683,11 @@ public class GameController : MonoBehaviour
         b.view = Spawn(key, parent =>
         {
             var v = BuildBlockArt(b, parent);
-            float outline = b.type == "stone" || b.type == "screw" ? 0.0013f : b.type == "pixel" || b.type == "domino" ? 0f : 0.001f;   // thin silhouette: blocks read apart in a crowd (desktop; phones skip outlines)
+            float outline = OUTLINE_W;   // one ink width for every toy, PC and phone alike   // thin silhouette: blocks read apart in a crowd (desktop; phones skip outlines)
             float gloss = b.type == "screw" ? 0.9f : b.type == "chest" ? 0.7f : 0.4f;
             Art.Bake(v, key, gloss, outline, "Spark", "IceShell", "Arrow", "Glow", "Plate1", "Plate2", "Plate3");
             if (b.type == "plates")   // each plate: one baked, instanced mesh
-                for (int i = 1; i <= 3; i++) { var pc = v.Find("Plate" + i); if (pc) Art.Bake(pc, "plate_" + Mathf.RoundToInt(b.r * 2), 0.9f, 0.003f); }
+                for (int i = 1; i <= 3; i++) { var pc = v.Find("Plate" + i); if (pc) Art.Bake(pc, "plate_" + Mathf.RoundToInt(b.r * 2), 0.9f, OUTLINE_W); }
             if (App.Mobile) foreach (var r in v.GetComponentsInChildren<Renderer>(true)) { r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false; }
             if (b.type != "pixel" && b.type != "plank" && b.type != "screw" && (b.type != "domino" || App.Mobile))   // phones have no realtime shadows: dominoes get the blob too
             {   // soft contact shadow on the water: blocks sit IN the bath instead of hovering, and read apart from the caustics
@@ -754,7 +755,7 @@ public class GameController : MonoBehaviour
         d.view = Spawn("duck_" + kind, parent =>
         {
             var v = Art.Duck(parent, kind, out _);
-            Art.Bake(v.Find("Body"), "duck_" + kind, kind == "heavy" ? 0.95f : 0.85f, 0.0011f, App.Mobile ? new[] { "Spark" } : new[] { "Spark", "Eye" });   // thin, soft ink: glossy toy look
+            Art.Bake(v.Find("Body"), "duck_" + kind, kind == "heavy" ? 0.95f : 0.85f, OUTLINE_W, App.Mobile ? new[] { "Spark" } : new[] { "Spark", "Eye" });   // thin, soft ink: glossy toy look
             if (App.Mobile)
             {   // no realtime shadows on phones: a soft dark disc under the duck instead
                 foreach (var r in v.GetComponentsInChildren<Renderer>(true)) { r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false; }
@@ -1579,7 +1580,7 @@ public class GameController : MonoBehaviour
     void ChooseKind(string k)
     {
         if (moving || state != "play" || TrayCount(k) <= 0) return;
-        loadKind = k; LoadDuck(false);
+        loadKind = k; LoadDuck(false); if (k == "heavy") { if (level == 4 && !tutKind) hint = ""; tutKind = true; }
         if (loaded != null) { PopText(k == "normal" ? "Vịt thường" : Cap(KindTag(k) ?? k), loaded.p + new Vector2(0, -60), KindColor(k), 40); Sfx.Play("quack", 0.5f, k == "heavy" ? 0.8f : 1.2f); }
     }
     void MoveToDock(int i)
@@ -1636,7 +1637,7 @@ public class GameController : MonoBehaviour
     void BuildTray()
     {
         trayRoot = UIKit.Panel(hud, new Color(1f, 0.98f, 0.94f, 0.96f), "DuckTray").rectTransform;
-        UIKit.Place(trayRoot, 0.5f, 0, 0, 430, 1000, 150);
+        UIKit.Place(trayRoot, 0.5f, 0, 0, 192, 1000, 122);
         var sh = trayRoot.gameObject.AddComponent<Shadow>(); sh.effectColor = new Color(0.35f, 0.25f, 0.55f, 0.35f); sh.effectDistance = new Vector2(0, -8);
         UIKit.Gloss(trayRoot, 0.35f);
     }
@@ -1659,14 +1660,14 @@ public class GameController : MonoBehaviour
             {
                 string k = ks[i];
                 var b = UIKit.Btn(trayRoot, "", Color.white, Ink, 30, () => ChooseKind(k), "Chip_" + k);
-                var rt = (RectTransform)b.transform; UIKit.Place(rt, 0.5f, 0.5f, x0 + i * w, 0, w - 16, 124);
+                var rt = (RectTransform)b.transform; UIKit.Place(rt, 0.5f, 0.5f, x0 + i * w, 0, w - 16, 104);
                 var bg = b.GetComponent<Image>();
                 var ic = UIKit.Rect("Icon", rt).gameObject.AddComponent<RawImage>(); ic.texture = DuckIcon(k); ic.raycastTarget = false;
-                UIKit.Place(ic.rectTransform, 0.5f, 0.5f, -30, 12, 80, 69);
-                var cnt = UIKit.Outlined(UIKit.Label(rt, "x" + TrayCount(k), 42, Color.white), Ink, 3); cnt.raycastTarget = false;
-                UIKit.Place(cnt.rectTransform, 0.5f, 0.5f, 42, 14, 90, 56);
-                var nm = UIKit.Label(rt, k == "normal" ? "Thường" : Cap(KindTag(k) ?? k), 26, Ink); nm.raycastTarget = false;
-                UIKit.Place(nm.rectTransform, 0.5f, 0.5f, 0, -38, w - 20, 34);
+                UIKit.Place(ic.rectTransform, 0.5f, 0.5f, -30, 10, 70, 60);
+                var cnt = UIKit.Outlined(UIKit.Label(rt, "x" + TrayCount(k), 36, Color.white), Ink, 3); cnt.raycastTarget = false;
+                UIKit.Place(cnt.rectTransform, 0.5f, 0.5f, 40, 12, 90, 50);
+                var nm = UIKit.Label(rt, k == "normal" ? "Thường" : Cap(KindTag(k) ?? k), 22, Ink); nm.raycastTarget = false;
+                UIKit.Place(nm.rectTransform, 0.5f, 0.5f, 0, -32, w - 20, 30);
                 trayChips.Add((rt, bg, cnt, k));
             }
         }
@@ -1795,8 +1796,8 @@ public class GameController : MonoBehaviour
                 {   // explain it once, the first time it happens
                     PlayerPrefs.SetInt("ds_frenzy_tut", 1); PlayerPrefs.Save();
                     introTitle.text = "DUCK FRENZY!"; introTitle.color = new Color(1f, 0.45f, 0.72f);
-                    introBody.text = "<size=46><b>FRENZY đầy!</b></size>\n\n<size=42>Phát sau: <b>5 vịt</b> lao ra\nvà <b>xuyên qua</b> đồ vật</size>\n\n<size=36><color=#5b3cc4>Phá 1 món = +1 thanh</color></size>";
-                    introRoot.sizeDelta = new Vector2(820, 600); introMax = introTimer = 5f; introRoot.gameObject.SetActive(true); introRoot.SetAsLastSibling();
+                    introBody.text = "<b>FRENZY đầy!</b>\n<size=28>Phát sau: <b>5 vịt</b> lao ra, <b>xuyên qua</b> đồ vật</size>";
+                    introMax = introTimer = 5f; introRoot.gameObject.SetActive(true); introRoot.SetAsLastSibling();
                 }
             }
         }
@@ -1868,26 +1869,23 @@ public class GameController : MonoBehaviour
         // reminder of the combo ducks the player has already unlocked
         var known = LevelLibrary.Specials.Where(s => LevelLibrary.Unlocked(s.kind, level) && LevelLibrary.NewSpecialAt(level) != s).ToList();
         string combos = "";   // no combo recipe reminder on every level (players found it patronising); the COMBO ? guide has it
-        introBody.text = string.Join("\n", g) + "\n\n" + moves + " lượt bắn\n<size=30><color=#a14a00>3 sao khi còn ≥ " + Mathf.CeilToInt(startMoves * 0.4f) + " lượt</color></size>" + combos;
+        introBody.text = "Phá sạch <b>" + GoalsLeft() + "</b> món · <b>" + moves + "</b> vịt";
         introMax = introTimer = 1.6f;
-        introRoot.sizeDelta = new Vector2(760, 520);
-
         // onboarding: level 1 = how to play in 3 steps; levels 2-5 = the one new thing this level teaches
         if (level == 1)
         {
             introTitle.text = "CÁCH CHƠI";
-            introBody.text = "<size=44><b>1.</b> Chạm vào vịt, <b>kéo ra sau</b>\n<b>2.</b> <b>Thả tay</b> để bắn\n<b>3.</b> <b>Phá sạch</b> mọi món trong bồn</size>\n\n<size=32>" + moves + " lượt bắn · chạm để bắt đầu</size>";
-            introRoot.sizeDelta = new Vector2(820, 560); introMax = introTimer = 6f;
+            introBody.text = "Chạm vịt · <b>kéo ra sau</b> · thả tay để bắn\n<size=28><color=#5b3cc4>Phá sạch mọi món trong bồn</color></size>";
+            introMax = introTimer = 6f;
         }
         else if (!string.IsNullOrEmpty(L.hint) && !LevelLibrary.IsSandbox(level))
         {   // one short line about what's special here (shelves, rings, hard level...), then the goal
-            introBody.text = "<size=40><color=#5b3cc4><b>" + (level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? "MỚI" : "CÂU ĐỐ") + "</b></color></size>\n<size=52><color=#2e2450><b>" + L.hint + "</b></color></size>"
-                + (keyName != "" && level > LevelLibrary.Onboarding ? "\n<size=40><color=#a14a00>Chìa khoá: <b>" + keyName.Split(':')[0] + "</b></color></size>" : "")
-                + (LevelLibrary.IsHard(level) ? "\n<size=40><color=#b0283c><b>Màn khó: không tặng thêm lượt!</b></color></size>"
-                   : ducks.Count >= 3 && level > LevelLibrary.Onboarding ? "\n<size=40><color=#16703d>Húc vịt = phá <b>x2</b></color></size>" : "")
-                + (docks.Count > 1 ? "\n<size=38><color=#1d6fa8>Chọn vịt ở khay · chạm <b>vòng lá</b> để đổi bến</color></size>" : "\n<size=38><color=#1d6fa8>Chọn vịt ở khay dưới bồn</color></size>")
-                + "\n\n<size=42><color=#2e2450>Phá <b>" + GoalsLeft() + "</b> món · <b>" + moves + "</b> vịt</color></size>";
-            introRoot.sizeDelta = new Vector2(820, 600); introMax = introTimer = level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? 5f : 4.5f;
+            // two short lines: the idea of the level, then key / rule / goal
+            introBody.text = "<b>" + L.hint + "</b>\n<size=28><color=#a14a00>"
+                + (keyName != "" && level > LevelLibrary.Onboarding ? "Chìa khoá: <b>" + keyName.Split(':')[0] + "</b> · " : "")
+                + (LevelLibrary.IsHard(level) ? "<color=#b0283c>Màn khó</color> · " : "")
+                + GoalsLeft() + " món · " + moves + " vịt</color></size>";
+            introMax = introTimer = level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? 5f : 4.5f;
         }
 
         // unlock level: teach how to earn the new duck and how it works, and give one free copy to try
@@ -1895,8 +1893,7 @@ public class GameController : MonoBehaviour
         if (nw != null)
         {
             introTitle.text = "VỊT MỚI!";
-            introBody.text = "<size=58><color=#d4520f>" + nw.name + "</color></size>\n\n<size=38>" + nw.use + "</size>\n<size=32><color=#7a4dd8>Có khi: " + nw.how.ToLower() + "</color></size>";
-            introRoot.sizeDelta = new Vector2(820, 520);
+            introBody.text = "<color=#d4520f><b>" + nw.name + "</b></color>\n<size=28>" + nw.use + "</size>";
             introMax = introTimer = 6f;
             traySpecials.Add(nw.kind); if (moves < traySpecials.Count + 1) moves = startMoves = traySpecials.Count + 1;
             loadKind = nw.kind; LoadDuck(false); trayDirty = true;
@@ -1928,8 +1925,24 @@ public class GameController : MonoBehaviour
         // tutorial hand on the first levels: shows the pull-back gesture
         UpdateHint(rdt); UpdateHatchFliers(rdt);
         bool showHand = level <= 2 && state == "play" && !moving && drag == null && introTimer <= 0 && moves == startMoves && ducks.Count > 0 && !hintShown;
-        handRt.gameObject.SetActive(showHand || hintShown);
-        if (hintShown && !showHand)
+        // onboarding taps: level 4 teaches the tray (pick the iron duck), level 5 teaches docks (tap another lily pad)
+        Vector2? tapAt = null;
+        if (state == "play" && !moving && drag == null && introTimer <= 0)
+        {
+            if (level == 4 && !tutKind) { foreach (var c in trayChips) if (c.kind == "heavy" && c.rt) tapAt = WorldToHudFromRect(c.rt); if (tapAt.HasValue) hint = "Chạm VỊT SẮT ở khay: phá đĩa 1 phát!"; }
+            else if (level == 5 && !tutDock && docks.Count > 1) { tapAt = WorldToHud(W(docks[(dock + 1) % docks.Count], 0.2f)); hint = "Chạm vòng lá khác để đổi chỗ bắn!"; }
+        }
+        if (tapAt.HasValue) { showHand = false; if (hintShown) HideHint(); }
+        handRt.gameObject.SetActive(showHand || hintShown || tapAt.HasValue);
+        { var hlb = handRt.Find("HandLabel"); if (hlb && hlb.gameObject.activeSelf == tapAt.HasValue) hlb.gameObject.SetActive(!tapAt.HasValue); }   // "KÉO" only for the drag demo
+        if (tapAt.HasValue)
+        {   // tap tap: the finger presses on the spot
+            float k = Mathf.Repeat(Time.unscaledTime, 1f);
+            handRt.anchoredPosition = tapAt.Value + new Vector2(10, -18 - (k < 0.3f ? (0.3f - k) * 60f : 0));
+            handRt.localScale = Vector3.one * (k < 0.15f ? 0.85f : 1f);
+            handRt.GetComponent<CanvasGroup>().alpha = 0.95f;
+        }
+        if (hintShown && !showHand && !tapAt.HasValue)
         {   // hint hand: drag the suggested duck back, opposite to the suggested direction
             var d = ducks[Mathf.Clamp(hintBestDuck, 0, ducks.Count - 1)];
             float k = Mathf.Repeat(Time.unscaledTime, 1.6f) / 1.2f;
@@ -2140,7 +2153,7 @@ public class GameController : MonoBehaviour
             {   // tapped a different dock: hop the duck over there
                 int di = -1; float dbest = 62f;
                 for (int i = 0; i < docks.Count; i++) { float dd = Vector2.Distance(docks[i], p); if (dd < dbest) { dbest = dd; di = i; } }
-                if (di >= 0 && di != dock) { MoveToDock(di); return; }
+                if (di >= 0 && di != dock) { MoveToDock(di); if (level == 5 && !tutDock) hint = ""; tutDock = true; return; }
             }
             drag = best; dragPt = dragSm = p;
             if (best != null) { best.squash = 0.12f; Sfx.Play("squeak", 0.35f, 1.5f); }
@@ -2227,7 +2240,7 @@ public class GameController : MonoBehaviour
 
     void HideHint() { hintShown = false; foreach (var h in hintDots) if (h.gameObject.activeSelf) h.gameObject.SetActive(false); }
 
-    bool bumpTeach; int bumpMoves; int hintBestDock; bool lastShotWeak; Vector2? lastAssist;
+    bool bumpTeach; int bumpMoves; bool tutKind, tutDock; int hintBestDock; bool lastShotWeak; Vector2? lastAssist;
     void UpdateHint(float rdt)
     {
         UpdateKeys(rdt);
@@ -3000,22 +3013,34 @@ public class GameController : MonoBehaviour
         if (!force && Screen.width == lastW && Screen.height == lastH) return;
         lastW = Screen.width; lastH = Screen.height;
         cam.fieldOfView = 34;
-        var rot = Quaternion.Euler(55, 0, 0); cam.transform.rotation = rot;   // a bit lower: toys read as round 3D objects
+        // tall phones are width-limited: tip the camera more top-down so the tub stands taller and fills the screen
+        float tallT = Mathf.Clamp01((1080f * Screen.height / Mathf.Max(1, Screen.width) - 1920f) / 420f);
+        var rot = Quaternion.Euler(Mathf.Lerp(55f, 66f, tallT), 0, 0); cam.transform.rotation = rot;   // 9:16 keeps the 3/4 toy view
         var focus = new Vector3(0, 0, -0.25f);
         float refH = 1080f * Screen.height / Mathf.Max(1, Screen.width);   // canvas height in reference units (fit-width scaler)
-        float botFrac = 515f / refH, topFrac = 1f - 330f / refH;          // keep the tray + boosters below, the HUD above
-        float w = TW * K / 2 + 0.45f, h = TH * K / 2 + 0.45f;
+        float botFrac = 322f / refH, topFrac = 1f - 196f / refH;          // slim HUD: tray + boosters below, one bar above
+        float w = TW * K / 2 + 0.2f, h = TH * K / 2 + 0.25f;
         Vector3[] corners = { new Vector3(-w, 0.5f, h), new Vector3(w, 0.5f, h), new Vector3(-w, 0, -h), new Vector3(w, 0, -h) };
-        for (float dist = 12; dist < 80; dist += 0.25f)
+        for (int pass = 0; pass < 4; pass++)
         {
-            cam.transform.position = focus - rot * Vector3.forward * dist;
-            bool ok = true;
-            foreach (var c in corners)
+            float dist = 12;
+            for (; dist < 80; dist += 0.25f)
             {
-                var v = cam.WorldToViewportPoint(c);
-                if (v.x < 0.02f || v.x > 0.98f || v.y < botFrac || v.y > topFrac) { ok = false; break; }
+                cam.transform.position = focus - rot * Vector3.forward * dist;
+                bool ok = true;
+                foreach (var c in corners)
+                {
+                    var v = cam.WorldToViewportPoint(c);
+                    if (v.x < 0.02f || v.x > 0.98f || v.y < botFrac || v.y > topFrac) { ok = false; break; }
+                }
+                if (ok) break;
             }
-            if (ok) break;
+            // centre the tub in the space between the HUD and the tray, then fit again (zooms in when the gap was lopsided)
+            float vTop = cam.WorldToViewportPoint(corners[0]).y, vBot = cam.WorldToViewportPoint(corners[2]).y;
+            float off = (vTop + vBot) * 0.5f - (topFrac + botFrac) * 0.5f;
+            if (Mathf.Abs(off) < 0.004f) break;
+            float worldH = 2f * dist * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) / Mathf.Sin(rot.eulerAngles.x * Mathf.Deg2Rad);
+            focus.z += off * worldH;
         }
         camBase = cam.transform.position;
         QualitySettings.shadowDistance = (camBase - focus).magnitude + 14f;   // just enough to cover the whole tub
@@ -3036,46 +3061,47 @@ public class GameController : MonoBehaviour
         flashImg = UIKit.Stretch(UIKit.Rect("Flash", hud)).gameObject.AddComponent<Image>();
         flashImg.color = new Color(1f, 0.97f, 0.9f, 0); flashImg.raycastTarget = false; flashImg.canvasRenderer.cullTransparentMesh = true;
         // top bar
-        var top = UIKit.Panel(hud, PurpleDark, "TopBar").rectTransform; UIKit.Place(top, 0.5f, 1, 0, -150, 1040, 250);
-        var topIn = UIKit.Panel(top, Purple, "Inner").rectTransform; UIKit.Stretch(topIn, 0, 10, 0, 0);
+        // slim top bar: the board gets the screen (players said "UI huge, game tiny")
+        var top = UIKit.Panel(hud, PurpleDark, "TopBar").rectTransform; UIKit.Place(top, 0.5f, 1, 0, -74, 1060, 132);
+        var topIn = UIKit.Panel(top, Purple, "Inner").rectTransform; UIKit.Stretch(topIn, 0, 8, 0, 0);
         UIKit.Gloss(topIn, 0.2f);
-        var mframe = UIKit.Panel(topIn, Yellow, "MovesFrame").rectTransform; UIKit.Place(mframe, 0, 0.5f, 125, 18, 206, 196);
-        var mb = UIKit.Panel(topIn, Color.white, "Moves").rectTransform; UIKit.Place(mb, 0, 0.5f, 125, 18, 186, 176);
-        movesTxt = UIKit.Label(mb, "10", 100, Ink); movesTxt.rectTransform.offsetMin = new Vector2(0, 26);
-        var ml = UIKit.Label(mb, "LƯỢT BẮN", 30, PurpleDark); ml.fontStyle = FontStyle.Bold; ml.rectTransform.offsetMax = new Vector2(0, -122);
-        var sp = UIKit.Rect("StarPreview", topIn); UIKit.Place(sp, 0, 0.5f, 125, -100, 170, 36);
-        starPreview = UIKit.StarRow(sp, 3, 36, 6);
+        var mframe = UIKit.Panel(topIn, Yellow, "MovesFrame").rectTransform; UIKit.Place(mframe, 0, 0.5f, 72, 2, 116, 110);
+        var mb = UIKit.Panel(topIn, Color.white, "Moves").rectTransform; UIKit.Place(mb, 0, 0.5f, 72, 2, 104, 98);
+        movesTxt = UIKit.Label(mb, "10", 60, Ink); movesTxt.rectTransform.offsetMin = new Vector2(0, 22);
+        var ml = UIKit.Label(mb, "VỊT", 24, PurpleDark); ml.fontStyle = FontStyle.Bold; ml.rectTransform.offsetMax = new Vector2(0, -68);
+        var sp = UIKit.Rect("StarPreview", topIn); UIKit.Place(sp, 0, 0.5f, 210, -32, 110, 28);
+        starPreview = UIKit.StarRow(sp, 3, 26, 4);
         aimCount = UIKit.Outlined(UIKit.Label(hud, "", 64, Color.white), Ink, 4); aimCount.verticalOverflow = VerticalWrapMode.Overflow; aimCount.horizontalOverflow = HorizontalWrapMode.Overflow; aimCount.lineSpacing = 0.85f;
         aimCount.rectTransform.anchorMin = aimCount.rectTransform.anchorMax = new Vector2(0.5f, 0.5f); aimCount.rectTransform.sizeDelta = new Vector2(300, 100);
         aimCount.gameObject.SetActive(false);
-        goalsTxt = UIKit.Outlined(UIKit.Label(topIn, "", 40, Color.white, TextAnchor.MiddleLeft), Ink, 3); UIKit.Place(goalsTxt.rectTransform, 0, 0.5f, 480, 22, 420, 150);
+        goalsTxt = UIKit.Outlined(UIKit.Label(topIn, "", 30, Color.white, TextAnchor.MiddleLeft), Ink, 3); UIKit.Place(goalsTxt.rectTransform, 0, 0.5f, 470, 12, 400, 84);
         goalsTxt.horizontalOverflow = HorizontalWrapMode.Overflow; goalsTxt.verticalOverflow = VerticalWrapMode.Overflow; goalsTxt.lineSpacing = 0.95f;
         goalsTxt.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        var ob = UIKit.Panel(topIn, new Color(0.23f, 0.18f, 0.42f, 0.55f), "ObjBar").rectTransform; UIKit.Place(ob, 0, 0.5f, 480, -78, 420, 26);
+        var ob = UIKit.Panel(topIn, new Color(0.23f, 0.18f, 0.42f, 0.55f), "ObjBar").rectTransform; UIKit.Place(ob, 0, 0.5f, 470, -44, 400, 14);
         objFill = UIKit.Panel(ob, new Color(0.45f, 0.95f, 0.5f), "Fill").rectTransform;
         objFill.anchorMin = Vector2.zero; objFill.anchorMax = new Vector2(0, 1); objFill.offsetMin = objFill.offsetMax = Vector2.zero; objFill.pivot = new Vector2(0, 0.5f);
-        levelTxt = UIKit.Outlined(UIKit.Label(topIn, "", 36, Color.white, TextAnchor.MiddleRight), new Color(0.25f, 0.2f, 0.45f), 2); UIKit.Place(levelTxt.rectTransform, 1, 0.5f, -265, 50, 260, 60);
-        scoreTxt = UIKit.Label(topIn, "", 40, Yellow, TextAnchor.MiddleRight); UIKit.Place(scoreTxt.rectTransform, 1, 0.5f, -265, -20, 260, 60);
-        var gear = UIKit.Btn(topIn, "II", Yellow, Ink, 44, () => App.OpenSettings(true), "Settings");
-        UIKit.Place((RectTransform)gear.transform, 1, 0.5f, -65, 10, 100, 100);
+        levelTxt = UIKit.Outlined(UIKit.Label(topIn, "", 28, Color.white, TextAnchor.MiddleRight), new Color(0.25f, 0.2f, 0.45f), 2); UIKit.Place(levelTxt.rectTransform, 1, 0.5f, -230, 24, 240, 44);
+        scoreTxt = UIKit.Label(topIn, "", 30, Yellow, TextAnchor.MiddleRight); UIKit.Place(scoreTxt.rectTransform, 1, 0.5f, -230, -20, 240, 44);
+        var gear = UIKit.Btn(topIn, "II", Yellow, Ink, 36, () => App.OpenSettings(true), "Settings");
+        UIKit.Place((RectTransform)gear.transform, 1, 0.5f, -56, 4, 84, 84);
         // fever bar
         // FRENZY meter: how much is banked, what a full bar gives, and what this shot will add
-        feverBar = UIKit.Panel(hud, new Color(0.47f, 0.42f, 0.74f, 0.95f), "Fever").rectTransform; UIKit.Place(feverBar, 0.5f, 1, 0, -312, 1010, 62);
-        var ftrack = UIKit.Rect("Track", feverBar); UIKit.Stretch(ftrack, 6, 6, 6, 6);
+        feverBar = UIKit.Panel(hud, new Color(0.47f, 0.42f, 0.74f, 0.95f), "Fever").rectTransform; UIKit.Place(feverBar, 0.5f, 1, -66, -164, 880, 38);
+        var ftrack = UIKit.Rect("Track", feverBar); UIKit.Stretch(ftrack, 4, 4, 4, 4);
         UIKit.Gloss(feverBar, 0.16f);
         feverGhost = UIKit.Panel(ftrack, new Color(1f, 1f, 1f, 0.4f), "Ghost").rectTransform;
         var ff = UIKit.Panel(ftrack, new Color(1f, 0.42f, 0.68f), "Fill"); feverFill = ff.rectTransform;
         foreach (var r in new[] { feverGhost, feverFill }) { r.anchorMin = Vector2.zero; r.anchorMax = new Vector2(0, 1); r.offsetMin = r.offsetMax = Vector2.zero; r.pivot = new Vector2(0, 0.5f); }
         for (int i = 1; i < 7; i++)
         {   // a tick every 10 points
-            var tk = UIKit.Panel(ftrack, new Color(1f, 1f, 1f, 0.35f), "Tick").rectTransform; tk.anchorMin = tk.anchorMax = new Vector2(i / 7f, 0.5f); tk.sizeDelta = new Vector2(3, 40);
+            var tk = UIKit.Panel(ftrack, new Color(1f, 1f, 1f, 0.35f), "Tick").rectTransform; tk.anchorMin = tk.anchorMax = new Vector2(i / 7f, 0.5f); tk.sizeDelta = new Vector2(3, 26);
         }
-        var fl = UIKit.Outlined(UIKit.Label(feverBar, "FRENZY", 34, Color.white, TextAnchor.MiddleLeft), new Color(0.6f, 0.15f, 0.4f), 3); UIKit.Place(fl.rectTransform, 0, 0.5f, 110, 0, 200, 60);
-        feverTxt = UIKit.Outlined(UIKit.Label(feverBar, "0 / 70", 36, Color.white), Ink, 3); UIKit.Place(feverTxt.rectTransform, 0.5f, 0.5f, 0, 0, 600, 60);
-        feverHint = UIKit.Outlined(UIKit.Label(feverBar, "phá 1 món = +1", 30, Color.white, TextAnchor.MiddleRight), new Color(0.25f, 0.2f, 0.45f), 2); UIKit.Place(feverHint.rectTransform, 1, 0.5f, -120, 0, 260, 60);
-        feverPop = UIKit.Outlined(UIKit.Label(hud, "", 46, new Color(1f, 0.55f, 0.8f)), Color.white, 3); UIKit.Place(feverPop.rectTransform, 0.5f, 1, 300, -262, 400, 70);
+        var fl = UIKit.Outlined(UIKit.Label(feverBar, "FRENZY", 24, Color.white, TextAnchor.MiddleLeft), new Color(0.6f, 0.15f, 0.4f), 2); UIKit.Place(fl.rectTransform, 0, 0.5f, 80, 0, 150, 38);
+        feverTxt = UIKit.Outlined(UIKit.Label(feverBar, "0 / 70", 24, Color.white), Ink, 2); UIKit.Place(feverTxt.rectTransform, 0.5f, 0.5f, 0, 0, 400, 38);
+        feverHint = UIKit.Outlined(UIKit.Label(feverBar, "phá 1 món = +1", 20, Color.white, TextAnchor.MiddleRight), new Color(0.25f, 0.2f, 0.45f), 2); UIKit.Place(feverHint.rectTransform, 1, 0.5f, -100, 0, 200, 38);
+        feverPop = UIKit.Outlined(UIKit.Label(hud, "", 40, new Color(1f, 0.55f, 0.8f)), Color.white, 3); UIKit.Place(feverPop.rectTransform, 0.5f, 1, 300, -210, 400, 60);
         feverPop.raycastTarget = false; feverPop.gameObject.SetActive(false);
-        streakTxt = UIKit.Outlined(UIKit.Label(topIn, "", 30, new Color(1f, 0.85f, 0.4f), TextAnchor.MiddleRight), new Color(0.25f, 0.2f, 0.45f), 2); UIKit.Place(streakTxt.rectTransform, 1, 0.5f, -265, -70, 300, 40);
+        streakTxt = UIKit.Outlined(UIKit.Label(hud, "", 26, new Color(1f, 0.85f, 0.4f), TextAnchor.MiddleRight), new Color(0.25f, 0.2f, 0.45f), 2); UIKit.Place(streakTxt.rectTransform, 1, 1, -170, -210, 300, 36);
         // boss bar
         bossBar = UIKit.Panel(hud, new Color(0.23f, 0.18f, 0.42f, 0.7f), "BossBar").rectTransform; UIKit.Place(bossBar, 0.5f, 1, 0, -360, 700, 40);
         var bf = UIKit.Panel(bossBar, new Color(1f, 0.35f, 0.2f), "Fill"); bossFill = bf.rectTransform;
@@ -3088,29 +3114,29 @@ public class GameController : MonoBehaviour
         bigTxt = UIKit.Outlined(UIKit.Label(hud, "", 110, Color.white), new Color(1f, 0.5f, 0.75f), 8); UIKit.Place(bigTxt.rectTransform, 0.5f, 0.5f, 0, 120, 1000, 200);
         bigTxt.color = new Color(1, 1, 1, 0);
         // hint
-        hintPanel = UIKit.Panel(hud, new Color(1, 1, 1, 0.93f), "Hint").rectTransform; UIKit.Place(hintPanel, 0.5f, 0, 0, 290, 980, 90);
-        hintTxt = UIKit.Label(hintPanel, "", 40, Ink); hintTxt.fontStyle = FontStyle.Bold; hintTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
+        hintPanel = UIKit.Panel(hud, new Color(1, 1, 1, 0.82f), "Hint").rectTransform; UIKit.Place(hintPanel, 0.5f, 0, 0, 286, 960, 54);
+        hintTxt = UIKit.Label(hintPanel, "", 30, Ink); hintTxt.fontStyle = FontStyle.Bold; hintTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
         BuildTray();
         // booster bar
-        var bar = UIKit.Rect("Boosters", hud); UIKit.Place(bar, 0.5f, 0, 0, 125, 1060, 190);
-        var mapBtn = UIKit.Btn(bar, "BẢN ĐỒ", PurpleDark, Color.white, 30, App.ShowMap, "Map");
-        UIKit.Place((RectTransform)mapBtn.transform, 0, 0.5f, 100, 0, 180, 170);
+        var bar = UIKit.Rect("Boosters", hud); UIKit.Place(bar, 0.5f, 0, 0, 66, 1060, 112);
+        var mapBtn = UIKit.Btn(bar, "BẢN\nĐỒ", PurpleDark, Color.white, 24, App.ShowMap, "Map");
+        UIKit.Place((RectTransform)mapBtn.transform, 0, 0.5f, 68, 0, 120, 100);
         string[] keys = { "hammer", "bomb", "moves" };
         for (int i = 0; i < 3; i++)
         {
             string k = keys[i];
             var b = UIKit.Btn(bar, "", Yellow, Ink, 36, () => UseBooster(k), "Boost_" + k);
-            UIKit.Place((RectTransform)b.transform, 0, 0.5f, 335 + i * 270, 0, 250, 170);
-            var lbl = UIKit.BtnText(b); lbl.lineSpacing = 1.05f; lbl.fontSize = 32;
+            UIKit.Place((RectTransform)b.transform, 0, 0.5f, 290 + i * 296, 0, 280, 100);
+            var lbl = UIKit.BtnText(b); lbl.lineSpacing = 1f; lbl.fontSize = 24;
             lbl.rectTransform.offsetMin = new Vector2(84, lbl.rectTransform.offsetMin.y);   // room for the icon
             var bIcon = UIKit.Rect("Icon", b.transform).gameObject.AddComponent<RawImage>(); bIcon.raycastTarget = false;
-            UIKit.Place(bIcon.rectTransform, 0, 0.5f, 54, 4, 76, 76); bIcon.texture = BoosterIcon(k);
+            UIKit.Place(bIcon.rectTransform, 0, 0.5f, 48, 2, 62, 62); bIcon.texture = BoosterIcon(k);
             boostTxt[k] = lbl; boostImg[k] = b.GetComponent<Image>();
         }
         // popup
         popupRoot = UIKit.Stretch(UIKit.Rect("Popup", hud));
-        var dim = popupRoot.gameObject.AddComponent<Image>(); dim.color = new Color(0.11f, 0.08f, 0.25f, 0.75f);
-        var card = UIKit.Panel(popupRoot, Purple, "Card").rectTransform; UIKit.Place(card, 0.5f, 0.5f, 0, 0, 900, 1000);
+        var dim = popupRoot.gameObject.AddComponent<Image>(); dim.color = new Color(0.11f, 0.08f, 0.25f, 0.45f);
+        var card = UIKit.Panel(popupRoot, Purple, "Card").rectTransform; UIKit.Place(card, 0.5f, 0.5f, 0, 0, 900, 1000); card.localScale = Vector3.one * 0.74f;
         popTitle = UIKit.Outlined(UIKit.Label(card, "", 90, Color.white), Ink, 5); UIKit.Place(popTitle.rectTransform, 0.5f, 1, 0, -120, 860, 140);
         popStars = UIKit.Label(card, "", 130, Yellow); UIKit.Place(popStars.rectTransform, 0.5f, 1, 0, -290, 860, 170);
         sunburst = UIKit.Rect("Sunburst", popStars.transform).gameObject.AddComponent<RawImage>(); sunburst.raycastTarget = false;
@@ -3125,11 +3151,11 @@ public class GameController : MonoBehaviour
         popA = UIKit.Btn(card, "", new Color(0.37f, 0.83f, 0.37f), Color.white, 50, OnPopA, "A"); UIKit.Place((RectTransform)popA.transform, 0.5f, 0, 0, 280, 640, 150);
         popB = UIKit.Btn(card, "", Yellow, Ink, 44, OnPopB, "B"); UIKit.Place((RectTransform)popB.transform, 0.5f, 0, 0, 110, 640, 130);
         // level intro card
-        introRoot = UIKit.Rect("Intro", hud); UIKit.Place(introRoot, 0.5f, 0.5f, 0, 60, 760, 520);
+        introRoot = UIKit.Rect("Intro", hud); UIKit.Place(introRoot, 0.5f, 0, 0, 214, 1020, 236);
         var ic = UIKit.Panel(introRoot, new Color(1f, 0.97f, 0.94f, 0.96f), "IntroCard"); UIKit.Stretch(ic.rectTransform);
         var ish = ic.gameObject.AddComponent<Shadow>(); ish.effectColor = new Color(0.3f, 0.2f, 0.5f, 0.3f); ish.effectDistance = new Vector2(0, -12);
-        introTitle = UIKit.Outlined(UIKit.Label(introRoot, "", 80, Purple), Ink, 3); UIKit.Place(introTitle.rectTransform, 0.5f, 1, 0, -95, 700, 120);
-        introBody = UIKit.Label(introRoot, "", 46, Ink); UIKit.Place(introBody.rectTransform, 0.5f, 0.5f, 0, -50, 760, 380);
+        introTitle = UIKit.Outlined(UIKit.Label(introRoot, "", 48, Purple), Ink, 3); UIKit.Place(introTitle.rectTransform, 0.5f, 1, 0, -40, 980, 64);
+        introBody = UIKit.Label(introRoot, "", 34, Ink); UIKit.Place(introBody.rectTransform, 0.5f, 0.5f, 0, -30, 980, 150);
         introRoot.gameObject.SetActive(false);
         // tutorial hand (white fingertip)
         var hand = UIKit.Dot(hud, Color.white, "Hand"); hand.raycastTarget = false; handRt = hand.rectTransform;
@@ -3146,7 +3172,7 @@ public class GameController : MonoBehaviour
             new Dictionary<char, Color> { { 'o', new Color(0.23f, 0.18f, 0.42f) }, { 'w', new Color(1f, 0.93f, 0.85f) } });
         hpx.rectTransform.anchorMin = hpx.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
         hpx.rectTransform.sizeDelta = new Vector2(91, 112); hpx.rectTransform.anchoredPosition = new Vector2(14, -50);
-        var hl = UIKit.Label(hand.transform, "KÉO", 26, Ink); hl.rectTransform.offsetMin = new Vector2(0, -150); hl.rectTransform.offsetMax = new Vector2(0, -120);
+        var hl = UIKit.Label(hand.transform, "KÉO", 26, Ink); hl.name = "HandLabel"; hl.rectTransform.offsetMin = new Vector2(0, -150); hl.rectTransform.offsetMax = new Vector2(0, -120);
         handRt.gameObject.SetActive(false);
         // animated UI lives in a nested canvas: moving labels no longer force a rebuild of the whole HUD
         dynLayer = UIKit.Stretch(UIKit.Rect("DynamicUI", hud));
@@ -3219,13 +3245,13 @@ public class GameController : MonoBehaviour
             comboMarks.Add((tr.need, tr.kind, dot, lbl, mk));
         }
         var help = UIKit.Btn(hud, "COMBO ?", Yellow, Ink, 28, OpenComboGuide, "ComboHelp"); comboHelp = help.gameObject;
-        UIKit.Place((RectTransform)help.transform, 1, 1, -88, -384, 150, 56);
+        UIKit.Place((RectTransform)help.transform, 1, 1, -78, -164, 130, 40); UIKit.BtnText(help).fontSize = 22;
     }
 
     GameObject comboHelp;
     void UpdateComboBar()
     {
-        bool show = level > LevelLibrary.Onboarding && state == "play";
+        bool show = false;   // minimal HUD: the milestone bar is gone (the tray shows what you earn)
         if (comboBar.gameObject.activeSelf != show) comboBar.gameObject.SetActive(show);
         // first lessons: no combo help, no FRENZY bar (one idea at a time)
         bool help = level > LevelLibrary.Onboarding || LevelLibrary.IsSandbox(level);
@@ -3334,7 +3360,7 @@ public class GameController : MonoBehaviour
         {
             shownLeft = left;
             int done = goalTotal - left, pctDone = goalTotal > 0 ? Mathf.RoundToInt(100f * done / goalTotal) : 100;
-            goalsTxt.text = "<size=34>ĐÃ PHÁ <b>" + done + "/" + goalTotal + "</b> · <color=#9dffa0><b>" + pctDone + "%</b></color></size>\n<size=62><b>" + (left == 0 ? "XONG!" : "còn " + left + " món") + "</b></size>";
+            goalsTxt.text = "<size=24>ĐÃ PHÁ <b>" + done + "/" + goalTotal + "</b> · <color=#9dffa0><b>" + pctDone + "%</b></color></size>\n<size=42><b>" + (left == 0 ? "XONG!" : "còn " + left + " món") + "</b></size>";
             objFill.anchorMax = new Vector2(goalTotal > 0 ? 1f - left / (float)goalTotal : 1f, 1);
             goalPulse = 0.25f;
             if (!halfShown && goalTotal >= 10 && left > 0 && left <= goalTotal / 2)

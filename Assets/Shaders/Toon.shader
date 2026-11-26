@@ -97,16 +97,20 @@ Shader "DuckSmash/Toon"
             #include "UnityCG.cginc"
             float _Outline; fixed4 _OutlineColor;
 
-            float4 vert (appdata_base v) : SV_POSITION
+            float4 vert (appdata_full v) : SV_POSITION
             {
                 UNITY_SETUP_INSTANCE_ID(v);
             #if defined(NO_OUTLINE)
                 return float4(2, 2, 2, 1);   // every vertex outside clip space -> whole outline culled
             #endif
+                // baked meshes carry smoothed normals in uv3 (xyz) + a per-part on/off flag (w); plain meshes use their normals
+                float3 sn = v.texcoord3.xyz; bool baked = dot(sn, sn) > 0.25;
+                float3 nrm = baked ? sn : v.normal; float on = baked ? v.texcoord3.w : 1;
                 float4 p = UnityObjectToClipPos(v.vertex);
-                float3 nv = normalize(mul((float3x3)UNITY_MATRIX_IT_MV, v.normal));
+                float3 nv = normalize(mul((float3x3)UNITY_MATRIX_IT_MV, nrm));
                 float2 off = TransformViewToProjection(nv.xy);
-                p.xy += off * _Outline * p.w;
+                p.xy += off * _Outline * p.w * on;
+                p.z += (1 - on) * 0.0 ;
                 return p;
             }
             fixed4 frag () : SV_Target { return _OutlineColor; }
