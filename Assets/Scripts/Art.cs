@@ -51,6 +51,7 @@ public static class Art
     public static Material Mat(Color c, float smooth = 0.55f, float metal = 0f, float emission = 0f, float outline = 0f)
     {
         if (App.Mobile) outline = 0f;   // phones: no outline passes at all (ducks keep theirs via Bake)
+        outline *= 0.55f;
         string key = ColorUtility.ToHtmlStringRGBA(c) + "|" + smooth + "|" + metal + "|" + emission + "|" + outline;
         if (mats.TryGetValue(key, out var m) && m != null) return m;
         m = new Material(outline > 0f ? ToonShader : FlatShader) { color = c };
@@ -332,6 +333,48 @@ public static class Art
         return m;
     }
 
+    static Texture2D faceTex; static Material faceMat;
+    static Material FaceMat()
+    {
+        if (faceMat != null) return faceMat;
+        const int S = 128; faceTex = new Texture2D(S, S, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+        var px = new Color[S * S]; var ink = new Color(0.16f, 0.1f, 0.22f, 1f);
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                float u = (x + 0.5f) / S, v = (y + 0.5f) / S; Color c = Color.clear;
+                for (int e = -1; e <= 1; e += 2)
+                {
+                    float ex = 0.5f + e * 0.2f, ey = 0.58f;
+                    float d = Mathf.Sqrt(Mathf.Pow((u - ex) / 0.085f, 2) + Mathf.Pow((v - ey) / 0.11f, 2));
+                    if (d < 1f) c = ink;
+                    if (Mathf.Sqrt(Mathf.Pow((u - ex + 0.03f) / 0.03f, 2) + Mathf.Pow((v - ey - 0.04f) / 0.035f, 2)) < 1f) c = Color.white;   // eye shine
+                    float bd = Mathf.Sqrt(Mathf.Pow((u - (0.5f + e * 0.31f)) / 0.08f, 2) + Mathf.Pow((v - 0.4f) / 0.045f, 2));
+                    if (bd < 1f && c.a == 0) c = new Color(1f, 0.55f, 0.65f, 0.75f);                                                     // blush
+                }
+                float sm = Mathf.Abs(Mathf.Sqrt(Mathf.Pow(u - 0.5f, 2) + Mathf.Pow((v - 0.47f) * 1.3f, 2)) - 0.085f);
+                if (sm < 0.016f && v < 0.43f) c = ink;                                                                                    // little smile
+                px[y * S + x] = c;
+            }
+        faceTex.SetPixels(px); faceTex.Apply();
+        var ui = Shader.Find("UI/Default");
+        if (ui != null)
+        {   // UI shader: lets us switch the depth test off so the face is never swallowed by the round body
+            faceMat = new Material(ui) { mainTexture = faceTex, color = Color.white, renderQueue = 3001 };
+            faceMat.SetInt("unity_GUIZTestMode", (int)UnityEngine.Rendering.CompareFunction.Always);
+        }
+        else { faceMat = Fade(Color.white); faceMat.mainTexture = faceTex; faceMat.renderQueue = 3001; }
+        return faceMat;
+    }
+    // stick a face on the side of a prop that looks at the camera
+    public static void Face(Transform root, Vector3 localPos, float size)
+    {
+        size *= 1.45f; localPos.z *= 0.6f; localPos.y += 0.06f;   // sits on the front of the body; drawn on top of it (no depth test)
+        var q = Prim(PrimitiveType.Quad, root, localPos, new Vector3(size, size, 1f), FaceMat());
+        q.rotation = Quaternion.Euler(55, 0, 0); q.name = "Face";
+        var r = q.GetComponent<Renderer>(); r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
+    }
+
     public static Transform Root(string name, Transform parent)
     {
         var t = new GameObject(name).transform;
@@ -375,21 +418,22 @@ public static class Art
         Prim(PrimitiveType.Sphere, body, new Vector3(0, 0.68f, -0.62f), new Vector3(0.22f, 0.26f, 0.18f), mbFlat, new Vector3(-55, 0, 0));// tail tip
         Prim(PrimitiveType.Sphere, body, new Vector3(-0.44f, 0.4f, -0.08f), new Vector3(0.16f, 0.32f, 0.56f), md, new Vector3(0, 0, -12)); // wings
         Prim(PrimitiveType.Sphere, body, new Vector3(0.44f, 0.4f, -0.08f), new Vector3(0.16f, 0.32f, 0.56f), md, new Vector3(0, 0, 12));
-        // head
-        Prim(PrimitiveType.Sphere, body, new Vector3(0, 0.86f, 0.26f), new Vector3(0.66f, 0.64f, 0.62f), mb);
-        Prim(PrimitiveType.Sphere, body, new Vector3(0, 1.16f, 0.2f), new Vector3(0.14f, 0.16f, 0.14f), mbFlat);                  // tuft
-        // beak (upper + lower)
-        var bm = Mat(Beak, 0.6f);
-        Prim(PrimitiveType.Sphere, body, new Vector3(0, 0.8f, 0.6f), new Vector3(0.36f, 0.12f, 0.3f), bm);
-        Prim(PrimitiveType.Sphere, body, new Vector3(0, 0.73f, 0.56f), new Vector3(0.26f, 0.08f, 0.22f), Mat(Color.Lerp(Beak, Color.black, 0.15f), 0.4f));
-        // eyes: white + pupil + highlight
-        var white = Mat(Color.white, 0.9f); var pupil = Mat(Eye, 0.9f, 0, 0, 0f); var shine = Mat(Color.white, 1f, 0, 0.4f, 0f);
+        // head: bigger and rounder (toy proportions: the face sells the character)
+        Prim(PrimitiveType.Sphere, body, new Vector3(0, 0.9f, 0.24f), new Vector3(0.74f, 0.72f, 0.7f), mb);
+        Prim(PrimitiveType.Sphere, body, new Vector3(0, 1.24f, 0.16f), new Vector3(0.13f, 0.18f, 0.13f), mbFlat, new Vector3(-20, 0, 0));   // tuft
+        // beak: soft rounded bill with a darker lower lip and a tiny smile line
+        var bm = Mat(Beak, 0.8f);
+        Prim(PrimitiveType.Sphere, body, new Vector3(0, 0.83f, 0.62f), new Vector3(0.4f, 0.15f, 0.3f), bm);
+        Prim(PrimitiveType.Sphere, body, new Vector3(0, 0.76f, 0.58f), new Vector3(0.3f, 0.1f, 0.24f), Mat(Color.Lerp(Beak, Color.black, 0.12f), 0.6f));
+        // eyes: big glossy ovals with two highlights (cute, readable from far away)
+        var white = Mat(Color.white, 0.95f); var pupil = Mat(Eye, 1f, 0, 0, 0f); var shine = Mat(Color.white, 1f, 0, 0.8f, 0f);
         foreach (int s in new[] { -1, 1 })
         {
-            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.17f, 0.95f, 0.5f), new Vector3(0.16f, 0.18f, 0.1f), white);
-            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.17f, 0.94f, 0.55f), new Vector3(0.1f, 0.12f, 0.06f), pupil);
-            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.15f, 0.98f, 0.58f), Vector3.one * 0.035f, shine);
-            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.27f, 0.8f, 0.46f), new Vector3(0.12f, 0.06f, 0.06f), Mat(Cheek, 0.3f, 0, 0, 0f));
+            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.19f, 1.0f, 0.5f), new Vector3(0.2f, 0.25f, 0.12f), white);
+            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.19f, 0.99f, 0.56f), new Vector3(0.15f, 0.19f, 0.07f), pupil);
+            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.16f, 1.05f, 0.6f), Vector3.one * 0.06f, shine);
+            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.22f, 0.95f, 0.6f), Vector3.one * 0.028f, shine);
+            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.3f, 0.84f, 0.48f), new Vector3(0.14f, 0.07f, 0.06f), Mat(Cheek, 0.3f, 0, 0, 0f));
         }
 
         if (kind == "bomb")
@@ -465,6 +509,7 @@ public static class Art
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.22f, 0), new Vector3(d * 0.74f, 0.1f, d * 0.74f), Mat(Hex("5fbf8c"), 0.9f, 0, 0.1f)); // liquid
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.38f, 0), new Vector3(d * 0.735f, 0.05f, d * 0.735f), Mat(Hex("fff6e8"), 0.7f));   // paper label band
         Prim(PrimitiveType.Cube, root, new Vector3(d * 0.16f, 0.42f, -d * 0.34f), new Vector3(0.035f, 0.3f, 0.02f), Mat(Color.white, 1f, 0, 0.9f));   // glint
+        Face(root, new Vector3(0, 0.4f, -d * 0.4f), d * 0.5f);
         return root;
     }
 
@@ -483,6 +528,7 @@ public static class Art
         }
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.66f, 0), new Vector3(d * 0.36f, 0.1f, d * 0.36f), body);
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.77f, 0), new Vector3(d * 0.5f, 0.025f, d * 0.5f), body);
+        Face(root, new Vector3(0, 0.34f, -d * 0.46f), d * 0.52f);
         return root;
     }
 
@@ -496,6 +542,7 @@ public static class Art
         Prim(PrimitiveType.Sphere, root, new Vector3(-d * 0.18f, 0.27f, 0.02f), Vector3.one * d * 0.24f, foam);
         Prim(PrimitiveType.Sphere, root, new Vector3(d * 0.1f, 0.28f, -0.03f), Vector3.one * d * 0.3f, foam);
         Prim(PrimitiveType.Sphere, root, new Vector3(d * 0.26f, 0.26f, 0.05f), Vector3.one * d * 0.18f, foam);
+        Face(root, new Vector3(0, 0.16f, -d * 0.34f), d * 0.46f);
         return root;
     }
 
@@ -537,6 +584,7 @@ public static class Art
             Prim(PrimitiveType.Sphere, root, new Vector3(Mathf.Cos(a) * d * 0.4f, yy, Mathf.Sin(a) * d * 0.4f), Vector3.one * d * 0.14f, Mat(Hex(dots[i % 4]), 0.5f));
         }
         Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.62f, 0), Vector3.one * d * 0.2f, Mat(Color.white, 1f, 0, 2f, 0f)).name = "Spark";
+        Face(root, new Vector3(0, 0.3f, -d * 0.48f), d * 0.55f);
         return root;
     }
 
@@ -628,6 +676,7 @@ public static class Art
         Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.26f, 0), new Vector3(w * 1.05f, 0.55f, h * 1.05f), Mat(StoneCol, 0.25f, 0, 0, 0.0025f));
         Prim(PrimitiveType.Sphere, root, new Vector3(-w * 0.18f, 0.44f, h * 0.1f), new Vector3(w * 0.55f, 0.36f, h * 0.5f), Mat(Color.Lerp(StoneCol, Color.white, 0.2f), 0.2f));
         Prim(PrimitiveType.Sphere, root, new Vector3(w * 0.22f, 0.32f, -h * 0.2f), new Vector3(w * 0.4f, 0.3f, h * 0.4f), Mat(StoneDark, 0.2f));
+        Face(root, new Vector3(0, 0.3f, -h * 0.5f), Mathf.Min(w, h) * 0.5f);
         return root;
     }
 

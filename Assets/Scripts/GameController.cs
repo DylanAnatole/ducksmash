@@ -26,7 +26,8 @@ public class GameController : MonoBehaviour
     {
         public Vector2 p, v; public float r; public string kind; public bool hot, charged = true, frenzy, clone;
         public float squash, zapCd, face = -Mathf.PI / 2; public Transform view, ring, body;
-        public int Dmg => kind == "heavy" ? 3 : 1;
+        public bool boost;   // bumped by another duck this shot: hits harder
+        public int Dmg => (kind == "heavy" ? 3 : 1) + (boost ? 1 : 0);
         // special (combo-reward) ducks are one-use: after their power fires they turn back into a normal duck
         public RectTransform tag; public string tagKind;
         public bool inWhirl;
@@ -395,6 +396,7 @@ public class GameController : MonoBehaviour
         }
         if (aimRoot == null) BuildAim(); else aimVisible = true;
         MarkKeys();
+        if (level > LevelLibrary.Onboarding && keyName != "" && !LevelLibrary.IsSandbox(level)) hint = "Câu đố: " + levelTip.Replace("MÀN KHÓ! ", "").Replace("SIÊU KHÓ! ", "");
         ShowIntro(L);
         popupRoot.gameObject.SetActive(false);
         bossBar.gameObject.SetActive(L.boss);
@@ -948,6 +950,11 @@ public class GameController : MonoBehaviour
                 float sp = d.v.magnitude; if (sp > MAX_SPEED) d.v *= MAX_SPEED / sp;
                 if (UnityEngine.Random.value < dt * 10f) FxKit.Wake(W(d.p));
             }
+        for (int di = 0; di < ducks.Count; di++)
+        {
+            var bd = ducks[di];
+            if (bd.boost && bd.v.sqrMagnitude > 100 * 100 && UnityEngine.Random.value < dt * 14f) FxKit.Sparkle(W(bd.p, 0.4f), new Color(1f, 0.85f, 0.3f), 2);
+        }
         if (portals.Count > 0)
             for (int di = 0; di < ducks.Count; di++)
             {
@@ -1047,8 +1054,14 @@ public class GameController : MonoBehaviour
                         a.v = Rot(a.v, UnityEngine.Random.Range(-0.06f, 0.06f)) * 1.08f; b.v = Rot(b.v, UnityEngine.Random.Range(-0.06f, 0.06f)) * 1.08f;
                         if (a.v.sqrMagnitude > cap * cap) a.v = a.v.normalized * cap; if (b.v.sqrMagnitude > cap * cap) b.v = b.v.normalized * cap;
                         a.hot = b.hot = true; a.squash = b.squash = 0.2f; var mid = (a.p + b.p) / 2;
+                        bool newBoost = !a.boost || !b.boost; a.boost = b.boost = true;   // both ducks are powered up: they now break 2 hits per touch
+                        if (newBoost) { FxKit.Shockwave(W(mid), 2.6f, new Color(1f, 0.85f, 0.3f, 0.9f), 0.35f); FxKit.StarBurst(W(mid, 0.4f), 8); }
                         Splash(mid, 8); FxKit.Sparkle(W(mid), Color.white, 8); AddRing(mid, 38 + Mathf.Min(pushes, 6) * 6, new Color(0.55f, 0.95f, 1f, 0.75f)); Shake(0.15f); HitStop(0.03f); pushes++; shotSmash++; comboPulse = 0.18f;
-                        PopText(LevelLibrary.Unlocked("zap", level) && pushes == ZAP_PUSHES ? "ĐỦ 3 CỐC → VỊT SÉT!" : LevelLibrary.Unlocked("zap", level) && pushes < ZAP_PUSHES ? "CỐC! " + pushes + "/" + ZAP_PUSHES : pushes > 1 ? "CỐC x" + pushes + "!" : "CỐC!", mid, Color.white, 46 + Mathf.Min(20, pushes * 4));
+                        PopText(LevelLibrary.Unlocked("zap", level) && pushes == ZAP_PUSHES ? "ĐỦ 3 CỐC → VỊT SÉT!" : pushes == 1 ? "TIẾP SỨC! phá x2" : LevelLibrary.Unlocked("zap", level) && pushes < ZAP_PUSHES ? "CỐC! " + pushes + "/" + ZAP_PUSHES : "CỐC x" + pushes + "!", mid, pushes == 1 ? new Color(1f, 0.85f, 0.3f) : Color.white, 46 + Mathf.Min(20, pushes * 4));
+                        if (pushes == 2 && state == "play" && moving)
+                        {   // reward real billiards: two ducks bumped in one shot gives the move back
+                            moves++; movesPulse = 0.45f; PopText("HÚC 2 VỊT: +1 LƯỢT!", mid + new Vector2(0, -70), new Color(0.45f, 0.95f, 0.5f), 56); Sfx.Play("coin", 0.9f, 1.3f);
+                        }
                         Sfx.Play(pushes % 2 == 1 ? "quack" : "squeak", 0.9f, 1f + pushes * 0.08f); Sfx.Play("thud", 0.5f, 1.35f);   // the "clack" has weight
                     }
                 }
@@ -1098,7 +1111,7 @@ public class GameController : MonoBehaviour
         if (shotSmash == 1 && state == "play") HitStop(0.035f);
         if (!keySolved && keyType != "" && b.type == keyType && state == "play")
         {   // the player found the trick: say so, so the puzzle idea sticks
-            keySolved = true; keyPts.Clear();
+            keySolved = true; keyPts.Clear(); hint = "";
             PopText("ĐÚNG CHÌA KHOÁ!", b.p + new Vector2(0, -60), new Color(1f, 0.85f, 0.3f), 58); Sfx.Play("star", 0.8f, 1.5f);
         }
         if (b.tag) { tags.Remove(b.tag); Destroy(b.tag.gameObject); b.tag = null; }
@@ -1452,7 +1465,7 @@ public class GameController : MonoBehaviour
     // ---------- shooting ----------
     void Launch(Duck d, Vector2 v)
     {
-        d.v = v; d.hot = true; moves--; moving = true; shotClock = 0; shotsTaken++; if (shotsTaken == 1) foreach (var k in keyTags) if (k) { tags.Remove(k); Destroy(k.gameObject); } shotSmash = 0; hint = ""; pushes = 0; frenzyShot = false; shotBanks = 0; shotClears = 0; dominoFalls = 0;
+        d.v = v; d.hot = true; moves--; moving = true; shotClock = 0; shotsTaken++; if (shotsTaken == 1) foreach (var k in keyTags) if (k) { tags.Remove(k); Destroy(k.gameObject); } shotSmash = 0; hint = level > LevelLibrary.Onboarding && !keySolved && keyName != "" ? "Câu đố: " + levelTip.Replace("MÀN KHÓ! ", "").Replace("SIÊU KHÓ! ", "") : ""; pushes = 0; frenzyShot = false; shotBanks = 0; shotClears = 0; dominoFalls = 0;
         foreach (var k in ducks) k.charged = true;
         d.stretch = 0.22f; d.pullVis = 0;
         Sfx.Play("shoot"); Sfx.Play("squeak", 0.5f, 1.3f); Sfx.Buzz(18);
@@ -1483,7 +1496,7 @@ public class GameController : MonoBehaviour
 
     void EndShot()
     {
-        foreach (var d in ducks) { d.hot = false; d.frenzy = false; d.rocketT = 0; d.rainbowReady = false; }
+        foreach (var d in ducks) { d.hot = false; d.frenzy = false; d.rocketT = 0; d.rainbowReady = false; d.boost = false; }
         foreach (var c in ducks.Where(d => d.clone).ToList()) { Splash(c.p, 10); Destroy(c.view.gameObject); ducks.Remove(c); }
         // one-use special ducks that fired turn back into plain ducks
         foreach (var d in ducks.Where(x => x.special && x.spent).ToList()) SetKind(d, "normal", false);
@@ -1614,8 +1627,9 @@ public class GameController : MonoBehaviour
         {   // one short line about what's special here (shelves, rings, hard level...), then the goal
             introBody.text = "<size=38><color=#7a4dd8><b>" + (level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? "MỚI:" : "CÂU ĐỐ:") + "</b></color> " + L.hint + "</size>"
                 + (keyName != "" && level > LevelLibrary.Onboarding ? "\n<size=32><color=#c98a00>Chìa khoá: <b>" + keyName + "</b> (vòng vàng nhấp nháy)</color></size>" : "")
+                + (ducks.Count >= 3 && level > LevelLibrary.Onboarding ? "\n<size=30><color=#2f9e5a>Nhiều vịt = nhiều chỗ bắn. Bắn vịt <b>húc vịt</b>: vịt bị húc được <b>TIẾP SỨC</b> (phá x2), húc 2 con = <b>+1 lượt</b></color></size>" : "")
                 + "\n\n<b>PHÁ SẠCH " + GoalsLeft() + " MÓN</b> · " + moves + " lượt";
-            introRoot.sizeDelta = new Vector2(860, 560); introMax = introTimer = level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? 4.5f : 4f;
+            introRoot.sizeDelta = new Vector2(880, 640); introMax = introTimer = level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? 5f : 4.5f;
         }
 
         // unlock level: teach how to earn the new duck and how it works, and give one free copy to try
@@ -2214,7 +2228,14 @@ public class GameController : MonoBehaviour
             }
         }
         bool rbAim = drag.kind == "rainbow" && !drag.spent;
-        aimCount.gameObject.SetActive(aimHits.Count > 0 || rbAim);
+        if (hitDuck != null && aimHits.Count == 0 && !rbAim)
+        {
+            aimCount.gameObject.SetActive(true);
+            aimCount.text = "<size=40>HÚC VỊT → TIẾP SỨC!</size>\n<size=30>phá x2 · húc 2 con = +1 lượt</size>";
+            aimCount.rectTransform.anchoredPosition = WorldToHud(W(hitDuck.p, 0.6f)) + new Vector2(0, 90);
+            aimCount.color = new Color(1f, 0.88f, 0.35f);
+        }
+        else aimCount.gameObject.SetActive(aimHits.Count > 0 || rbAim);
         if (aimHits.Count > 0 || rbAim)
         {
             // the combo payoff right on the aim: "x12 -> Vịt Bom" when this shot alone would hatch a special
