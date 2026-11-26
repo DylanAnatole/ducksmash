@@ -27,6 +27,7 @@ public class GameController : MonoBehaviour
         public Vector2 p, v; public float r; public string kind; public bool hot, charged = true, frenzy, clone;
         public float squash, zapCd, face = Mathf.PI / 2; public Transform view, ring, body;
         public bool boost;   // bumped by another duck this shot: hits harder
+        public Transform[] eyes; public float blink = 2f;
         public int Dmg => (kind == "heavy" ? 3 : 1) + (boost ? 1 : 0);
         // special (combo-reward) ducks are one-use: after their power fires they turn back into a normal duck
         public RectTransform tag; public string tagKind;
@@ -701,12 +702,13 @@ public class GameController : MonoBehaviour
     void BuildDuckView(Duck d)
     {
         if (d.view) Destroy(d.view.gameObject);
+        d.eyes = null;
         d.r = d.kind == "heavy" ? 20 : 17;
         string kind = d.kind;
         d.view = Spawn("duck_" + kind, parent =>
         {
             var v = Art.Duck(parent, kind, out _);
-            Art.Bake(v.Find("Body"), "duck_" + kind, kind == "heavy" ? 0.95f : 0.85f, 0.0011f, "Spark");   // thin, soft ink: glossy toy look
+            Art.Bake(v.Find("Body"), "duck_" + kind, kind == "heavy" ? 0.95f : 0.85f, 0.0011f, App.Mobile ? new[] { "Spark" } : new[] { "Spark", "Eye" });   // thin, soft ink: glossy toy look
             if (App.Mobile)
             {   // no realtime shadows on phones: a soft dark disc under the duck instead
                 foreach (var r in v.GetComponentsInChildren<Renderer>(true)) { r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false; }
@@ -2293,6 +2295,13 @@ public class GameController : MonoBehaviour
             d.view.position = W(d.p + lean + jit) + Vector3.up * (Mathf.Sin(t * 3 + d.p.x) * 0.02f + drop + hop);
             // sim y is down, world z is up: direction (cos, -sin)
             d.view.rotation = Quaternion.Euler(0, Mathf.Atan2(Mathf.Cos(d.face), -Mathf.Sin(d.face)) * Mathf.Rad2Deg, 0);
+            if (d.eyes == null) d.eyes = d.view.GetComponentsInChildren<Transform>(true).Where(x => x.name == "Eye").ToArray();
+            if (d.eyes.Length > 0)
+            {   // blink every few seconds: the toys feel alive
+                d.blink -= dt; float sy = 1f;
+                if (d.blink < 0) { float bt = -d.blink; sy = bt < 0.07f ? 1f - bt / 0.07f * 0.88f : 0.12f + (bt - 0.07f) / 0.07f * 0.88f; if (bt > 0.14f) { d.blink = UnityEngine.Random.Range(2f, 5f); sy = 1f; } }
+                foreach (var e in d.eyes) if (e) e.localScale = new Vector3(1f, sy, 1f);
+            }
             float s = d.squash * 1.6f, st = d.stretch * 1.8f;
             d.body.localRotation = dragged ? Quaternion.Euler(-pw * 14f, 0, 0)
                 : spd < 20 ? Quaternion.Euler(Mathf.Sin(t * 2.3f + d.p.y) * 4, Mathf.Sin(t * 1.7f + d.p.x) * 12, 0) : Quaternion.Euler(Mathf.Min(10, spd / 90f), 0, 0);

@@ -429,11 +429,12 @@ public static class Art
         var white = Mat(Color.white, 0.95f); var pupil = Mat(Eye, 1f, 0, 0, 0f); var shine = Mat(Color.white, 1f, 0, 0.8f, 0f);
         foreach (int s in new[] { -1, 1 })
         {
-            var tilt = new Vector3(-35, s * -12, 0);   // eyes lean back toward the camera (it looks down at 55 deg)
-            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.18f, 1.06f, 0.47f), new Vector3(0.24f, 0.3f, 0.13f), white, tilt);
-            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.18f, 1.06f, 0.52f), new Vector3(0.18f, 0.24f, 0.08f), pupil, tilt);
-            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.15f, 1.13f, 0.53f), Vector3.one * 0.07f, shine);
-            Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.21f, 1.02f, 0.57f), Vector3.one * 0.032f, shine);
+            // each eye is its own little group so it can blink (eyes lean back toward the camera, which looks down at 55 deg)
+            var eye = Root("Eye", body); eye.localPosition = new Vector3(s * 0.18f, 1.06f, 0.5f); eye.localEulerAngles = new Vector3(-35, s * -12, 0);
+            Prim(PrimitiveType.Sphere, eye, new Vector3(0, 0, -0.03f), new Vector3(0.24f, 0.3f, 0.13f), white);
+            Prim(PrimitiveType.Sphere, eye, new Vector3(0, 0, 0.02f), new Vector3(0.18f, 0.24f, 0.08f), pupil);
+            Prim(PrimitiveType.Sphere, eye, new Vector3(-s * 0.03f, 0.07f, 0.05f), Vector3.one * 0.07f, shine);
+            Prim(PrimitiveType.Sphere, eye, new Vector3(s * 0.03f, -0.05f, 0.06f), Vector3.one * 0.032f, shine);
             Prim(PrimitiveType.Sphere, body, new Vector3(s * 0.3f, 0.84f, 0.48f), new Vector3(0.14f, 0.07f, 0.06f), Mat(Cheek, 0.3f, 0, 0, 0f));
         }
 
@@ -557,6 +558,7 @@ public static class Art
             var p = Root("Plate" + i, root); p.localPosition = new Vector3(0, 0.02f + i * 0.1f, 0);
             Prim(PrimitiveType.Cylinder, p, Vector3.zero, new Vector3(d * 0.98f, 0.035f, d * 0.98f), white);
             Prim(PrimitiveType.Cylinder, p, new Vector3(0, 0.03f, 0), new Vector3(d * 0.7f, 0.012f, d * 0.7f), rim);
+            if (i == 3) Face(p, new Vector3(0, 0.02f, -d * 0.3f), d * 0.42f);
         }
         return root;
     }
