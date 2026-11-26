@@ -1585,7 +1585,14 @@ public class GameController : MonoBehaviour
     void ChooseKind(string k)
     {
         if (moving || state != "play" || TrayCount(k) <= 0) return;
-        loadKind = k; LoadDuck(false); if (k == "heavy") { if (level == 4 && !tutKind) hint = ""; tutKind = true; }
+        bool changed = loaded == null || loaded.kind != k;
+        loadKind = k; LoadDuck(false);
+        if (changed && loaded != null)
+        {   // the picked duck "jumps" from the rug onto the dock: sparkle on the rug, then it plops in from above
+            foreach (var r in rugDucks) if (r.kind == k && r.view) { FxKit.Sparkle(r.view.position + Vector3.up * 0.5f, KindColor(k), App.Mobile ? 5 : 9); r.view.localScale *= 1.25f; }
+            loaded.spawnT = 0.32f; loaded.introDrop = true; idleT = 0;
+            FxKit.StarBurst(W(loaded.p, 0.4f), App.Mobile ? 6 : 10);
+        } if (k == "heavy") { if (level == 4 && !tutKind) hint = ""; tutKind = true; }
         if (loaded != null) { PopText(k == "normal" ? "Vịt thường" : Cap(KindTag(k) ?? k), loaded.p + new Vector2(0, -60), KindColor(k), 40); Sfx.Play("quack", 0.5f, k == "heavy" ? 0.8f : 1.2f); }
     }
     void MoveToDock(int i)
