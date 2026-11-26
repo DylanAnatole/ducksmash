@@ -54,7 +54,7 @@ public static partial class LevelLibrary
         => d.bumpers.Add(new BumperDef { x = cx - w / 2, y = cy - h / 2, w = w, h = h, amp = amp, speed = speed, vertical = vertical });
     static void Ring(LevelDef d, float x, float y) => d.blocks.Add(B("ring", x, y));
     // "bait" ducks parked out on the water: shoot a duck into them and they fly off and smash too (billiards)
-    static void Bait(LevelDef d, params float[] xy) { for (int i = 0; i + 1 < xy.Length; i += 2) d.ducks.Add(new DuckDef(xy[i], xy[i + 1], "normal")); }
+    static void Bait(LevelDef d, params float[] xy) { for (int i = 0; i + 1 < xy.Length; i += 2) d.ducks.Add(new DuckDef(xy[i], xy[i + 1], "normal", true)); }
     static void Whirl(LevelDef d, float x, float y, float r) => d.whirls.Add(new Vector3(x, y, r));
     // water current given by its centre + size; dir "left" / "right" / "up" / "down"
     static void Flow(LevelDef d, float cx, float cy, float w, float h, string dir)

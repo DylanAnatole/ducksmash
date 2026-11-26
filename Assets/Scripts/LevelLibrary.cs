@@ -9,7 +9,7 @@ public class BlockDef
     public int hp = -1; public float mvAmp, mvSpeed;
     public bool shelf;   // plank drawn as a shelf: things it covers stand ON it and crash down when its legs go
 }
-public class DuckDef { public float x, y; public string kind; public DuckDef(float x, float y, string kind = "normal") { this.x = x; this.y = y; this.kind = kind; } }
+public class DuckDef { public float x, y; public string kind; public bool bait; public DuckDef(float x, float y, string kind = "normal", bool bait = false) { this.x = x; this.y = y; this.kind = kind; this.bait = bait; } }
 public class BumperDef { public float x, y, w, h, amp, speed; public bool vertical; }   // amp > 0: the pad slides back and forth
 public class LevelDef
 {
@@ -132,6 +132,21 @@ public static partial class LevelLibrary
                     yield return new BlockDef { type = "pixel", rect = true, w = cell - 2, h = cell - 2, color = c, x = cx + (x - (w - 1) / 2f) * cell, y = cy + (y - (h - 1) / 2f) * cell };
     }
 
+    // tray icon: the pixel duck re-coloured per kind, smoothed like the other icons
+    public static Texture2D DuckIcon(Color body)
+    {
+        var rows = ART_DUCK; int h = rows.Length, w = 0; foreach (var r in rows) w = Mathf.Max(w, r.Length);
+        var src = new Color[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                char ch = x < rows[y].Length ? rows[y][x] : '.';
+                Color c = ch == 'Y' ? body : PAL.TryGetValue(ch, out var pc) ? pc : new Color(0, 0, 0, 0);
+                src[(h - 1 - y) * w + x] = c;
+            }
+        return UIKit.SmoothPixels(src, w, h, 8);
+    }
+
     static readonly string[] ART_DUCK = {
         ".....YYYY.....", "....YYYYYY....", "...YYYYWKYY...", "...YYYYKKYYOO.", "...YYYYYYYOOOO", "....YYYYYY.OO.",
         "..Y..YYYY.....", ".YYYYYYYYYYY..", "YYYYYYYYYYYYY.", "YYYYYYYYYYYYY.", ".YYYYYYYYYYY..", "..YYYYYYYYY..." };
@@ -182,7 +197,8 @@ public static partial class LevelLibrary
                 d.bumpers.Add(BumperL(500)); d.bumpers.Add(BumperR(500));
                 break;
             case 2:
-                d = L(9, "Bắn vịt vào vịt để đẩy đi!", (270, 810, null), (270, 650, null), (170, 570, null), (370, 570, null));
+                d = L(9, "Bắn vịt vào vịt để đẩy đi!", (270, 810, null));
+                foreach (var (bx, by) in new[] { (270f, 650f), (170f, 570f), (370f, 570f) }) d.ducks.Add(new DuckDef(bx, by, "normal", true));
                 d.blocks.AddRange(Cluster("soap", 270, 245, 3, 11, 40)); d.blocks.AddRange(Col("glass", 70, 380, 5, 40)); d.blocks.AddRange(Col("glass", 470, 380, 5, 40));
                 d.blocks.AddRange(Row("glass", 150, 410, 7, 40));
                 break;
@@ -269,8 +285,8 @@ public static partial class LevelLibrary
                 d.blocks.AddRange(Shelf(270, 610, 380, "vase", "glass", "glass", "vase", "glass", "glass", "vase"));
                 break;
             case 13:   // BILLIARDS: a rack of ducks in the middle, the cue duck at the bottom - break the rack and every duck flies off powered up
-                d = L(6, "Bắn vào đàn vịt: tung khắp bồn!", (270, 820, "heavy"),
-                      (270, 610, null), (248, 572, null), (292, 572, null), (226, 534, null), (270, 534, "bomb"), (314, 534, null));
+                d = L(6, "Bắn vào đàn vịt: tung khắp bồn!", (270, 820, "heavy"));
+                foreach (var (bx, by) in new[] { (270f, 610f), (248f, 572f), (292f, 572f), (226f, 534f), (270f, 534f), (314f, 534f) }) d.ducks.Add(new DuckDef(bx, by, "normal", true));
                 d.blocks.AddRange(PixelArt(ART_FISH, 270, 250, 26)); d.art = "fish";
                 d.blocks.AddRange(Row("soap", 150, 410, 7, 40));
                 d.blocks.AddRange(Col("glass", 70, 400, 9, 40)); d.blocks.AddRange(Col("vase", 470, 400, 9, 40));

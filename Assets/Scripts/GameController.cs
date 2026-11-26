@@ -26,6 +26,7 @@ public class GameController : MonoBehaviour
     {
         public Vector2 p, v; public float r; public string kind; public bool hot, charged = true, frenzy, clone;
         public float dizzy; public bool introDrop;
+        public bool passive;   // already fired (or parked bait): floats in the tub, can be bumped, can't be aimed
         public float squash, zapCd, face = Mathf.PI / 2; public Transform view, ring, body;
         public bool boost;   // bumped by another duck this shot: hits harder
         public float cheer;
@@ -287,6 +288,7 @@ public class GameController : MonoBehaviour
         world = new GameObject("World").transform; fx = new GameObject("FX").transform;
         foreach (var bt in bits) if (bt.t) { bt.t.gameObject.SetActive(false); bitPools[bt.type].Push(bt.t); }   // debris pool persists across levels
         foreach (var w in whirls) if (w.view) Destroy(w.view.gameObject);
+        foreach (var dv in dockViews) if (dv) Destroy(dv.gameObject); dockViews.Clear();
         whirls.Clear(); portals.Clear(); portalTaught = false;
         foreach (var fl in flows) { if (fl.m) Destroy(fl.m); if (fl.mesh) Destroy(fl.mesh); }
         flows.Clear();
@@ -305,7 +307,20 @@ public class GameController : MonoBehaviour
         cam.cullingMask = ~0;
         EnsureTub();
         tubRoot.gameObject.SetActive(true);
-        { int di = 0; foreach (var d in L.ducks) { var nd = NewDuck(new Vector2(d.x, d.y), d.kind); nd.spawnT = 0.55f + di++ * 0.09f; nd.introDrop = true; } }   // the gang plops into the bath one by one
+        // DUCK TRAY: the level's duck spots become launch DOCKS, their kinds go into the tray; every duck in the tray is one shot.
+        // Parked "bait" ducks are dropped into the tub as passive billiard balls.
+        docks.Clear(); traySpecials.Clear(); loaded = null; dock = 0;
+        { int di = 0; foreach (var d in L.ducks)
+            {
+                var pos = new Vector2(d.x, d.y);
+                if (d.bait) { var nd = NewDuck(pos, d.kind); nd.passive = true; nd.spawnT = 0.55f + di++ * 0.09f; nd.introDrop = true; continue; }
+                if (!docks.Any(x => (x - pos).sqrMagnitude < 75 * 75)) docks.Add(pos);
+                if (d.kind != "normal") traySpecials.Add(d.kind);
+            } }
+        if (docks.Count == 0) docks.Add(new Vector2(270, 810));
+        { float by = -1; for (int i = 0; i < docks.Count; i++) if (docks[i].y > by) { by = docks[i].y; dock = i; } }   // start at the dock nearest the player
+        moves = startMoves = Mathf.Max(moves, traySpecials.Count + 1);
+        loadKind = "normal"; BuildDocks(); LoadDuck(true);
         foreach (var d in L.blocks)
         {
             var b = new Block
@@ -784,11 +799,19 @@ public class GameController : MonoBehaviour
     }
 
     // ---------- debug hooks (used for automated testing via MCP) ----------
-    public void DebugShoot(int duckIndex, float vx, float vy) { introTimer = 0; introRoot.gameObject.SetActive(false); if (state == "play" && !moving && duckIndex < ducks.Count) Launch(ducks[duckIndex], new Vector2(vx, vy)); }
+    public void DebugShoot(int duckIndex, float vx, float vy) { introTimer = 0; introRoot.gameObject.SetActive(false); if (state == "play" && !moving && loaded != null) Launch(loaded, new Vector2(vx, vy)); }
+    public int DebugDockCount => docks.Count;
+    public int DebugKindCount => TrayKinds().Count;
+    public void DebugChoose(int dockIdx, int kindIdx)
+    {
+        if (state != "play" || moving) return;
+        var ks = TrayKinds(); if (ks.Count > 0) ChooseKind(ks[Mathf.Clamp(kindIdx, 0, ks.Count - 1)]);
+        MoveToDock(Mathf.Clamp(dockIdx, 0, docks.Count - 1)); if (loaded != null) loaded.spawnT = 0;
+    }
     public void DebugRun(float seconds) { for (float s = 0; s < seconds; s += 1 / 60f) Tick(1 / 60f); }
     public string DebugInfo() => $"lvl {level} state {state} moves {moves} moving {moving} goals {GoalsLeft()} smash {shotSmash} ducks {ducks.Count} fever {fever:0} streak {streak}";
     public int DebugDuckCount => ducks.Count;
-    public Vector2 DebugDuckPos(int i) => ducks[i].p;
+    public Vector2 DebugDuckPos(int i) => loaded != null ? loaded.p : ducks[Mathf.Min(i, ducks.Count - 1)].p;
     public Vector2 DebugRandomTarget() { var a = blocks.Where(b => b.alive && !Covered(b) && !b.Hard).ToList(); return a.Count == 0 ? new Vector2(270, 300) : a[UnityEngine.Random.Range(0, a.Count)].p; }
     public bool DebugMoving => moving;
     public float DebugMaxSpeed => MAX_SPEED;
@@ -798,7 +821,7 @@ public class GameController : MonoBehaviour
         float best = -1; int bd = 0; Vector2 bdir = Vector2.up;
         for (int i = 0; i < ducks.Count; i++)
         {
-            if (ducks[i].clone || ducks[i].spawnT > 0) continue;
+            if (ducks[i].clone || ducks[i] != loaded) continue;
             for (int k = 0; k < angles; k++)
             {
                 float a = (k * 360f / angles - 180f) * Mathf.Deg2Rad; var dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
@@ -1488,11 +1511,11 @@ public class GameController : MonoBehaviour
 
     void HatchSpecial(string kind, string name, Color col)
     {
-        // a special never adds a duck: it transforms ONE random plain duck (no plain duck -> no reward)
-        var normals = ducks.Where(x => !x.clone && !x.special && x.kind == "normal" && x.spawnT <= 0).ToList();
-        if (normals.Count == 0) return;
-        var d = normals[UnityEngine.Random.Range(0, normals.Count)];
-        SetKind(d, kind, true);
+        // a special never adds a shot: it upgrades ONE plain duck waiting in the tray (no plain duck left -> no reward)
+        if (TrayNormals() <= 0) return;
+        traySpecials.Add(kind); trayDirty = true; trayPulse = 1f;
+        if (loaded == null || loaded.kind == "normal") { loadKind = kind; LoadDuck(false); }   // put it straight on the dock: the reward is ready to fire
+        var d = loaded; if (d == null) return;
         d.spawnT = 0.45f;
         var star = UIKit.Dot(dynLayer, new Color(1f, 0.85f, 0.25f), "HatchStar"); star.raycastTarget = false;
         var so = star.gameObject.AddComponent<Outline>(); so.effectColor = Color.white; so.effectDistance = new Vector2(3, -3);
@@ -1517,9 +1540,150 @@ public class GameController : MonoBehaviour
         return any ? (null, best, 0, true) : (null, null, 0, false);
     }
 
+    // =====================================================================
+    // DUCK TRAY + DOCKS: pick WHICH duck (tray) and WHERE it launches from (dock), then aim
+    // =====================================================================
+    readonly List<Vector2> docks = new List<Vector2>(); readonly List<string> traySpecials = new List<string>();
+    readonly List<Transform> dockViews = new List<Transform>();
+    Duck loaded; int dock; string loadKind = "normal"; bool trayDirty = true; float trayPulse;
+    RectTransform trayRoot;
+    readonly List<(RectTransform rt, Image bg, Text count, string kind)> trayChips = new List<(RectTransform, Image, Text, string)>();
+    static readonly Dictionary<string, Texture2D> duckIcons = new Dictionary<string, Texture2D>();
+    static Material dockMat, dockRimMat;
+
+    int TrayNormals() => Mathf.Max(0, moves - traySpecials.Count);
+    List<string> TrayKinds()
+    {
+        var ks = new List<string>(); if (TrayNormals() > 0) ks.Add("normal");
+        foreach (var k in traySpecials) if (!ks.Contains(k)) ks.Add(k);
+        return ks;
+    }
+    int TrayCount(string k) => k == "normal" ? TrayNormals() : traySpecials.Count(x => x == k);
+
+    // put a duck of the chosen kind on the current dock (or re-skin the one already there)
+    void LoadDuck(bool intro)
+    {
+        if (moves <= 0 || (state != "play" && !intro)) return;
+        if (TrayCount(loadKind) <= 0) loadKind = TrayNormals() > 0 ? "normal" : traySpecials.Count > 0 ? traySpecials[0] : "normal";
+        var at = docks[Mathf.Clamp(dock, 0, docks.Count - 1)];
+        if (loaded == null)
+        {
+            ClearDock(at);
+            loaded = NewDuck(at, loadKind); loaded.special = loadKind == "rocket" || loadKind == "rainbow";
+            loaded.spawnT = intro ? 0.7f : 0.45f; loaded.introDrop = true;
+        }
+        else if (loaded.kind != loadKind) SetKind(loaded, loadKind, loadKind == "rocket" || loadKind == "rainbow");
+        trayDirty = true;
+    }
+    void ChooseKind(string k)
+    {
+        if (moving || state != "play" || TrayCount(k) <= 0) return;
+        loadKind = k; LoadDuck(false);
+        if (loaded != null) { PopText(k == "normal" ? "Vịt thường" : Cap(KindTag(k) ?? k), loaded.p + new Vector2(0, -60), KindColor(k), 40); Sfx.Play("quack", 0.5f, k == "heavy" ? 0.8f : 1.2f); }
+    }
+    void MoveToDock(int i)
+    {
+        if (loaded == null || moving || i == dock) { dock = i; return; }
+        dock = i; var at = docks[i]; ClearDock(at);
+        FxKit.Ripple(W(loaded.p), 0.9f); Splash(loaded.p, 5);
+        loaded.p = at; loaded.v = Vector2.zero; loaded.spawnT = 0.3f; loaded.introDrop = true;
+        Sfx.Play("squeak", 0.4f, 1.5f); hintReady = false; hintSearch = -1; idleT = 0; if (hintShown) HideHint();
+    }
+    // nudge parked ducks off a dock so the new duck doesn't spawn inside one
+    void ClearDock(Vector2 at)
+    {
+        foreach (var o in ducks)
+        {
+            if (o == loaded) continue; var dl = o.p - at; float need = o.r * 2 + 4;
+            if (dl.sqrMagnitude < need * need) o.p = at + (dl.sqrMagnitude > 1 ? dl.normalized : Vector2.right) * need;
+        }
+    }
+
+    void BuildDocks()
+    {
+        if (dockMat == null) { dockMat = Art.Mat(new Color(0.5f, 0.86f, 0.55f), 0.5f); dockRimMat = Art.Mat(new Color(0.98f, 1f, 0.9f), 0.6f); }
+        foreach (var dv in dockViews) if (dv) Destroy(dv.gameObject); dockViews.Clear();
+        foreach (var at in docks)
+        {   // lily pad launch dock: green pad with a pale rim and a notch
+            var root = Art.Root("Dock", world); root.position = W(at, 0.03f);
+            Art.Prim(PrimitiveType.Cylinder, root, new Vector3(0, -0.02f, 0), new Vector3(1.02f, 0.025f, 1.02f), dockRimMat);
+            Art.Prim(PrimitiveType.Cylinder, root, Vector3.zero, new Vector3(0.9f, 0.03f, 0.9f), dockMat);
+            Art.Prim(PrimitiveType.Cube, root, new Vector3(0.3f, 0.005f, 0.16f), new Vector3(0.34f, 0.05f, 0.13f), dockRimMat, new Vector3(0, -28, 0));
+            foreach (var r in root.GetComponentsInChildren<Renderer>()) { r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = !App.Mobile; }
+            dockViews.Add(root);
+        }
+    }
+    void UpdateDocks(float dt)
+    {
+        for (int i = 0; i < dockViews.Count; i++)
+        {
+            var v = dockViews[i]; if (!v) continue;
+            bool act = i == dock;
+            float s = act ? 1.08f + Mathf.Sin(Time.unscaledTime * 4f) * 0.04f : docks.Count > 1 && state == "play" && !moving ? 0.86f + Mathf.Sin(Time.unscaledTime * 2.5f + i) * 0.04f : 0.82f;
+            v.localScale = Vector3.one * s;
+            v.localEulerAngles = new Vector3(0, Time.unscaledTime * (act ? 14f : 5f) + i * 70f, 0);
+        }
+    }
+
+    Texture2D DuckIcon(string kind)
+    {
+        if (duckIcons.TryGetValue(kind, out var t) && t) return t;
+        Color body = kind == "heavy" ? new Color(0.62f, 0.66f, 0.76f) : kind == "bomb" ? new Color(1f, 0.42f, 0.36f) : kind == "zap" ? new Color(0.45f, 0.75f, 1f)
+                   : kind == "rocket" ? new Color(1f, 0.62f, 0.25f) : kind == "rainbow" ? new Color(0.85f, 0.55f, 1f) : new Color(1f, 0.85f, 0.29f);
+        return duckIcons[kind] = LevelLibrary.DuckIcon(body);
+    }
+    void BuildTray()
+    {
+        trayRoot = UIKit.Panel(hud, new Color(1f, 0.98f, 0.94f, 0.96f), "DuckTray").rectTransform;
+        UIKit.Place(trayRoot, 0.5f, 0, 0, 430, 1000, 150);
+        var sh = trayRoot.gameObject.AddComponent<Shadow>(); sh.effectColor = new Color(0.35f, 0.25f, 0.55f, 0.35f); sh.effectDistance = new Vector2(0, -8);
+        UIKit.Gloss(trayRoot, 0.35f);
+    }
+    void UpdateTray(float dt)
+    {
+        if (trayRoot == null) return;
+        bool show = state == "play";
+        if (trayRoot.gameObject.activeSelf != show) trayRoot.gameObject.SetActive(show);
+        if (!show) return;
+        trayPulse = Mathf.Max(0, trayPulse - dt * 2f);
+        var ks = TrayKinds();
+        bool changed = ks.Count != trayChips.Count;
+        for (int i = 0; !changed && i < ks.Count; i++) if (trayChips[i].kind != ks[i]) changed = true;
+        if (trayDirty || changed)
+        {
+            trayDirty = false;
+            foreach (var c in trayChips) if (c.rt) Destroy(c.rt.gameObject); trayChips.Clear();
+            float w = Mathf.Min(200f, 960f / Mathf.Max(1, ks.Count)), x0 = -(ks.Count - 1) * w / 2f;
+            for (int i = 0; i < ks.Count; i++)
+            {
+                string k = ks[i];
+                var b = UIKit.Btn(trayRoot, "", Color.white, Ink, 30, () => ChooseKind(k), "Chip_" + k);
+                var rt = (RectTransform)b.transform; UIKit.Place(rt, 0.5f, 0.5f, x0 + i * w, 0, w - 16, 124);
+                var bg = b.GetComponent<Image>();
+                var ic = UIKit.Rect("Icon", rt).gameObject.AddComponent<RawImage>(); ic.texture = DuckIcon(k); ic.raycastTarget = false;
+                UIKit.Place(ic.rectTransform, 0.5f, 0.5f, -30, 12, 80, 69);
+                var cnt = UIKit.Outlined(UIKit.Label(rt, "x" + TrayCount(k), 42, Color.white), Ink, 3); cnt.raycastTarget = false;
+                UIKit.Place(cnt.rectTransform, 0.5f, 0.5f, 42, 14, 90, 56);
+                var nm = UIKit.Label(rt, k == "normal" ? "Thường" : Cap(KindTag(k) ?? k), 26, Ink); nm.raycastTarget = false;
+                UIKit.Place(nm.rectTransform, 0.5f, 0.5f, 0, -38, w - 20, 34);
+                trayChips.Add((rt, bg, cnt, k));
+            }
+        }
+        foreach (var c in trayChips)
+        {
+            if (!c.rt) continue;
+            bool sel = loaded != null ? loaded.kind == c.kind : loadKind == c.kind;
+            c.bg.color = sel ? new Color(0.7f, 0.92f, 0.6f) : Color.white;   // green: reads against every duck colour
+            float s = sel ? 1.05f + Mathf.Sin(Time.unscaledTime * 5f) * 0.02f : 1f;
+            c.rt.localScale = Vector3.one * (s + trayPulse * 0.08f);
+            string tx = "x" + TrayCount(c.kind); if (c.count.text != tx) c.count.text = tx;
+        }
+    }
+
     // ---------- shooting ----------
     void Launch(Duck d, Vector2 v)
     {
+        if (d == loaded) { if (d.kind != "normal") traySpecials.Remove(d.kind); loaded = null; d.passive = true; trayDirty = true; }
         d.v = v; d.hot = true; moves--; moving = true; shotClock = 0; shotsTaken++; if (shotsTaken == 1) foreach (var k in keyTags) if (k) { tags.Remove(k); Destroy(k.gameObject); } shotSmash = 0; hint = level > LevelLibrary.Onboarding && !keySolved && keyName != "" ? "Câu đố: " + levelTip : ""; pushes = 0; frenzyShot = false; shotBanks = 0; shotClears = 0; dominoFalls = 0;
         foreach (var k in ducks) k.charged = true;
         d.stretch = 0.22f; d.pullVis = 0;
@@ -1557,6 +1721,7 @@ public class GameController : MonoBehaviour
         foreach (var d in ducks.Where(x => x.special && x.spent).ToList()) SetKind(d, "normal", false);
         foreach (var d in ducks) d.spent = false;
         moving = false;
+        if (state == "play" && moves > 0) LoadDuck(false);
         int n = shotSmash;
         if (pushes >= 3 && state == "play")
         {   // a good carom gets its own little celebration
@@ -1685,8 +1850,9 @@ public class GameController : MonoBehaviour
                 + (keyName != "" && level > LevelLibrary.Onboarding ? "\n<size=40><color=#a14a00>Chìa khoá: <b>" + keyName.Split(':')[0] + "</b></color></size>" : "")
                 + (LevelLibrary.IsHard(level) ? "\n<size=40><color=#b0283c><b>Màn khó: không tặng thêm lượt!</b></color></size>"
                    : ducks.Count >= 3 && level > LevelLibrary.Onboarding ? "\n<size=40><color=#16703d>Húc vịt = phá <b>x2</b></color></size>" : "")
-                + "\n\n<size=42><color=#2e2450>Phá <b>" + GoalsLeft() + "</b> món · <b>" + moves + "</b> lượt</color></size>";
-            introRoot.sizeDelta = new Vector2(820, 560); introMax = introTimer = level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? 5f : 4.5f;
+                + (docks.Count > 1 ? "\n<size=38><color=#1d6fa8>Chọn vịt ở khay · chạm <b>vòng lá</b> để đổi bến</color></size>" : "\n<size=38><color=#1d6fa8>Chọn vịt ở khay dưới bồn</color></size>")
+                + "\n\n<size=42><color=#2e2450>Phá <b>" + GoalsLeft() + "</b> món · <b>" + moves + "</b> vịt</color></size>";
+            introRoot.sizeDelta = new Vector2(820, 600); introMax = introTimer = level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? 5f : 4.5f;
         }
 
         // unlock level: teach how to earn the new duck and how it works, and give one free copy to try
@@ -1697,8 +1863,8 @@ public class GameController : MonoBehaviour
             introBody.text = "<size=58><color=#d4520f>" + nw.name + "</color></size>\n\n<size=38>" + nw.use + "</size>\n<size=32><color=#7a4dd8>Có khi: " + nw.how.ToLower() + "</color></size>";
             introRoot.sizeDelta = new Vector2(820, 520);
             introMax = introTimer = 6f;
-            var pool = ducks.Where(x => x.kind == "normal").ToList(); if (pool.Count == 0) pool = ducks.Where(x => !x.special).ToList();
-            if (pool.Count > 0) SetKind(pool[UnityEngine.Random.Range(0, pool.Count)], nw.kind, true);
+            traySpecials.Add(nw.kind); if (moves < traySpecials.Count + 1) moves = startMoves = traySpecials.Count + 1;
+            loadKind = nw.kind; LoadDuck(false); trayDirty = true;
             hint = "Thử ngay " + Cap(nw.name) + "!";
         }
         introBody.verticalOverflow = VerticalWrapMode.Overflow; introBody.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -1835,7 +2001,7 @@ public class GameController : MonoBehaviour
             if (SaveData.Coins >= PRICE[k]) { SaveData.Coins -= PRICE[k]; SaveData.SetBoost(k, 1); PopText("Mua " + BNAME[k] + "!", new Vector2(270, 840), new Color(1f, 0.88f, 0.3f), 44); Sfx.Play("coin"); }
             else { PopText("Không đủ xu!", new Vector2(270, 840), new Color(1f, 0.35f, 0.2f), 44); return; }
         }
-        if (k == "moves") { SaveData.SetBoost(k, SaveData.GetBoost(k) - 1); moves += 3; PopText("+3 LƯỢT!", new Vector2(120, 200), new Color(0.4f, 0.9f, 0.4f), 56); return; }
+        if (k == "moves") { SaveData.SetBoost(k, SaveData.GetBoost(k) - 1); moves += 3; trayDirty = true; trayPulse = 1f; PopText("+3 VỊT!", new Vector2(120, 200), new Color(0.4f, 0.9f, 0.4f), 56); if (loaded == null) LoadDuck(false); return; }
         target = k;
     }
 
@@ -1932,9 +2098,15 @@ public class GameController : MonoBehaviour
         if (Input.GetMouseButtonDown(0) && !overUI && !moving && ScreenToSim(Input.mousePosition, out var p))
         {
             if (target != null) { if (p.y > TY && p.y < TY + TH) ApplyTarget(p); return; }
-            Duck best = null; float bd = 1e9f;
-            // generous grab radius: fingers are fat
-            foreach (var d in ducks) { if (d.spawnT > 0) continue; float dd = Vector2.Distance(d.p, p); if (dd < d.r + 55 && dd < bd) { bd = dd; best = d; } }
+            Duck best = null;
+            // generous grab radius: fingers are fat. Only the duck on the dock can be aimed
+            if (loaded != null && loaded.spawnT <= 0 && Vector2.Distance(loaded.p, p) < loaded.r + 60) best = loaded;
+            if (best == null)
+            {   // tapped a different dock: hop the duck over there
+                int di = -1; float dbest = 62f;
+                for (int i = 0; i < docks.Count; i++) { float dd = Vector2.Distance(docks[i], p); if (dd < dbest) { dbest = dd; di = i; } }
+                if (di >= 0 && di != dock) { MoveToDock(di); return; }
+            }
             drag = best; dragPt = dragSm = p;
             if (best != null) { best.squash = 0.12f; Sfx.Play("squeak", 0.35f, 1.5f); }
         }
@@ -2029,7 +2201,7 @@ public class GameController : MonoBehaviour
             int ia = -1, ib = -1; float best = 1e9f;
             for (int i = 0; i < ducks.Count; i++) for (int j = 0; j < ducks.Count; j++)
                 {
-                    if (i == j) continue; var dl = ducks[j].p - ducks[i].p; float dd = dl.sqrMagnitude;
+                    if (i == j || ducks[i] != loaded) continue; var dl = ducks[j].p - ducks[i].p; float dd = dl.sqrMagnitude;
                     if (dl.y < -20 && dd > 60 * 60 && dd < best) { best = dd; ia = i; ib = j; }   // the other duck sits in front (towards the blocks)
                 }
             if (ia >= 0)
@@ -2050,7 +2222,7 @@ public class GameController : MonoBehaviour
             int total = ducks.Count * HINT_ANGLES;
             for (int k = 0; k < 4 && hintSearch < total; k++, hintSearch++)
             {
-                var d = ducks[hintSearch / HINT_ANGLES]; if (d.clone || d.spawnT > 0) continue;
+                var d = ducks[hintSearch / HINT_ANGLES]; if (d.clone || d.spawnT > 0 || d != loaded) continue;
                 float a = (level <= LevelLibrary.Onboarding ? Mathf.Lerp(-165f, -15f, (hintSearch % HINT_ANGLES) / (HINT_ANGLES - 1f))   // upward fan (sim y points down)
                                                              : (hintSearch % HINT_ANGLES) * (360f / HINT_ANGLES) - 180f) * Mathf.Deg2Rad;        // ducks can sit anywhere now: all round
                 var dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
@@ -2350,6 +2522,7 @@ public class GameController : MonoBehaviour
     Duck shotDuckView;
     void UpdateViews(float dt)
     {
+        UpdateDocks(dt); UpdateTray(dt);
         if (moving) { float best = 300 * 300; Duck fd = null; foreach (var d in ducks) { float s2 = d.v.sqrMagnitude; if (s2 > best) { best = s2; fd = d; } } if (fd != null) shotDuckView = fd; }
         else shotDuckView = null;
         bool selectable = state == "play" && !moving && target == null;
@@ -2415,7 +2588,7 @@ public class GameController : MonoBehaviour
                 : spd < 20 ? Quaternion.Euler(Mathf.Sin(t * 2.3f + d.p.y) * 4, Mathf.Sin(t * 1.7f + d.p.x) * 12, 0) : Quaternion.Euler(Mathf.Min(10, spd / 90f), 0, 0);
             // squash on hits, stretch along the shot on launch, squish down + elongate while being pulled
             d.body.localScale = new Vector3((1 + s) * (1 - st * 0.35f) * (1 - pw * 0.12f), (1 - s) * (1 - pw * 0.1f), (1 + s) * (1 + st) * (1 + pw * 0.22f));
-            d.ring.gameObject.SetActive(selectable || d.frenzy || d.boost || (frenzyReady && !moving));
+            d.ring.gameObject.SetActive((selectable && d == loaded) || d.frenzy || d.boost || (frenzyReady && !moving && d == loaded));
             if (d.ring.gameObject.activeSelf)
             {
                 float pulse = 1.8f + Mathf.Sin(t * 5 + d.p.x) * 0.08f + (dragged ? 0.25f + pw * 0.25f : 0);
@@ -2771,6 +2944,8 @@ public class GameController : MonoBehaviour
         cam.fieldOfView = 34;
         var rot = Quaternion.Euler(55, 0, 0); cam.transform.rotation = rot;   // a bit lower: toys read as round 3D objects
         var focus = new Vector3(0, 0, -0.25f);
+        float refH = 1080f * Screen.height / Mathf.Max(1, Screen.width);   // canvas height in reference units (fit-width scaler)
+        float botFrac = 515f / refH, topFrac = 1f - 330f / refH;          // keep the tray + boosters below, the HUD above
         float w = TW * K / 2 + 0.45f, h = TH * K / 2 + 0.45f;
         Vector3[] corners = { new Vector3(-w, 0.5f, h), new Vector3(w, 0.5f, h), new Vector3(-w, 0, -h), new Vector3(w, 0, -h) };
         for (float dist = 12; dist < 80; dist += 0.25f)
@@ -2780,7 +2955,7 @@ public class GameController : MonoBehaviour
             foreach (var c in corners)
             {
                 var v = cam.WorldToViewportPoint(c);
-                if (v.x < 0.02f || v.x > 0.98f || v.y < 0.135f || v.y > 0.83f) { ok = false; break; }
+                if (v.x < 0.02f || v.x > 0.98f || v.y < botFrac || v.y > topFrac) { ok = false; break; }
             }
             if (ok) break;
         }
@@ -2857,6 +3032,7 @@ public class GameController : MonoBehaviour
         // hint
         hintPanel = UIKit.Panel(hud, new Color(1, 1, 1, 0.93f), "Hint").rectTransform; UIKit.Place(hintPanel, 0.5f, 0, 0, 290, 980, 90);
         hintTxt = UIKit.Label(hintPanel, "", 40, Ink); hintTxt.fontStyle = FontStyle.Bold; hintTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
+        BuildTray();
         // booster bar
         var bar = UIKit.Rect("Boosters", hud); UIKit.Place(bar, 0.5f, 0, 0, 125, 1060, 190);
         var mapBtn = UIKit.Btn(bar, "BẢN ĐỒ", PurpleDark, Color.white, 30, App.ShowMap, "Map");
@@ -3218,7 +3394,7 @@ public class GameController : MonoBehaviour
         if (state == "win") { if (HasNext) StartLevel(level + 1); else App.ShowMap(); }
         else if (state == "lose" && SaveData.Coins >= CONTINUE_PRICE)
         {
-            SaveData.Coins -= CONTINUE_PRICE; moves = 5; state = "play"; foreach (var b in blocks) b.blinkT = 0.05f; popupRoot.gameObject.SetActive(false); Sfx.Play("coin");
+            SaveData.Coins -= CONTINUE_PRICE; moves = 5 + traySpecials.Count; state = "play"; LoadDuck(false); foreach (var b in blocks) b.blinkT = 0.05f; popupRoot.gameObject.SetActive(false); Sfx.Play("coin");
         }
     }
 
