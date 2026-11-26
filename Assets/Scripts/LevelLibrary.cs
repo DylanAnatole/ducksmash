@@ -188,7 +188,7 @@ public static partial class LevelLibrary
                 d.bumpers.Add(BumperL(600)); d.bumpers.Add(BumperR(600));
                 break;
             case 4:
-                d = L(15, "Chấm đen = số cú. Rương: +2 vịt!", (150, 800, null), (270, 800, null), (390, 800, null), (270, 690, null));
+                d = L(15, "Chấm = số cú. Rương: +2 vịt", (150, 800, null), (270, 800, null), (390, 800, null), (270, 690, null));
                 for (int i = 0; i < 5; i++) d.blocks.Add(B("plates", 110 + i * 80, 240));   // tutorial: fewer 3-hit plates
                 d.blocks.AddRange(Row("vase", 70, 320, 11, 40)); d.blocks.Add(B("chest", 270, 400));
                 d.blocks.AddRange(Cluster("glass", 270, 480, 2, 11, 40));
@@ -202,14 +202,14 @@ public static partial class LevelLibrary
                 break;
             // ======== GAMEPLAY ========
             case 6:
-                d = L(5, "Phá nhiều 1 phát → đầy FRENZY!", (200, 800, null), (340, 800, null), (270, 710, null));
+                d = L(5, "Phá nhiều 1 phát → FRENZY", (200, 800, null), (340, 800, null), (270, 710, null));
                 d.blocks.AddRange(PixelArt(ART_DUCK, 270, 330, 26)); d.art = "duck";
                 d.blocks.AddRange(Row("soap", 70, 520, 11, 40));
                 d.bumpers.Add(BumperL(580, 160)); d.bumpers.Add(BumperR(580, 160));
                 d.ducks.Add(new DuckDef(170, 610, "normal")); d.ducks.Add(new DuckDef(370, 610, "normal"));
                 break;
             case 7:   // ducks in the MIDDLE floor between the shelves: shoot up at one shelf's legs, down at the other's
-                d = L(12, "Vịt giữa các kệ: bắn lên hay bắn xuống?", (150, 455, null), (270, 455, null), (390, 455, null));
+                d = L(12, "Bắn lên hay bắn xuống kệ?", (150, 455, null), (270, 455, null), (390, 455, null));
                 d.blocks.AddRange(Shelf(270, 230, 420, "glass", "vase", "glass", "vase", "glass", "vase", "glass", "vase"));
                 d.blocks.AddRange(Row("soap", 70, 300, 11, 40));
                 d.blocks.AddRange(Shelf(270, 370, 420, "vase", "glass", "glass", "vase", "glass", "glass", "vase", "glass"));
@@ -218,7 +218,7 @@ public static partial class LevelLibrary
                 d.ducks.Add(new DuckDef(200, 760, "normal")); d.ducks.Add(new DuckDef(340, 760, "normal"));
                 break;
             case 8:   // iron ducks in the MIDDLE: smash up into the plate towers, or down into the bottom pile
-                d = L(9, "Vịt Sắt ở giữa: phá lên trên, phá xuống dưới!", (120, 500, null), (210, 480, "heavy"), (330, 480, "heavy"), (420, 500, null), (270, 830, null));
+                d = L(9, "Vịt Sắt: phá lên, phá xuống", (120, 500, null), (210, 480, "heavy"), (330, 480, "heavy"), (420, 500, null), (270, 830, null));
                 foreach (var p in new[] { (190, 260), (350, 260), (190, 340), (350, 340) }) d.blocks.Add(B("stone", p.Item1, p.Item2));
                 d.blocks.Add(B("chest", 270, 250)); d.blocks.Add(B("chest", 270, 340));
                 d.blocks.AddRange(Col("plates", 85, 220, 6, 40)); d.blocks.AddRange(Col("plates", 455, 220, 6, 40));
@@ -233,7 +233,7 @@ public static partial class LevelLibrary
                 d.ducks.Add(new DuckDef(70, 420, "normal")); d.ducks.Add(new DuckDef(470, 420, "normal"));   // two ducks beside the heart: shoot it sideways
                 break;
             case 10:
-                d = L(15, "MÀN KHÓ! Ngắm qua khe đá!", (150, 810, "heavy"), (270, 810, null), (390, 810, null));
+                d = L(15, "Ngắm qua khe đá", (150, 810, "heavy"), (270, 810, null), (390, 810, null));
                 d.blocks.AddRange(Shelf(270, 215, 440, "glass", "vase", "glass", "vase", "glass", "vase", "glass", "vase"));
                 for (int i = 0; i < 11; i++) d.blocks.Add(B(i == 2 || i == 5 || i == 8 ? "stone" : "glass", 70 + i * 40, 290));   // lanes along the walls stay open for bank shots at the shelf legs
                 for (int i = 0; i < 19; i++) d.blocks.Add(Dom(60 + i * 22, 350, true, 0));
@@ -245,7 +245,7 @@ public static partial class LevelLibrary
                 // flipped upside down: the ducks start at the TOP and shoot down through the stone gaps
                 foreach (var b in d.blocks) b.y = 1020 - b.y;
                 foreach (var dk in d.ducks) dk.y = 1020 - dk.y;
-                d.hint = "MÀN KHÓ! Vịt trên cao: ngắm qua khe đá xuống dưới!";
+                d.hint = "Ngắm qua khe đá, bắn xuống";
                 break;
             case 11:
                 d = L(10, "Vịt Sét: giật 3 món gần nhất!", (150, 810, null), (270, 810, "zap"), (390, 810, null), (270, 720, "zap"));
@@ -255,14 +255,14 @@ public static partial class LevelLibrary
                 d.bumpers.Add(BumperL(660)); d.bumpers.Add(BumperR(660));
                 break;
             case 12:   // ducks on the SIDE WALLS next to the picture, one more at the bottom
-                d = L(6, "Vịt hai bên hông: bắn ngang vào bức tranh!", (60, 250, null), (480, 250, "heavy"), (60, 400, null), (270, 820, null));
+                d = L(6, "Bắn ngang vào bức tranh", (60, 250, null), (480, 250, "heavy"), (60, 400, null), (270, 820, null));
                 d.blocks.AddRange(PixelArt(ART_STRAW, 270, 300, 28)); d.art = "straw"; d.blocks.Add(LZ(270, 470, "h"));
                 for (int i = 0; i < 19; i++) d.blocks.Add(Dom(60 + i * 22, 530, true, 0));
                 d.blocks.Add(B("bathbomb", 488, 530));
                 d.blocks.AddRange(Shelf(270, 610, 380, "vase", "glass", "glass", "vase", "glass", "glass", "vase"));
                 break;
             case 13:   // a row of ducks in the MIDDLE: the picture is above them, the plates below
-                d = L(6, "Vịt ở giữa: trên là tranh, dưới là đĩa!", (150, 650, "zap"), (270, 650, null), (390, 650, "bomb"));
+                d = L(6, "Trên là tranh, dưới là đĩa", (150, 650, "zap"), (270, 650, null), (390, 650, "bomb"));
                 d.blocks.AddRange(PixelArt(ART_FISH, 270, 290, 30)); d.art = "fish";
                 d.blocks.AddRange(Row("vase", 70, 460, 11, 40)); d.blocks.Add(LZ(70, 520, "h")); d.blocks.AddRange(Row("soap", 110, 520, 10, 40));
                 for (int i = 0; i < 7; i++) d.blocks.Add(B("plates", 90 + i * 60, 770));

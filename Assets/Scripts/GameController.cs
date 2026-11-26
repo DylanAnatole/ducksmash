@@ -398,7 +398,7 @@ public class GameController : MonoBehaviour
         if (aimRoot == null) BuildAim(); else aimVisible = true;
         MarkKeys();
         bumpTeach = level > LevelLibrary.Onboarding && ducks.Count >= 3 && PlayerPrefs.GetInt("ds_bump_tut", 0) == 0;
-        if (level > LevelLibrary.Onboarding && keyName != "" && !LevelLibrary.IsSandbox(level)) hint = "Câu đố: " + levelTip.Replace("MÀN KHÓ! ", "").Replace("SIÊU KHÓ! ", "");
+        if (level > LevelLibrary.Onboarding && keyName != "" && !LevelLibrary.IsSandbox(level)) hint = "Câu đố: " + levelTip;
         ShowIntro(L);
         popupRoot.gameObject.SetActive(false);
         bossBar.gameObject.SetActive(L.boss);
@@ -1061,10 +1061,10 @@ public class GameController : MonoBehaviour
                         if (bumpTeach) { bumpTeach = false; PlayerPrefs.SetInt("ds_bump_tut", 1); PlayerPrefs.Save(); }   // both ducks are powered up: they now break 2 hits per touch
                         if (newBoost) { FxKit.Shockwave(W(mid), 2.6f, new Color(1f, 0.85f, 0.3f, 0.9f), 0.35f); FxKit.StarBurst(W(mid, 0.4f), 8); }
                         Splash(mid, 8); FxKit.Sparkle(W(mid), Color.white, 8); AddRing(mid, 38 + Mathf.Min(pushes, 6) * 6, new Color(0.55f, 0.95f, 1f, 0.75f)); Shake(0.15f); HitStop(0.03f); pushes++; shotSmash++; comboPulse = 0.18f;
-                        PopText(LevelLibrary.Unlocked("zap", level) && pushes == ZAP_PUSHES ? "ĐỦ 3 CỐC → VỊT SÉT!" : pushes == 1 ? "TIẾP SỨC! phá x2" : LevelLibrary.Unlocked("zap", level) && pushes < ZAP_PUSHES ? "CỐC! " + pushes + "/" + ZAP_PUSHES : "CỐC x" + pushes + "!", mid, pushes == 1 ? new Color(1f, 0.85f, 0.3f) : Color.white, 46 + Mathf.Min(20, pushes * 4));
+                        PopText(LevelLibrary.Unlocked("zap", level) && pushes == ZAP_PUSHES ? "ĐỦ 3 CỐC → VỊT SÉT!" : pushes == 1 ? "PHÁ x2!" : LevelLibrary.Unlocked("zap", level) && pushes < ZAP_PUSHES ? "CỐC! " + pushes + "/" + ZAP_PUSHES : "CỐC x" + pushes + "!", mid, pushes == 1 ? new Color(1f, 0.85f, 0.3f) : Color.white, 46 + Mathf.Min(20, pushes * 4));
                         if (pushes == 2 && state == "play" && moving)
                         {   // reward real billiards: two ducks bumped in one shot gives the move back
-                            moves++; movesPulse = 0.45f; PopText("HÚC 2 VỊT: +1 LƯỢT!", mid + new Vector2(0, -70), new Color(0.45f, 0.95f, 0.5f), 56); Sfx.Play("coin", 0.9f, 1.3f);
+                            moves++; movesPulse = 0.45f; PopText("+1 LƯỢT!", mid + new Vector2(0, -70), new Color(0.45f, 0.95f, 0.5f), 56); Sfx.Play("coin", 0.9f, 1.3f);
                         }
                         Sfx.Play(pushes % 2 == 1 ? "quack" : "squeak", 0.9f, 1f + pushes * 0.08f); Sfx.Play("thud", 0.5f, 1.35f);   // the "clack" has weight
                     }
@@ -1469,7 +1469,7 @@ public class GameController : MonoBehaviour
     // ---------- shooting ----------
     void Launch(Duck d, Vector2 v)
     {
-        d.v = v; d.hot = true; moves--; moving = true; shotClock = 0; shotsTaken++; if (shotsTaken == 1) foreach (var k in keyTags) if (k) { tags.Remove(k); Destroy(k.gameObject); } shotSmash = 0; hint = level > LevelLibrary.Onboarding && !keySolved && keyName != "" ? "Câu đố: " + levelTip.Replace("MÀN KHÓ! ", "").Replace("SIÊU KHÓ! ", "") : ""; pushes = 0; frenzyShot = false; shotBanks = 0; shotClears = 0; dominoFalls = 0;
+        d.v = v; d.hot = true; moves--; moving = true; shotClock = 0; shotsTaken++; if (shotsTaken == 1) foreach (var k in keyTags) if (k) { tags.Remove(k); Destroy(k.gameObject); } shotSmash = 0; hint = level > LevelLibrary.Onboarding && !keySolved && keyName != "" ? "Câu đố: " + levelTip : ""; pushes = 0; frenzyShot = false; shotBanks = 0; shotClears = 0; dominoFalls = 0;
         foreach (var k in ducks) k.charged = true;
         d.stretch = 0.22f; d.pullVis = 0;
         Sfx.Play("shoot"); Sfx.Play("squeak", 0.5f, 1.3f); Sfx.Buzz(18);
@@ -1616,7 +1616,7 @@ public class GameController : MonoBehaviour
         // reminder of the combo ducks the player has already unlocked
         var known = LevelLibrary.Specials.Where(s => LevelLibrary.Unlocked(s.kind, level) && LevelLibrary.NewSpecialAt(level) != s).ToList();
         string combos = "";   // no combo recipe reminder on every level (players found it patronising); the COMBO ? guide has it
-        introBody.text = string.Join("\n", g) + "\n\n" + moves + " lượt bắn\n<size=30><color=#c9a400>3 sao khi còn ≥ " + Mathf.CeilToInt(startMoves * 0.4f) + " lượt</color></size>" + combos;
+        introBody.text = string.Join("\n", g) + "\n\n" + moves + " lượt bắn\n<size=30><color=#a14a00>3 sao khi còn ≥ " + Mathf.CeilToInt(startMoves * 0.4f) + " lượt</color></size>" + combos;
         introMax = introTimer = 1.6f;
         introRoot.sizeDelta = new Vector2(760, 520);
 
@@ -1629,11 +1629,11 @@ public class GameController : MonoBehaviour
         }
         else if (!string.IsNullOrEmpty(L.hint) && !LevelLibrary.IsSandbox(level))
         {   // one short line about what's special here (shelves, rings, hard level...), then the goal
-            introBody.text = "<size=38><color=#7a4dd8><b>" + (level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? "MỚI:" : "CÂU ĐỐ:") + "</b></color> " + L.hint + "</size>"
-                + (keyName != "" && level > LevelLibrary.Onboarding ? "\n<size=32><color=#c98a00>Chìa khoá: <b>" + keyName + "</b> (vòng vàng nhấp nháy)</color></size>" : "")
-                + (ducks.Count >= 3 && level > LevelLibrary.Onboarding ? "\n<size=30><color=#2f9e5a>Nhiều vịt = nhiều chỗ bắn. Bắn vịt <b>húc vịt</b>: vịt bị húc được <b>TIẾP SỨC</b> (phá x2), húc 2 con = <b>+1 lượt</b></color></size>" : "")
-                + "\n\n<b>PHÁ SẠCH " + GoalsLeft() + " MÓN</b> · " + moves + " lượt";
-            introRoot.sizeDelta = new Vector2(880, 640); introMax = introTimer = level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? 5f : 4.5f;
+            introBody.text = "<size=40><color=#5b3cc4><b>" + (level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? "MỚI" : "CÂU ĐỐ") + "</b></color></size>\n<size=52><color=#2e2450><b>" + L.hint + "</b></color></size>"
+                + (keyName != "" && level > LevelLibrary.Onboarding ? "\n<size=40><color=#a14a00>Chìa khoá: <b>" + keyName.Split(':')[0] + "</b></color></size>" : "")
+                + (ducks.Count >= 3 && level > LevelLibrary.Onboarding ? "\n<size=40><color=#16703d>Húc vịt = phá <b>x2</b></color></size>" : "")
+                + "\n\n<size=42><color=#2e2450>Phá <b>" + GoalsLeft() + "</b> món · <b>" + moves + "</b> lượt</color></size>";
+            introRoot.sizeDelta = new Vector2(820, 560); introMax = introTimer = level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? 5f : 4.5f;
         }
 
         // unlock level: teach how to earn the new duck and how it works, and give one free copy to try
@@ -1977,7 +1977,7 @@ public class GameController : MonoBehaviour
             {
                 hintBestDuck = ia; hintBestDir = (ducks[ib].p - ducks[ia].p).normalized; PredictShot(ducks[ia], hintBestDir, hintPath);
                 hintReady = true; hintSearch = -1; idleT = Mathf.Max(idleT, 20f);
-                hint = "Thử bắn vịt HÚC vịt → vịt bị húc được TIẾP SỨC (phá x2)!";
+                hint = "Bắn vịt húc vịt: phá x2!";
             }
         }
         bool can = state == "play" && !moving && drag == null && introTimer <= 0 && target == null && ducks.Count > 0
@@ -2251,7 +2251,7 @@ public class GameController : MonoBehaviour
         if (hitDuck != null && aimHits.Count == 0 && !rbAim)
         {
             aimCount.gameObject.SetActive(true);
-            aimCount.text = "<size=40>HÚC VỊT → TIẾP SỨC!</size>\n<size=30>phá x2 · húc 2 con = +1 lượt</size>";
+            aimCount.text = "<size=42>HÚC VỊT = PHÁ x2</size>";
             aimCount.rectTransform.anchoredPosition = WorldToHud(W(hitDuck.p, 0.6f)) + new Vector2(0, 90);
             aimCount.color = new Color(1f, 0.88f, 0.35f);
         }
@@ -2713,12 +2713,12 @@ public class GameController : MonoBehaviour
         {   // a tick every 10 points
             var tk = UIKit.Panel(ftrack, new Color(1f, 1f, 1f, 0.35f), "Tick").rectTransform; tk.anchorMin = tk.anchorMax = new Vector2(i / 7f, 0.5f); tk.sizeDelta = new Vector2(3, 40);
         }
-        var fl = UIKit.Outlined(UIKit.Label(feverBar, "FRENZY", 30, Color.white, TextAnchor.MiddleLeft), new Color(0.6f, 0.15f, 0.4f), 3); UIKit.Place(fl.rectTransform, 0, 0.5f, 110, 0, 200, 60);
+        var fl = UIKit.Outlined(UIKit.Label(feverBar, "FRENZY", 34, Color.white, TextAnchor.MiddleLeft), new Color(0.6f, 0.15f, 0.4f), 3); UIKit.Place(fl.rectTransform, 0, 0.5f, 110, 0, 200, 60);
         feverTxt = UIKit.Outlined(UIKit.Label(feverBar, "0 / 70", 36, Color.white), Ink, 3); UIKit.Place(feverTxt.rectTransform, 0.5f, 0.5f, 0, 0, 600, 60);
-        feverHint = UIKit.Label(feverBar, "phá 1 món = +1", 24, new Color(1f, 1f, 1f, 0.85f), TextAnchor.MiddleRight); UIKit.Place(feverHint.rectTransform, 1, 0.5f, -120, 0, 220, 60);
+        feverHint = UIKit.Outlined(UIKit.Label(feverBar, "phá 1 món = +1", 30, Color.white, TextAnchor.MiddleRight), new Color(0.25f, 0.2f, 0.45f), 2); UIKit.Place(feverHint.rectTransform, 1, 0.5f, -120, 0, 260, 60);
         feverPop = UIKit.Outlined(UIKit.Label(hud, "", 46, new Color(1f, 0.55f, 0.8f)), Color.white, 3); UIKit.Place(feverPop.rectTransform, 0.5f, 1, 300, -262, 400, 70);
         feverPop.raycastTarget = false; feverPop.gameObject.SetActive(false);
-        streakTxt = UIKit.Label(topIn, "", 26, new Color(1f, 0.8f, 0.35f), TextAnchor.MiddleRight); UIKit.Place(streakTxt.rectTransform, 1, 0.5f, -265, -70, 300, 40);
+        streakTxt = UIKit.Outlined(UIKit.Label(topIn, "", 30, new Color(1f, 0.85f, 0.4f), TextAnchor.MiddleRight), new Color(0.25f, 0.2f, 0.45f), 2); UIKit.Place(streakTxt.rectTransform, 1, 0.5f, -265, -70, 300, 40);
         // boss bar
         bossBar = UIKit.Panel(hud, new Color(0.23f, 0.18f, 0.42f, 0.7f), "BossBar").rectTransform; UIKit.Place(bossBar, 0.5f, 1, 0, -360, 700, 40);
         var bf = UIKit.Panel(bossBar, new Color(1f, 0.35f, 0.2f), "Fill"); bossFill = bf.rectTransform;
@@ -2732,7 +2732,7 @@ public class GameController : MonoBehaviour
         bigTxt.color = new Color(1, 1, 1, 0);
         // hint
         hintPanel = UIKit.Panel(hud, new Color(1, 1, 1, 0.93f), "Hint").rectTransform; UIKit.Place(hintPanel, 0.5f, 0, 0, 290, 980, 90);
-        hintTxt = UIKit.Label(hintPanel, "", 34, Ink); hintTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
+        hintTxt = UIKit.Label(hintPanel, "", 40, Ink); hintTxt.fontStyle = FontStyle.Bold; hintTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
         // booster bar
         var bar = UIKit.Rect("Boosters", hud); UIKit.Place(bar, 0.5f, 0, 0, 125, 1060, 190);
         var mapBtn = UIKit.Btn(bar, "BẢN ĐỒ", PurpleDark, Color.white, 30, App.ShowMap, "Map");
@@ -2772,7 +2772,7 @@ public class GameController : MonoBehaviour
         var ic = UIKit.Panel(introRoot, new Color(1f, 0.97f, 0.94f, 0.96f), "IntroCard"); UIKit.Stretch(ic.rectTransform);
         var ish = ic.gameObject.AddComponent<Shadow>(); ish.effectColor = new Color(0.3f, 0.2f, 0.5f, 0.3f); ish.effectDistance = new Vector2(0, -12);
         introTitle = UIKit.Outlined(UIKit.Label(introRoot, "", 80, Purple), Ink, 3); UIKit.Place(introTitle.rectTransform, 0.5f, 1, 0, -95, 700, 120);
-        introBody = UIKit.Label(introRoot, "", 46, Ink); UIKit.Place(introBody.rectTransform, 0.5f, 0.5f, 0, -60, 700, 320);
+        introBody = UIKit.Label(introRoot, "", 46, Ink); UIKit.Place(introBody.rectTransform, 0.5f, 0.5f, 0, -50, 760, 380);
         introRoot.gameObject.SetActive(false);
         // tutorial hand (white fingertip)
         var hand = UIKit.Dot(hud, Color.white, "Hand"); hand.raycastTarget = false; handRt = hand.rectTransform;
