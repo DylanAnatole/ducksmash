@@ -25,7 +25,7 @@ public class GameController : MonoBehaviour
     class Duck
     {
         public Vector2 p, v; public float r; public string kind; public bool hot, charged = true, frenzy, clone;
-        public float dizzy;
+        public float dizzy; public bool introDrop;
         public float squash, zapCd, face = Mathf.PI / 2; public Transform view, ring, body;
         public bool boost;   // bumped by another duck this shot: hits harder
         public float cheer;
@@ -305,7 +305,7 @@ public class GameController : MonoBehaviour
         cam.cullingMask = ~0;
         EnsureTub();
         tubRoot.gameObject.SetActive(true);
-        foreach (var d in L.ducks) NewDuck(new Vector2(d.x, d.y), d.kind);
+        { int di = 0; foreach (var d in L.ducks) { var nd = NewDuck(new Vector2(d.x, d.y), d.kind); nd.spawnT = 0.55f + di++ * 0.09f; nd.introDrop = true; } }   // the gang plops into the bath one by one
         foreach (var d in L.blocks)
         {
             var b = new Block
@@ -2338,8 +2338,9 @@ public class GameController : MonoBehaviour
             float drop = 0;
             if (d.spawnT > 0)
             {
-                d.spawnT -= dt; float f = Mathf.Clamp01(d.spawnT / 0.6f); drop = f * f * 6f;
-                if (d.spawnT <= 0) { d.squash = 0.3f; Splash(d.p, 14); FxKit.Ripple(W(d.p), 1.3f); Sfx.Play("splash", 0.8f, 1.2f); Shake(0.15f); }
+                d.spawnT -= dt; float f = Mathf.Clamp01(d.spawnT / 0.6f); drop = d.spawnT > 0.6f ? 40f : f * f * 6f;   // waits off-screen, then falls
+                if (d.spawnT <= 0 && d.introDrop) { d.introDrop = false; d.squash = 0.3f; Splash(d.p, App.Mobile ? 5 : 8); FxKit.Ripple(W(d.p), 1.1f); Sfx.Play("splash", 0.35f, UnityEngine.Random.Range(1.2f, 1.45f)); }
+                else if (d.spawnT <= 0) { d.squash = 0.3f; Splash(d.p, 14); FxKit.Ripple(W(d.p), 1.3f); Sfx.Play("splash", 0.8f, 1.2f); Shake(0.15f); }
             }
             // while aiming the duck leans back toward the finger and trembles at full power
             var lean = dragged ? -dragDir * pw * 10f : Vector2.zero;
