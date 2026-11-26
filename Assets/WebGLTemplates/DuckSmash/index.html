@@ -95,25 +95,8 @@
     };
     // phones report devicePixelRatio 2-3: rendering at full DPR triples the pixel work, so cap it
     var mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    // sharp by default (2x on phones: 1x upscaled 3x looked blurry / "retro"); drop resolution only if the phone can't keep up
+    // sharp: 2x on phones too (1x upscaled 3x looked blurry / "retro"). Fixed at start: changing it mid-game breaks Unity's layout
     config.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-    function adaptResolution(inst) {
-      if (!mobile) return;
-      var steps = [2, 1.6, 1.25, 1], i = steps.indexOf(config.devicePixelRatio); if (i < 0) i = 0;
-      var frames = 0, t0 = performance.now(), slow = 0;
-      function tick(now) {
-        frames++;
-        if (now - t0 >= 2000) {
-          var fps = frames * 1000 / (now - t0); frames = 0; t0 = now;
-          if (document.hidden) { requestAnimationFrame(tick); return; }
-          slow = fps < 42 ? slow + 1 : 0;
-          if (slow >= 2 && i < steps.length - 1) { i++; slow = 0; inst.Module.devicePixelRatio = Math.min(window.devicePixelRatio || 1, steps[i]); }
-          if (i >= steps.length - 1) return;
-        }
-        requestAnimationFrame(tick);
-      }
-      setTimeout(function () { t0 = performance.now(); requestAnimationFrame(tick); }, 4000);
-    }
     var lmsg = document.querySelector("#lmsg"), started = false;
     // if the game hasn't started after a long while (bad network / stale cache), offer a reload
     setTimeout(function () { if (!started) document.querySelector("#retry").style.display = "block"; }, 30000);
@@ -125,7 +108,7 @@
         document.querySelector("#fill").style.width = (100 * p) + "%";
         lmsg.textContent = p < 0.9 ? "Đang tải " + Math.round(p * 100) + "%" : "Đang khởi động...";
       })
-        .then(function (inst) { adaptResolution(inst); started = true; document.querySelector("#loading").style.display = "none"; })
+        .then(function () { started = true; document.querySelector("#loading").style.display = "none"; })
         .catch(function (m) { lmsg.textContent = "Lỗi: " + m; document.querySelector("#retry").style.display = "block"; });
     };
     document.body.appendChild(s);
