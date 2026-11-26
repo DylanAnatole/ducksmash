@@ -342,7 +342,7 @@ public class GameController : MonoBehaviour
         if (waterMat != null)
             waterMat.SetColor("_Shift", LevelLibrary.IsSandbox(level) || level <= 12 ? new Color(1, 1, 1, 0)
                 : hardLevel ? new Color(0.25f, 0.35f, 0.8f, 0.45f)
-                : level <= 18 ? new Color(0.3f, 0.85f, 0.78f, 0.6f) : level <= 25 ? new Color(0.72f, 0.5f, 1f, 0.55f) : new Color(1f, 0.55f, 0.68f, 0.5f));
+                : level <= 18 ? new Color(0.2f, 0.66f, 0.7f, 0.5f) : level <= 25 ? new Color(0.72f, 0.5f, 1f, 0.55f) : new Color(1f, 0.55f, 0.68f, 0.5f));
         if (floorMat != null)
         {   // the bathroom tiles follow the chapter too (subtle tint, so the screen doesn't look the same for 30 levels)
             var fc = LevelLibrary.IsSandbox(level) || level <= 12 ? Color.white : hardLevel ? new Color(0.9f, 0.92f, 1f)
@@ -2685,7 +2685,7 @@ public class GameController : MonoBehaviour
         UIKit.Place((RectTransform)gear.transform, 1, 0.5f, -65, 10, 100, 100);
         // fever bar
         // FRENZY meter: how much is banked, what a full bar gives, and what this shot will add
-        feverBar = UIKit.Panel(hud, new Color(0.33f, 0.27f, 0.53f, 1f), "Fever").rectTransform; UIKit.Place(feverBar, 0.5f, 1, 0, -312, 1010, 62);
+        feverBar = UIKit.Panel(hud, new Color(0.47f, 0.42f, 0.74f, 0.95f), "Fever").rectTransform; UIKit.Place(feverBar, 0.5f, 1, 0, -312, 1010, 62);
         var ftrack = UIKit.Rect("Track", feverBar); UIKit.Stretch(ftrack, 6, 6, 6, 6);
         UIKit.Gloss(feverBar, 0.16f);
         feverGhost = UIKit.Panel(ftrack, new Color(1f, 1f, 1f, 0.4f), "Ghost").rectTransform;
@@ -2827,7 +2827,7 @@ public class GameController : MonoBehaviour
 
     void BuildComboBar()
     {
-        comboBar = UIKit.Panel(hud, new Color(0.33f, 0.27f, 0.53f, 0.92f), "ComboBar").rectTransform; UIKit.Place(comboBar, 0.5f, 1, -70, -384, 820, 52);
+        comboBar = UIKit.Panel(hud, new Color(0.47f, 0.42f, 0.74f, 0.85f), "ComboBar").rectTransform; UIKit.Place(comboBar, 0.5f, 1, -70, -384, 820, 52);
         var track = UIKit.Rect("Track", comboBar); UIKit.Stretch(track, 96, 6, 12, 6);
         comboGhost = UIKit.Panel(track, new Color(1f, 1f, 1f, 0.35f), "Ghost").rectTransform;
         comboFill = UIKit.Panel(track, new Color(1f, 0.82f, 0.3f), "Fill").rectTransform;
