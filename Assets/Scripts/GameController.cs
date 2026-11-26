@@ -1058,7 +1058,8 @@ public class GameController : MonoBehaviour
                         if (a.v.sqrMagnitude > cap * cap) a.v = a.v.normalized * cap; if (b.v.sqrMagnitude > cap * cap) b.v = b.v.normalized * cap;
                         a.hot = b.hot = true; a.squash = b.squash = 0.2f; var mid = (a.p + b.p) / 2;
                         bool newBoost = !a.boost || !b.boost; a.boost = b.boost = true;
-                        if (bumpTeach) { bumpTeach = false; PlayerPrefs.SetInt("ds_bump_tut", 1); PlayerPrefs.Save(); }   // both ducks are powered up: they now break 2 hits per touch
+                        if (bumpTeach) { bumpTeach = false; PlayerPrefs.SetInt("ds_bump_tut", 1); PlayerPrefs.Save(); }
+                        if (!keySolved && keyName == "HÚC VỊT" && state == "play") { keySolved = true; keyPts.Clear(); hint = ""; PopText("ĐÚNG CHÌA KHOÁ!", mid + new Vector2(0, -120), new Color(1f, 0.85f, 0.3f), 58); Sfx.Play("star", 0.8f, 1.5f); }   // both ducks are powered up: they now break 2 hits per touch
                         if (newBoost) { FxKit.Shockwave(W(mid), 2.6f, new Color(1f, 0.85f, 0.3f, 0.9f), 0.35f); FxKit.StarBurst(W(mid, 0.4f), 8); }
                         Splash(mid, 8); FxKit.Sparkle(W(mid), Color.white, 8); AddRing(mid, 38 + Mathf.Min(pushes, 6) * 6, new Color(0.55f, 0.95f, 1f, 0.75f)); Shake(0.15f); HitStop(0.03f); pushes++; shotSmash++; comboPulse = 0.18f;
                         PopText(LevelLibrary.Unlocked("zap", level) && pushes == ZAP_PUSHES ? "ĐỦ 3 CỐC → VỊT SÉT!" : pushes == 1 ? "PHÁ x2!" : LevelLibrary.Unlocked("zap", level) && pushes < ZAP_PUSHES ? "CỐC! " + pushes + "/" + ZAP_PUSHES : "CỐC x" + pushes + "!", mid, pushes == 1 ? new Color(1f, 0.85f, 0.3f) : Color.white, 46 + Mathf.Min(20, pushes * 4));
@@ -1398,8 +1399,8 @@ public class GameController : MonoBehaviour
     {
         var p = UIKit.Panel(dynLayer, bg, "Tag"); p.raycastTarget = false;
         var o = p.gameObject.AddComponent<Outline>(); o.effectColor = new Color(1, 1, 1, 0.9f); o.effectDistance = new Vector2(2, -2);
-        var rt = p.rectTransform; rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f); rt.sizeDelta = new Vector2(duckIcon ? 150 : 24 + text.Length * 17, 44);
-        var l = UIKit.Label(rt, text, 26, Color.white); l.raycastTarget = false;
+        var rt = p.rectTransform; rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f); rt.sizeDelta = new Vector2(duckIcon ? 160 : 28 + text.Length * 19, 50);
+        var l = UIKit.Label(rt, text, 30, Color.white); l.raycastTarget = false; l.fontStyle = FontStyle.Bold;
         if (duckIcon)
         {
             if (tagDuckIcon == null) tagDuckIcon = LevelLibrary.ArtTexture("duck", false);
@@ -2518,6 +2519,11 @@ public class GameController : MonoBehaviour
         if (keyPts.Count == 0) Pick("ring", 2, "PHAO: húc cho trượt", new Color(1f, 0.42f, 0.4f));
         if (keyPts.Count == 0 && bumpers.Count > 0) { keyName = "ĐỆM CAO SU"; foreach (var m in bumpers) keyPts.Add(new Vector2(m.x + m.w / 2, m.y + m.h / 2)); }
         if (keyPts.Count == 0) Pick("ice", 1, "BĂNG: 2 cú", new Color(0.45f, 0.75f, 1f));
+        if (keyPts.Count == 0 && ducks.Count >= 5)
+        {   // billiards level: the rack of ducks IS the puzzle
+            keyName = "HÚC VỊT"; float maxY = ducks.Max(x => x.p.y);
+            foreach (var dk in ducks) if (dk.p.y < maxY - 1) keyPts.Add(dk.p);
+        }
         if (keyPts.Count > 6) keyPts.RemoveRange(6, keyPts.Count - 6);
     }
     // pulse rings on the key pieces until the first shot (and again while the player is stuck)

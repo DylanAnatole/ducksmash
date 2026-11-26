@@ -261,12 +261,13 @@ public static partial class LevelLibrary
                 d.blocks.Add(B("bathbomb", 488, 530));
                 d.blocks.AddRange(Shelf(270, 610, 380, "vase", "glass", "glass", "vase", "glass", "glass", "vase"));
                 break;
-            case 13:   // a row of ducks in the MIDDLE: the picture is above them, the plates below
-                d = L(6, "Trên là tranh, dưới là đĩa", (150, 650, "zap"), (270, 650, null), (390, 650, "bomb"));
-                d.blocks.AddRange(PixelArt(ART_FISH, 270, 290, 30)); d.art = "fish";
-                d.blocks.AddRange(Row("vase", 70, 460, 11, 40)); d.blocks.Add(LZ(70, 520, "h")); d.blocks.AddRange(Row("soap", 110, 520, 10, 40));
-                for (int i = 0; i < 7; i++) d.blocks.Add(B("plates", 90 + i * 60, 770));
-                d.ducks.Add(new DuckDef(270, 840, "normal"));
+            case 13:   // BILLIARDS: a rack of ducks in the middle, the cue duck at the bottom - break the rack and every duck flies off powered up
+                d = L(6, "Bắn vào đàn vịt: tung khắp bồn!", (270, 820, "heavy"),
+                      (270, 610, null), (248, 572, null), (292, 572, null), (226, 534, null), (270, 534, "bomb"), (314, 534, null));
+                d.blocks.AddRange(PixelArt(ART_FISH, 270, 250, 26)); d.art = "fish";
+                d.blocks.AddRange(Row("soap", 150, 410, 7, 40));
+                d.blocks.AddRange(Col("glass", 70, 400, 9, 40)); d.blocks.AddRange(Col("vase", 470, 400, 9, 40));
+                foreach (var x in new[] { 110f, 170f, 370f, 430f }) d.blocks.Add(B("plates", x, 760));
                 break;
             default:
                 if (n >= 14 && n <= Count) { d = Puzzle(n); break; }   // hand-designed puzzle levels (LevelPuzzles.cs)
