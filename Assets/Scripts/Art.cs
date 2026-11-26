@@ -723,8 +723,10 @@ public static class Art
     public static Transform Pixel(Transform parent, float s, Color c)
     {
         var root = Root("Pixel", parent);
-        Prim(PrimitiveType.Cube, root, new Vector3(0, 0.16f, 0), new Vector3(s, 0.32f, s), Mat(Color.Lerp(c, new Color(1f, 0.97f, 0.95f), 0.14f), 0.5f));
-        Prim(PrimitiveType.Cube, root, new Vector3(0, 0.325f, 0), new Vector3(s * 0.8f, 0.02f, s * 0.8f), Mat(Color.Lerp(c, Color.white, 0.3f), 0.6f));   // lighter top face: candy-tile look
+        // glossy toy brick with a round stud: the picture reads as a little plastic mosaic
+        var bc = Color.Lerp(c, new Color(1f, 0.97f, 0.95f), 0.1f);
+        Prim(PrimitiveType.Cube, root, new Vector3(0, 0.14f, 0), new Vector3(s * 0.96f, 0.28f, s * 0.96f), Mat(bc, 0.85f));
+        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.3f, 0), new Vector3(s * 0.56f, 0.035f, s * 0.56f), Mat(Color.Lerp(bc, Color.white, 0.18f), 0.95f));
         return root;
     }
 
