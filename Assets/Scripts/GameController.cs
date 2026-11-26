@@ -75,7 +75,8 @@ public class GameController : MonoBehaviour
     class Portal { public Vector2 a, b; public Transform sa, sb; public Color c; }
     readonly List<Portal> portals = new List<Portal>();
     const float PORTAL_R = 24f;
-    const float OUTLINE_W = 0.0017f;   // shared silhouette width (baked toys use smoothed normals, so boxes don't crack)
+    const float OUTLINE_W = 0.0017f;
+    const float DUCK_VIS = 1.22f;   // ducks drawn a bit larger than their hit circle   // shared silhouette width (baked toys use smoothed normals, so boxes don't crack)
     class Flow { public Rect r; public Vector2 dir; public Material m; public Mesh mesh; public float tu, tv; readonly Vector2[] uv = new Vector2[4];
         // the shared material ignores tiling/offset, so the chevrons are tiled + scrolled through the quad's own UVs
         public void Scroll(float off) { if (!mesh) return; uv[0] = new Vector2(off, 0); uv[1] = new Vector2(off + tu, 0); uv[2] = new Vector2(off, tv); uv[3] = new Vector2(off + tu, tv); mesh.uv = uv; } }
@@ -310,7 +311,7 @@ public class GameController : MonoBehaviour
         tubRoot.gameObject.SetActive(true);
         // DUCK TRAY: the level's duck spots become launch DOCKS, their kinds go into the tray; every duck in the tray is one shot.
         // Parked "bait" ducks are dropped into the tub as passive billiard balls.
-        docks.Clear(); traySpecials.Clear(); loaded = null; dock = 0;
+        docks.Clear(); traySpecials.Clear(); loaded = null; dock = 0; ClearRug();
         { int di = 0; foreach (var d in L.ducks)
             {
                 var pos = new Vector2(d.x, d.y);
@@ -587,7 +588,8 @@ public class GameController : MonoBehaviour
         var sole = Art.Mat(new Color(1f, 0.62f, 0.45f), 0.3f);
         var slip = Art.Mat(new Color(1f, 0.86f, 0.3f), 0.6f);
         var beak = Art.Mat(new Color(1f, 0.55f, 0.2f), 0.5f);
-        foreach (var (x, yaw) in new[] { (2.75f, -12f), (3.55f, 10f) })
+        rugZ = bottom;
+        foreach (var (x, yaw) in new (float, float)[0])
         {
             var sl = Art.Root("Slipper", root); sl.localPosition = new Vector3(x, -0.2f, bottom + 0.05f); sl.localEulerAngles = new Vector3(0, yaw, 0);
             Art.Prim(PrimitiveType.Capsule, sl, new Vector3(0, 0, 0), new Vector3(0.55f, 0.55f, 0.16f), sole, new Vector3(90, 0, 0));
@@ -699,6 +701,9 @@ public class GameController : MonoBehaviour
             return v;
         }, world);
         b.view.position = W(b.p);
+        // toys read bigger than their hit circles: the board is the heart of the game
+        float vis = b.type == "pixel" ? 1.06f : b.type == "stone" ? 1.08f : b.type == "plank" || b.type == "screw" || b.type == "domino" || b.type == "boss" ? 1f : 1.16f;
+        b.view.localScale *= vis;
         b.baseScale = b.view.localScale;
         b.rends = b.view.GetComponentsInChildren<Renderer>().Where(r => r.sharedMaterial != null && r.sharedMaterial.HasProperty("_Emission")).ToArray();
         AddPips(b);
@@ -764,7 +769,7 @@ public class GameController : MonoBehaviour
             return v;
         }, world);
         d.body = d.view.Find("Body"); d.ring = d.view.Find("Ring"); d.ringCol = Color.clear;
-        d.view.localScale = Vector3.one * d.r * 2 * K;
+        d.view.localScale = Vector3.one * d.r * 2 * K * DUCK_VIS;
         d.view.position = W(d.p);
         // water streak behind a fast duck
         if (trailMat == null) trailMat = new Material(Shader.Find("Sprites/Default"));
@@ -1627,6 +1632,62 @@ public class GameController : MonoBehaviour
         }
     }
 
+    // ---------- the waiting ducks stand on the bath rug: tap one to put that kind on the dock ----------
+    float rugZ = float.NaN;
+    readonly List<(string kind, Transform view, RectTransform tag)> rugDucks = new List<(string, Transform, RectTransform)>();
+    string rugSig = "";
+    void ClearRug() { foreach (var r in rugDucks) { if (r.view) Destroy(r.view.gameObject); if (r.tag) { tags.Remove(r.tag); Destroy(r.tag.gameObject); } } rugDucks.Clear(); rugSig = ""; }
+    void UpdateRug(float dt)
+    {
+        bool show = state == "play" && !float.IsNaN(rugZ);
+        var ks = show ? TrayKinds() : new List<string>();
+        string sig = string.Join(",", ks);
+        if (sig != rugSig)
+        {
+            ClearRug(); rugSig = sig;
+            float gap = Mathf.Min(1.55f, 7.4f / Mathf.Max(1, ks.Count)), x0 = -(ks.Count - 1) * gap / 2f;
+            for (int i = 0; i < ks.Count; i++)
+            {
+                var tmp = new Duck { kind = ks[i] }; BuildDuckView(tmp);
+                var v = tmp.view; v.position = new Vector3(x0 + i * gap, -0.22f, rugZ + 0.05f);
+                v.localScale = Vector3.one * 17 * 2 * K * DUCK_VIS * 1.05f;
+                v.rotation = Quaternion.Euler(0, 180f + (i - (ks.Count - 1) / 2f) * -12f, 0);   // facing the player, fanned a little
+                var ring = v.Find("Ring"); if (ring) ring.gameObject.SetActive(false);
+                if (tmp.trail) tmp.trail.emitting = false;
+                var tag = MakeTag("x" + TrayCount(ks[i]), ks[i] == "normal" ? new Color(0.95f, 0.65f, 0.1f) : KindColor(ks[i]), false);
+                rugDucks.Add((ks[i], v, tag));
+            }
+        }
+        for (int i = 0; i < rugDucks.Count; i++)
+        {
+            var r = rugDucks[i]; if (!r.view) continue;
+            bool sel = loaded != null ? loaded.kind == r.kind : loadKind == r.kind;
+            float hop = sel ? Mathf.Abs(Mathf.Sin(Time.unscaledTime * 4f)) * 0.18f : Mathf.Sin(Time.unscaledTime * 2f + i) * 0.02f;
+            var basePos = new Vector3(r.view.position.x, -0.22f + hop, rugZ + 0.05f); r.view.position = basePos;
+            float s = 17 * 2 * K * DUCK_VIS * (sel ? 1.18f : 1.0f);
+            r.view.localScale = Vector3.Lerp(r.view.localScale, Vector3.one * s, 1 - Mathf.Exp(-12f * dt));
+            if (r.tag)
+            {
+                r.tag.anchoredPosition = WorldToHud(new Vector3(basePos.x, -0.2f, rugZ - 0.62f));   // under its feet: the duck stays visible
+                var t = r.tag.GetComponentInChildren<Text>(); string tx = "x" + TrayCount(r.kind);
+                if (t && t.text != tx) t.text = tx;
+                r.tag.localScale = Vector3.one * (sel ? 1.12f : 0.95f);
+            }
+        }
+    }
+    // screen-space pick of a rug duck (generous radius)
+    bool TryPickRugDuck(Vector3 screen)
+    {
+        float best = Screen.height * 0.055f; string kind = null;
+        foreach (var r in rugDucks)
+        {
+            if (!r.view) continue; var sp = cam.WorldToScreenPoint(r.view.position + Vector3.up * 0.35f);
+            float dd = Vector2.Distance(sp, screen); if (dd < best) { best = dd; kind = r.kind; }
+        }
+        if (kind == null) return false;
+        ChooseKind(kind); return true;
+    }
+
     Texture2D DuckIcon(string kind)
     {
         if (duckIcons.TryGetValue(kind, out var t) && t) return t;
@@ -1644,8 +1705,9 @@ public class GameController : MonoBehaviour
     void UpdateTray(float dt)
     {
         if (trayRoot == null) return;
+        if (trayRoot.gameObject.activeSelf) trayRoot.gameObject.SetActive(false);   // the tray lives on the rug now (3D ducks)
+        UpdateRug(dt);
         bool show = state == "play";
-        if (trayRoot.gameObject.activeSelf != show) trayRoot.gameObject.SetActive(show);
         if (!show) return;
         trayPulse = Mathf.Max(0, trayPulse - dt * 2f);
         var ks = TrayKinds();
@@ -1929,7 +1991,7 @@ public class GameController : MonoBehaviour
         Vector2? tapAt = null;
         if (state == "play" && !moving && drag == null && introTimer <= 0)
         {
-            if (level == 4 && !tutKind) { foreach (var c in trayChips) if (c.kind == "heavy" && c.rt) tapAt = WorldToHudFromRect(c.rt); if (tapAt.HasValue) hint = "Chạm VỊT SẮT ở khay: phá đĩa 1 phát!"; }
+            if (level == 4 && !tutKind) { foreach (var r in rugDucks) if (r.kind == "heavy" && r.view) tapAt = WorldToHud(r.view.position + Vector3.up * 0.3f); if (tapAt.HasValue) hint = "Chạm VỊT SẮT trên thảm: phá đĩa 1 phát!"; }
             else if (level == 5 && !tutDock && docks.Count > 1) { tapAt = WorldToHud(W(docks[(dock + 1) % docks.Count], 0.2f)); hint = "Chạm vòng lá khác để đổi chỗ bắn!"; }
         }
         if (tapAt.HasValue) { showHand = false; if (hintShown) HideHint(); }
@@ -2143,6 +2205,7 @@ public class GameController : MonoBehaviour
         if (state != "play") return;
         bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject() ||
                       (Input.touchCount > 0 && EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId));
+        if (Input.GetMouseButtonDown(0) && !overUI && !moving && target == null && TryPickRugDuck(Input.mousePosition)) return;
         if (Input.GetMouseButtonDown(0) && !overUI && !moving && ScreenToSim(Input.mousePosition, out var p))
         {
             if (target != null) { if (p.y > TY && p.y < TY + TH) ApplyTarget(p); return; }
@@ -3018,9 +3081,10 @@ public class GameController : MonoBehaviour
         var rot = Quaternion.Euler(Mathf.Lerp(55f, 66f, tallT), 0, 0); cam.transform.rotation = rot;   // 9:16 keeps the 3/4 toy view
         var focus = new Vector3(0, 0, -0.25f);
         float refH = 1080f * Screen.height / Mathf.Max(1, Screen.width);   // canvas height in reference units (fit-width scaler)
-        float botFrac = 322f / refH, topFrac = 1f - 196f / refH;          // slim HUD: tray + boosters below, one bar above
-        float w = TW * K / 2 + 0.2f, h = TH * K / 2 + 0.25f;
-        Vector3[] corners = { new Vector3(-w, 0.5f, h), new Vector3(w, 0.5f, h), new Vector3(-w, 0, -h), new Vector3(w, 0, -h) };
+        float botFrac = 178f / refH, topFrac = 1f - 192f / refH;          // slim HUD: boosters below, one bar above; the duck rug is part of the board
+        float w = TW * K / 2 - 0.1f, h = TH * K / 2 + 0.05f;              // rims may crop a touch at the sides: bigger toys
+        float zb = float.IsNaN(rugZ) ? -h : rugZ - 0.75f;
+        Vector3[] corners = { new Vector3(-w, 0.5f, h), new Vector3(w, 0.5f, h), new Vector3(-w * 0.85f, 0, zb), new Vector3(w * 0.85f, 0, zb) };
         for (int pass = 0; pass < 4; pass++)
         {
             float dist = 12;
@@ -3114,7 +3178,7 @@ public class GameController : MonoBehaviour
         bigTxt = UIKit.Outlined(UIKit.Label(hud, "", 110, Color.white), new Color(1f, 0.5f, 0.75f), 8); UIKit.Place(bigTxt.rectTransform, 0.5f, 0.5f, 0, 120, 1000, 200);
         bigTxt.color = new Color(1, 1, 1, 0);
         // hint
-        hintPanel = UIKit.Panel(hud, new Color(1, 1, 1, 0.82f), "Hint").rectTransform; UIKit.Place(hintPanel, 0.5f, 0, 0, 286, 960, 54);
+        hintPanel = UIKit.Panel(hud, new Color(1, 1, 1, 0.82f), "Hint").rectTransform; UIKit.Place(hintPanel, 0.5f, 0, 0, 150, 960, 46);
         hintTxt = UIKit.Label(hintPanel, "", 30, Ink); hintTxt.fontStyle = FontStyle.Bold; hintTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
         BuildTray();
         // booster bar

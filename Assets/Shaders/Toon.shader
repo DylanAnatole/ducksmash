@@ -76,7 +76,7 @@ Shader "DuckSmash/Toon"
                 float ndh = saturate(dot(n, h));
                 c += (pow(ndh, 18.0) * 0.16 + smoothstep(0.972, 0.988, ndh) * 0.55) * _Gloss * saturate(lit + 0.2);
                 float rim = pow(1.0 - saturate(dot(n, v)), 2.6);
-                c += rim * (0.22 * col.rgb + 0.14) * sky;
+                c += rim * (0.16 * col.rgb + 0.08) * sky;   // softer rim: less washed-out edges
                 c *= lerp(1.0, lerp(0.68, 1.0, saturate(i.wp.y * 3.2 + 0.08)), _Ground);   // grounded look without a shadow pass
                 c += _Emission.rgb;
                 return fixed4(c, 1);

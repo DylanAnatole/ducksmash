@@ -827,7 +827,7 @@ public static class Art
     {
         var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear };
         var px = new Color[size * size];
-        Color deep = Hex("2a9fd6"), light = Hex("45b8e6"), line = Hex("a8e6fa");   // clean pool turquoise: the toys pop against it   // calmer + deeper: less glare, more contrast
+        Color deep = Hex("2b8cc4"), light = Hex("4aa9d8"), line = Hex("a3d8ef");   // balanced: a touch deeper + calmer so every toy colour reads with even contrast   // clean pool turquoise: the toys pop against it   // calmer + deeper: less glare, more contrast
         float k = Mathf.PI * 2 / size;
         for (int y = 0; y < size; y++)
             for (int x = 0; x < size; x++)
