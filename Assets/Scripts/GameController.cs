@@ -25,7 +25,7 @@ public class GameController : MonoBehaviour
     class Duck
     {
         public Vector2 p, v; public float r; public string kind; public bool hot, charged = true, frenzy, clone;
-        public float squash, zapCd, face = -Mathf.PI / 2; public Transform view, ring, body;
+        public float squash, zapCd, face = Mathf.PI / 2; public Transform view, ring, body;
         public bool boost;   // bumped by another duck this shot: hits harder
         public int Dmg => (kind == "heavy" ? 3 : 1) + (boost ? 1 : 0);
         // special (combo-reward) ducks are one-use: after their power fires they turn back into a normal duck
@@ -635,7 +635,7 @@ public class GameController : MonoBehaviour
         b.view = Spawn(key, parent =>
         {
             var v = BuildBlockArt(b, parent);
-            float outline = b.type == "stone" || b.type == "screw" ? 0.0022f : b.type == "pixel" || b.type == "domino" ? 0f : 0.0016f;   // thin silhouette: blocks read apart in a crowd (desktop; phones skip outlines)
+            float outline = b.type == "stone" || b.type == "screw" ? 0.0013f : b.type == "pixel" || b.type == "domino" ? 0f : 0.001f;   // thin silhouette: blocks read apart in a crowd (desktop; phones skip outlines)
             float gloss = b.type == "screw" ? 0.9f : b.type == "chest" ? 0.7f : 0.4f;
             Art.Bake(v, key, gloss, outline, "Spark", "IceShell", "Arrow", "Glow", "Plate1", "Plate2", "Plate3");
             if (b.type == "plates")   // each plate: one baked, instanced mesh
@@ -706,7 +706,7 @@ public class GameController : MonoBehaviour
         d.view = Spawn("duck_" + kind, parent =>
         {
             var v = Art.Duck(parent, kind, out _);
-            Art.Bake(v.Find("Body"), "duck_" + kind, kind == "heavy" ? 0.9f : 0.75f, 0.002f, "Spark");
+            Art.Bake(v.Find("Body"), "duck_" + kind, kind == "heavy" ? 0.95f : 0.85f, 0.0011f, "Spark");   // thin, soft ink: glossy toy look
             if (App.Mobile)
             {   // no realtime shadows on phones: a soft dark disc under the duck instead
                 foreach (var r in v.GetComponentsInChildren<Renderer>(true)) { r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false; }
@@ -2269,6 +2269,11 @@ public class GameController : MonoBehaviour
             {   // bystanders turn to watch the duck being aimed (cute, and it reads "everyone's waiting on this shot")
                 var lk = drag.p - d.p;
                 if (lk.sqrMagnitude > 1) d.face = Mathf.LerpAngle(d.face * Mathf.Rad2Deg, Mathf.Atan2(lk.y, lk.x) * Mathf.Rad2Deg, 1 - Mathf.Exp(-6 * dt)) * Mathf.Deg2Rad;
+            }
+            else if (drag == null && !moving && state == "play")
+            {   // resting ducks turn to face the player (3/4 view): you see their faces, not their tails
+                float tgt = 90f - Mathf.Clamp((d.p.x - 270f) * 0.12f, -28f, 28f);
+                d.face = Mathf.LerpAngle(d.face * Mathf.Rad2Deg, tgt, 1 - Mathf.Exp(-3f * dt)) * Mathf.Deg2Rad;
             }
             bool dragged = d == drag && !moving;
             float pw = dragged ? d.pullVis : 0;
