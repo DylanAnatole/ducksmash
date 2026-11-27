@@ -26,7 +26,7 @@ public class GameController : MonoBehaviour
     {
         public Vector2 p, v; public float r; public string kind; public bool hot, charged = true, frenzy, clone;
         public float dizzy; public bool introDrop;
-        public bool passive;   // already fired (or parked bait): floats in the tub, can be bumped, can't be aimed
+        public bool passive; public bool keep;   // keep: chest ducks stay in the tub after their burst   // already fired (or parked bait): floats in the tub, can be bumped, can't be aimed
         public float squash, zapCd, face = Mathf.PI / 2; public Transform view, ring, body;
         public bool boost;   // bumped by another duck this shot: hits harder
         public float cheer;
@@ -76,7 +76,8 @@ public class GameController : MonoBehaviour
     readonly List<Portal> portals = new List<Portal>();
     const float PORTAL_R = 24f;
     const float OUTLINE_W = 0.0017f;
-    const float DUCK_VIS = 1.22f;   // ducks drawn a bit larger than their hit circle   // shared silhouette width (baked toys use smoothed normals, so boxes don't crack)
+    const float DUCK_VIS = 1.22f;
+    const float CANCEL_PULL = 44f;   // pull less than this and let go = cancelled shot   // ducks drawn a bit larger than their hit circle   // shared silhouette width (baked toys use smoothed normals, so boxes don't crack)
     class Flow { public Rect r; public Vector2 dir; public Material m; public Mesh mesh; public float tu, tv; readonly Vector2[] uv = new Vector2[4];
         // the shared material ignores tiling/offset, so the chevrons are tiled + scrolled through the quad's own UVs
         public void Scroll(float off) { if (!mesh) return; uv[0] = new Vector2(off, 0); uv[1] = new Vector2(off + tu, 0); uv[2] = new Vector2(off, tv); uv[3] = new Vector2(off + tu, tv); mesh.uv = uv; } }
@@ -1300,8 +1301,10 @@ public class GameController : MonoBehaviour
                 HitStop(0.06f); Shake(0.3f); PopText("+2 Vịt!", b.p, new Color(1f, 0.88f, 0.3f), 56); Sfx.Play("coin"); FxKit.StarBurst(W(b.p, 0.5f));
                 for (int i = 0; i < 2; i++)
                 {
-                    var nd = NewDuck(b.p + new Vector2(i == 0 ? -14 : 14, 0), "normal"); nd.passive = true; nd.hot = true;   // they burst out and smash, then pop like the rest
-                    float a = Mathf.PI / 2 + (i == 0 ? 0.6f : -0.6f); nd.v = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * 420;
+                    // they burst out fast and powered up (break 2 hits per touch), then STAY in the tub as billiard balls
+                    var nd = NewDuck(b.p + new Vector2(i == 0 ? -14 : 14, 0), "normal"); nd.passive = true; nd.hot = true; nd.keep = true; nd.boost = true;
+                    var aim = b.hitDir.sqrMagnitude > 1 ? b.hitDir.normalized : Vector2.down;
+                    nd.v = Rot(aim, i == 0 ? -0.55f : 0.55f) * 950f; nd.stretch = 0.2f;
                 }
                 if (state == "play") { moves += 2; movesPulse = 0.45f; trayDirty = true; trayPulse = 1f; }   // ...and two more ducks land in the tray
                 break;
@@ -1811,7 +1814,7 @@ public class GameController : MonoBehaviour
     {
         // Duckies-Pop style clean-up: the duck that was fired, and any parked duck it knocked into, pop and vanish -
         // the tub never fills up with spent ducks. Untouched parked ducks stay for later shots.
-        foreach (var gd in ducks.Where(x => x.passive && x.hot && !x.clone).ToList())
+        foreach (var gd in ducks.Where(x => x.passive && x.hot && !x.clone && !x.keep).ToList())
         {
             Splash(gd.p, 8); FxKit.Sparkle(W(gd.p, 0.5f), new Color(1f, 0.95f, 0.6f), App.Mobile ? 4 : 8); FxKit.Ripple(W(gd.p), 1f);
             if (gd.tag) { tags.Remove(gd.tag); Destroy(gd.tag.gameObject); gd.tag = null; }
@@ -2232,11 +2235,11 @@ public class GameController : MonoBehaviour
         if (drag != null && Input.GetMouseButtonUp(0))
         {
             var pv = Pull(); var d = drag; drag = null; d.pullVis = 0;
-            if (pv.z >= 18) { float sp = MAX_SPEED * Mathf.Pow(EffPull(pv.z) / MAX_PULL, 0.8f); Launch(d, AimAssist(d, new Vector2(pv.x, pv.y), EffPull(pv.z)) * sp); }
+            if (pv.z >= CANCEL_PULL) Launch(d, AimAssist(d, new Vector2(pv.x, pv.y), MAX_PULL) * MAX_SPEED);   // same full power every shot: only the direction is yours
             else
-            {   // a tap (or too-short pull) still answers: the duck quacks, and a short pull gets a nudge
-                d.squash = 0.2f; Sfx.Play("quack", 0.6f, UnityEngine.Random.Range(1.1f, 1.3f));
-                PopText(pv.z > 6 ? "Kéo xa hơn!" : "Quạc!", d.p + new Vector2(0, -46), Color.white, pv.z > 6 ? 38 : 32);
+            {   // released inside the cancel ring: no shot (no accidental fire)
+                d.squash = 0.2f; Sfx.Play("quack", 0.5f, UnityEngine.Random.Range(1.1f, 1.3f));
+                PopText(pv.z > 8 ? "Đã huỷ" : "Quạc!", d.p + new Vector2(0, -46), Color.white, 34);
             }
         }
     }
@@ -2518,7 +2521,18 @@ public class GameController : MonoBehaviour
         float pw = pv.z / MAX_PULL;
         drag.pullVis = Mathf.Lerp(drag.pullVis, pv.z < 12 ? 0 : pw, 1 - Mathf.Exp(-20f * udt));
         if (pv.z < 12) { powerStep = 0; return; }
-        var dir = AimAssist(drag, new Vector2(pv.x, pv.y), EffPull(pv.z)); dragDir = dir; drag.face = Mathf.Atan2(dir.y, dir.x);
+        var dir = AimAssist(drag, new Vector2(pv.x, pv.y), MAX_PULL); dragDir = dir; drag.face = Mathf.Atan2(dir.y, dir.x);
+        if (pv.z < CANCEL_PULL)
+        {   // inside the cancel ring: slack band, no aim line, clear "let go = cancel"
+            var g0 = drag.p - dir * (pv.z + 6); var sd = new Vector2(-dir.y, dir.x) * drag.r * 0.85f;
+            SetBand(band, drag.p + sd - dir * 4, g0, new Color(0.75f, 0.75f, 0.85f), 0.07f); SetBand(band2, drag.p - sd - dir * 4, g0, new Color(0.75f, 0.75f, 0.85f), 0.07f);
+            aimGrab.gameObject.SetActive(true); aimGrab.position = W(g0, 0.32f);
+            aimTarget.gameObject.SetActive(true); aimTarget.position = W(drag.p, 0.08f);
+            aimTarget.localScale = Vector3.one * CANCEL_PULL * K; var cl = aimTarget.GetComponent<LineRenderer>(); cl.startColor = cl.endColor = new Color(1f, 1f, 1f, 0.6f);
+            powerTxt.gameObject.SetActive(true); powerTxt.text = "Thả = huỷ · kéo xa để bắn"; powerTxt.color = new Color(0.85f, 0.88f, 1f); shownPower = -1;
+            powerTxt.rectTransform.anchoredPosition = WorldToHud(W(drag.p, 0.4f)) + new Vector2(0, -150);
+            powerStep = 0; aimHits.Clear(); return;
+        }
         if (assistPt.HasValue)
         {   // locked on: a gold cross on the piece the shot is aimed at
             aimX.gameObject.SetActive(true); aimX.position = W(assistPt.Value, 0.5f);
@@ -2526,6 +2540,7 @@ public class GameController : MonoBehaviour
             if (lastAssist != assistPt) Sfx.Play("click", 0.3f, 1.6f);
         }
         lastAssist = assistPt;
+        pw = 1f;   // fixed power: the pull only aims
         int step = Mathf.Min(4, Mathf.FloorToInt(pw * 4.999f));
         if (step != powerStep) { Sfx.Play("click", 0.22f, 0.8f + step * 0.14f); if (step > powerStep) Sfx.Buzz(6 + step * 2); powerStep = step; }
         Color pc = PowerColor(pw);
@@ -2540,13 +2555,13 @@ public class GameController : MonoBehaviour
         int pct = Mathf.RoundToInt(pw * 100f);
         powerTxt.gameObject.SetActive(level <= LevelLibrary.Onboarding);
         powerTxt.rectTransform.anchoredPosition = WorldToHud(W(drag.p, 0.4f)) + new Vector2(drag.p.x > 380 ? -150 : 150, 20);   // beside the duck, clear of the band + boosters
-        if (pct != shownPower) { shownPower = pct; powerTxt.text = pct >= 99 ? "LỰC MAX" : "Lực " + pct + "%"; powerTxt.color = PowerColor(pw); }
+        if (pct != shownPower) { shownPower = pct; powerTxt.text = "Thả để bắn!"; powerTxt.color = new Color(1f, 0.85f, 0.3f); }
         aimGrab.localScale = new Vector3(0.32f, 0.12f, 0.32f) * (1 + Mathf.Sin(Time.unscaledTime * 12) * 0.06f * pw);
 
         // trajectory: bounce off the walls, carve through what it will break, stop at the first thing it won't
         aimPath.Clear(); aimPath.Add(drag.p);
-        float aimSpeed = Mathf.Max(300f, MAX_SPEED * Mathf.Pow(EffPull(pv.z) / MAX_PULL, 0.8f));
-        Vector2 gp = drag.p, gv = dir; float len = (260 + EffPull(pv.z) * 4.5f) * (level <= 5 ? 1.45f : 1f), stepL = 5; int ghostIdx = -1; Vector2? stopPt = null; Duck hitDuck = null; Vector2? firstContact = null; Block hitRing = null;
+        float aimSpeed = MAX_SPEED;
+        Vector2 gp = drag.p, gv = dir; float len = (260 + MAX_PULL * 4.5f) * (level <= 5 ? 1.45f : 1f), stepL = 5; int ghostIdx = -1; Vector2? stopPt = null; Duck hitDuck = null; Vector2? firstContact = null; Block hitRing = null;
         aimHits.Clear(); int dmg = drag.kind == "rocket" ? 3 : drag.Dmg; bool pierce = frenzyReady; int jumpIdx = -1;
         bool rocketAim = drag.kind == "rocket" && !drag.spent;
         if (rocketAim) { len = ROCKET_SPEED * ROCKET_TIME * 0.85f; pc = new Color(1f, 0.55f, 0.2f); }   // rocket flies full thrust whatever the pull
