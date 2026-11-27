@@ -302,6 +302,7 @@ public class GameController : MonoBehaviour
         pops.Clear();
         projShown = -1; starLossT = 0;
         fever = 0; frenzyReady = false; feverShown = 0; feverShownInt = -1; feverMode = 0;   // frenzy starts empty in every level: no banking it for the next one
+        par3 = L.par3; par2 = L.par2;
         moves = startMoves = L.moves; state = "play"; moving = false; shotSmash = streak = pushes = score = 0;
         frenzyShot = bossKilled = rewarded = false; hardLevel = L.hard; target = null; hint = level <= LevelLibrary.Onboarding || LevelLibrary.IsSandbox(level) ? L.hint : ""; freeze = shake = 0; drag = null;
 
@@ -820,7 +821,7 @@ public class GameController : MonoBehaviour
     public Vector2 DebugDuckPos(int i) => loaded != null ? loaded.p : ducks[Mathf.Min(i, ducks.Count - 1)].p;
     public Vector2 DebugRandomTarget() { var a = blocks.Where(b => b.alive && !Covered(b) && !b.Hard).ToList(); return a.Count == 0 ? new Vector2(270, 300) : a[UnityEngine.Random.Range(0, a.Count)].p; }
     public bool DebugMoving => moving;
-    public float DebugMaxSpeed => MAX_SPEED;
+    public float DebugMaxSpeed => MAX_SPEED; public float DebugLastScore;
     // "smart" test bot: the same search the in-game hint uses, over a finer fan of angles
     public Vector3 DebugBestShot(int angles = 48)
     {
@@ -835,7 +836,7 @@ public class GameController : MonoBehaviour
                 if (sc > best) { best = sc; bd = i; bdir = dir; }
             }
         }
-        return new Vector3(bd, bdir.x, bdir.y);
+        DebugLastScore = best; return new Vector3(bd, bdir.x, bdir.y);
     }
     public string DebugState => state;
 
@@ -1615,14 +1616,14 @@ public class GameController : MonoBehaviour
 
     void BuildDocks()
     {
-        if (dockMat == null) { dockMat = Art.Mat(new Color(0.5f, 0.86f, 0.55f), 0.5f); dockRimMat = Art.Mat(new Color(0.98f, 1f, 0.9f), 0.6f); }
+        if (dockMat == null) { dockMat = Art.Mat(new Color(0.55f, 0.87f, 0.55f), 0.45f); dockRimMat = Art.Mat(new Color(0.3f, 0.62f, 0.42f), 0.35f); }
         foreach (var dv in dockViews) if (dv) Destroy(dv.gameObject); dockViews.Clear();
         foreach (var at in docks)
         {   // lily pad launch dock: green pad with a pale rim and a notch
-            var root = Art.Root("Dock", world); root.position = W(at, 0.03f);
-            Art.Prim(PrimitiveType.Cylinder, root, new Vector3(0, -0.02f, 0), new Vector3(1.02f, 0.025f, 1.02f), dockRimMat);
-            Art.Prim(PrimitiveType.Cylinder, root, Vector3.zero, new Vector3(0.9f, 0.03f, 0.9f), dockMat);
-            Art.Prim(PrimitiveType.Cube, root, new Vector3(0.3f, 0.005f, 0.16f), new Vector3(0.34f, 0.05f, 0.13f), dockRimMat, new Vector3(0, -28, 0));
+            // lily pad launch dock, lifted clear of the water (no z-fighting flicker), darker green rim instead of white
+            var root = Art.Root("Dock", world); root.position = W(at, 0.07f);
+            Art.Prim(PrimitiveType.Cylinder, root, Vector3.zero, new Vector3(1.04f, 0.03f, 1.04f), dockRimMat);
+            Art.Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.022f, 0), new Vector3(0.9f, 0.03f, 0.9f), dockMat);
             foreach (var r in root.GetComponentsInChildren<Renderer>()) { r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = !App.Mobile; }
             dockViews.Add(root);
         }
@@ -1632,10 +1633,9 @@ public class GameController : MonoBehaviour
         for (int i = 0; i < dockViews.Count; i++)
         {
             var v = dockViews[i]; if (!v) continue;
-            bool act = i == dock;
-            float s = act ? 1.08f + Mathf.Sin(Time.unscaledTime * 4f) * 0.04f : docks.Count > 1 && state == "play" && !moving ? 0.86f + Mathf.Sin(Time.unscaledTime * 2.5f + i) * 0.04f : 0.82f;
-            v.localScale = Vector3.one * s;
-            v.localEulerAngles = new Vector3(0, Time.unscaledTime * (act ? 14f : 5f) + i * 70f, 0);
+            bool act = i == dock;   // still and calm: no spinning or pulsing (it read as jitter under the duck)
+            float s = act ? 1.06f : 0.88f;
+            v.localScale = Vector3.Lerp(v.localScale, Vector3.one * s, 1 - Mathf.Exp(-10f * dt));
         }
     }
 
@@ -1877,7 +1877,7 @@ public class GameController : MonoBehaviour
     {
         state = "win";
         int left = movesAtClear >= 0 ? movesAtClear : moves; leftAtWin = left;
-        stars = left >= Mathf.CeilToInt(startMoves * 0.4f) ? 3 : left >= Mathf.CeilToInt(startMoves * 0.15f) ? 2 : 1;
+        stars = shotsTaken <= par3 ? 3 : shotsTaken <= par2 ? 2 : 1;
         score += left * 150;
         if (!rewarded && LevelLibrary.IsSandbox(level)) { rewarded = true; reward = 0; }   // test levels: no progress saved
         newArt = false;
@@ -1938,7 +1938,7 @@ public class GameController : MonoBehaviour
         // reminder of the combo ducks the player has already unlocked
         var known = LevelLibrary.Specials.Where(s => LevelLibrary.Unlocked(s.kind, level) && LevelLibrary.NewSpecialAt(level) != s).ToList();
         string combos = "";   // no combo recipe reminder on every level (players found it patronising); the COMBO ? guide has it
-        introBody.text = "Phá sạch <b>" + GoalsLeft() + "</b> món · <b>" + moves + "</b> vịt";
+        introBody.text = "Phá sạch <b>" + GoalsLeft() + "</b> món\n<size=28><color=#c98a00>3 sao khi chỉ dùng " + par3 + " vịt</color></size>";
         introMax = introTimer = 1.6f;
         // onboarding: level 1 = how to play in 3 steps; levels 2-5 = the one new thing this level teaches
         if (level == 1)
@@ -1953,7 +1953,7 @@ public class GameController : MonoBehaviour
             introBody.text = "<b>" + L.hint + "</b>\n<size=28><color=#a14a00>"
                 + (keyName != "" && level > LevelLibrary.Onboarding ? "Chìa khoá: <b>" + keyName.Split(':')[0] + "</b> · " : "")
                 + (LevelLibrary.IsHard(level) ? "<color=#b0283c>Màn khó</color> · " : "")
-                + GoalsLeft() + " món · " + moves + " vịt</color></size>";
+                + GoalsLeft() + " món · <color=#c98a00>3 sao: " + par3 + " vịt</color></color></size>";
             introMax = introTimer = level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? 5f : 4.5f;
         }
 
@@ -2310,6 +2310,7 @@ public class GameController : MonoBehaviour
 
     void HideHint() { hintShown = false; foreach (var h in hintDots) if (h.gameObject.activeSelf) h.gameObject.SetActive(false); }
 
+    int par3 = 5, par2 = 7;   // stars come from how FEW ducks you needed (puzzle), not from leftover moves
     bool bumpTeach; int bumpMoves; bool tutKind, tutDock; int hintBestDock; bool lastShotWeak; Vector2? lastAssist;
     void UpdateHint(float rdt)
     {
@@ -2732,7 +2733,7 @@ public class GameController : MonoBehaviour
             d.ring.gameObject.SetActive((selectable && d == loaded) || d.frenzy || d.boost || (frenzyReady && !moving && d == loaded));
             if (d.ring.gameObject.activeSelf)
             {
-                float pulse = 1.8f + Mathf.Sin(t * 5 + d.p.x) * 0.08f + (dragged ? 0.25f + pw * 0.25f : 0);
+                float pulse = 1.8f + (dragged ? 0.25f + pw * 0.25f + Mathf.Sin(t * 5) * 0.05f : 0);   // steady while waiting, only breathes while aiming
                 d.ring.localScale = new Vector3(pulse, 0.01f, pulse);
                 Color rc = d.boost ? new Color(1f, 0.78f, 0.2f, 0.85f)   // powered up by a bump: gold ring
                          : frenzyReady || d.frenzy ? new Color(1f, 0.5f, 0.75f, 0.6f)
@@ -3404,7 +3405,8 @@ public class GameController : MonoBehaviour
         movesPulse = Mathf.Max(0, movesPulse - Time.unscaledDeltaTime);
         movesTxt.rectTransform.localScale = Vector3.one * (1 + movesPulse * 1.2f);
         movesTxt.color = moves <= 2 && state == "play" ? new Color(1f, 0.35f, 0.3f) : Ink;
-        int proj = moves >= Mathf.CeilToInt(startMoves * 0.4f) ? 3 : moves >= Mathf.CeilToInt(startMoves * 0.15f) ? 2 : 1;
+        int nextShot = shotsTaken + (moving || state != "play" ? 0 : 1);   // stars still reachable if the next duck clears the tub
+        int proj = nextShot <= par3 ? 3 : nextShot <= par2 ? 2 : 1;
         if (projShown < 0 || state != "play" || moves > shownMovesMax) { projShown = proj; shownMovesMax = moves; }
         if (proj < projShown) { starLossT = 1f; starLostIdx = proj; projShown = proj; Sfx.Play("squeak", 0.45f, 0.6f); PopText("-1 sao", new Vector2(110, 150), new Color(1f, 0.85f, 0.3f), 40); }
         if (proj > projShown) projShown = proj;

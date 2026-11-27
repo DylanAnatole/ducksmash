@@ -14,6 +14,7 @@ public class BumperDef { public float x, y, w, h, amp, speed; public bool vertic
 public class LevelDef
 {
     public int moves; public string hint = ""; public bool boss;
+    public int par3, par2;   // shots for 3 / 2 stars: stars reward solving it smartly, the move budget only stops endless play
     public string art;   // pixel picture smashed in this level (goes into the album on a win)
     public bool hard;
     public List<DuckDef> ducks = new List<DuckDef>();
@@ -168,9 +169,16 @@ public static partial class LevelLibrary
 
     static readonly Dictionary<int, int> MovesTable = new Dictionary<int, int>
     {
-        { 6, 5 }, { 7, 10 }, { 8, 9 }, { 9, 5 }, { 10, 15 }, { 11, 16 }, { 12, 4 }, { 13, 6 }, { 14, 7 }, { 15, 18 },
-        { 16, 5 }, { 17, 13 }, { 18, 6 }, { 19, 5 }, { 20, 8 }, { 21, 4 }, { 22, 5 }, { 23, 5 }, { 24, 12 }, { 25, 12 },
-        { 26, 6 }, { 27, 8 }, { 28, 11 }, { 29, 5 }, { 30, 15 },
+        { 4, 15 }, { 5, 13 }, { 6, 6 }, { 7, 12 }, { 8, 19 }, { 9, 8 }, { 10, 15 }, { 11, 23 }, { 12, 5 }, { 13, 6 }, { 14, 9 }, { 15, 18 },
+        { 16, 6 }, { 17, 18 }, { 18, 6 }, { 19, 11 }, { 20, 8 }, { 21, 6 }, { 22, 6 }, { 23, 7 }, { 24, 14 }, { 25, 12 },
+        { 26, 7 }, { 27, 9 }, { 28, 13 }, { 29, 8 }, { 30, 15 },
+    };
+    // (3-star par, 2-star par) in shots: ~best 20% / median of bot runs - beat it by finding the key shots
+    static readonly Dictionary<int, (int, int)> ParTable = new Dictionary<int, (int, int)>
+    {
+        { 1, (4, 5) }, { 2, (4, 5) }, { 3, (3, 4) }, { 4, (8, 11) }, { 5, (9, 10) }, { 6, (3, 4) }, { 7, (6, 8) }, { 8, (10, 13) }, { 9, (4, 5) },
+        { 11, (14, 16) }, { 12, (2, 3) }, { 13, (3, 4) }, { 14, (5, 6) }, { 16, (3, 4) }, { 17, (11, 13) }, { 18, (2, 3) }, { 19, (5, 7) },
+        { 21, (3, 4) }, { 22, (3, 4) }, { 23, (4, 5) }, { 24, (7, 8) }, { 26, (4, 5) }, { 27, (5, 6) }, { 28, (7, 9) }, { 29, (3, 4) },
     };
 
     static LevelDef L(int moves, string hint, params (float x, float y, string k)[] ducks)
@@ -307,6 +315,9 @@ public static partial class LevelLibrary
         // moves over a random player, hard ones about none - you have to find the key shot
         if (MovesTable.TryGetValue(n, out var mv)) d.moves = mv;
         d.moves = Mathf.Max(3, d.moves);
+        if (ParTable.TryGetValue(n, out var par)) { d.par3 = par.Item1; d.par2 = par.Item2; }
+        else { d.par3 = Mathf.CeilToInt(d.moves * 0.65f); d.par2 = Mathf.CeilToInt(d.moves * 0.85f); }   // hard levels + sandboxes
+        d.par3 = Mathf.Min(d.par3, d.moves); d.par2 = Mathf.Clamp(d.par2, d.par3, d.moves);
         return d;
     }
 
