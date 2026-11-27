@@ -11,8 +11,8 @@ public class MapScreen : MonoBehaviour
     const float NodeGap = 230, Bottom = 260;
     readonly Dictionary<int, Image[]> nodeStars = new Dictionary<int, Image[]>();
 
-    static readonly Color Bg = new Color(0.97f, 0.85f, 0.9f), Purple = new Color(0.6f, 0.53f, 0.93f), PurpleDark = new Color(0.49f, 0.42f, 0.84f),
-        Ink = new Color(0.23f, 0.18f, 0.42f), Yellow = new Color(1f, 0.8f, 0.2f), Teal = new Color(0.25f, 0.78f, 0.75f),
+    static readonly Color Bg = new Color(0.88f, 0.93f, 0.98f), Purple = new Color(0.27f, 0.56f, 0.93f), PurpleDark = new Color(0.2f, 0.42f, 0.78f),
+        Ink = new Color(0.15f, 0.2f, 0.32f), Yellow = new Color(1f, 0.8f, 0.2f), Teal = new Color(0.25f, 0.78f, 0.75f),
         Red = new Color(1f, 0.38f, 0.3f), Green = new Color(0.37f, 0.83f, 0.37f), Locked = new Color(0.79f, 0.76f, 0.84f);
 
     public void Build(Transform canvas)

@@ -237,9 +237,9 @@ public static class UIKit
     {
         var img = Panel(parent, bg, name);
         var sh = img.gameObject.AddComponent<Shadow>();   // a darker lip of the same colour under the button: chunky, toy-like
-        var lip = Color.Lerp(bg, new Color(0.2f, 0.12f, 0.35f), 0.45f); lip.a = 1f;
-        sh.effectColor = lip; sh.effectDistance = new Vector2(0, -9);
-        Gloss(img.transform, 0.26f);
+        var lip = Color.Lerp(bg, new Color(0.15f, 0.2f, 0.32f), 0.3f); lip.a = 1f;   // flatter, cleaner buttons: a thin lip, faint gloss
+        sh.effectColor = lip; sh.effectDistance = new Vector2(0, -6);
+        Gloss(img.transform, 0.1f);
         var b = img.gameObject.AddComponent<Button>();
         var cb = b.colors; cb.pressedColor = new Color(0.85f, 0.85f, 0.85f); b.colors = cb;
         Label(img.transform, label, size, fg);

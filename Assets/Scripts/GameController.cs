@@ -225,7 +225,7 @@ public class GameController : MonoBehaviour
             }
         });
     }
-    void Flash(float a) => flashA = Mathf.Max(flashA, a * 0.3f);
+    void Flash(float a) => flashA = Mathf.Max(flashA, a * 0.12f);   // calm: a hint of a flash, never a white-out
     Transform aimTarget, aimGrab; readonly List<Transform> pushDots = new List<Transform>(), frenzyDots = new List<Transform>(); LineRenderer band2;
     MaterialPropertyBlock mpb; static Material trailMat;
     Vector3 camBase; Material waterMat;
@@ -401,7 +401,7 @@ public class GameController : MonoBehaviour
             var fl = new Flow { r = new Rect(fd.x, fd.y, fd.w, fd.h), dir = new Vector2(fd.dx, fd.dy) };
             bool horiz = Mathf.Abs(fd.dx) > 0.5f;
             float along = horiz ? fd.w : fd.h, across = horiz ? fd.h : fd.w;
-            fl.m = Art.Fade(new Color(1f, 1f, 1f, 0.8f)); fl.m.mainTexture = FlowTex(); fl.m.renderQueue = 2980;
+            fl.m = Art.Fade(new Color(1f, 1f, 1f, 0.5f)); fl.m.mainTexture = FlowTex();   // calmer current arrows fl.m.renderQueue = 2980;
             fl.tu = along / 44f; fl.tv = Mathf.Max(1, Mathf.Round(across / 44f));
             // the quad's local +x is the flow direction; texture chevrons point along +u
             float yaw = horiz ? (fd.dx > 0 ? 0 : 180) : (fd.dy > 0 ? 90 : -90);
@@ -534,72 +534,16 @@ public class GameController : MonoBehaviour
     {
         var root = Art.Root("Decor", world);
         float top = h / 2 + rim + 1.0f, bottom = -h / 2 - rim - 1.3f;
-        // fluffy bath rug below the tub: soft pastel stadium shape with a scalloped fringe and dotted pattern
-        var mat = Art.Mat(new Color(1f, 0.74f, 0.82f), 0.25f);
-        var fringe = Art.Mat(new Color(1f, 0.86f, 0.9f), 0.25f);
-        Art.Prim(PrimitiveType.Cube, root, new Vector3(0, -0.3f, bottom), new Vector3(6.4f, 0.14f, 2.0f), mat);
-        foreach (float x in new[] { -3.2f, 3.2f }) Art.Prim(PrimitiveType.Cylinder, root, new Vector3(x, -0.3f, bottom), new Vector3(2.0f, 0.07f, 2.0f), mat);
-        for (int i = 0; i <= 12; i++)
-        {   // scallops along the long edges
-            float x = -3.6f + i * 0.6f;
-            foreach (float zz in new[] { -1.02f, 1.02f }) Art.Prim(PrimitiveType.Cylinder, root, new Vector3(x, -0.31f, bottom + zz), new Vector3(0.62f, 0.06f, 0.62f), fringe);
-        }
-        for (int i = 0; i < 9; i++)
-        {   // ...and round the ends
-            float a = -Mathf.PI / 2 + i / 8f * Mathf.PI;
-            foreach (float s in new[] { -1f, 1f }) Art.Prim(PrimitiveType.Cylinder, root, new Vector3(s * (3.2f + Mathf.Cos(a) * 1.02f), -0.31f, bottom + Mathf.Sin(a) * 1.02f), new Vector3(0.62f, 0.06f, 0.62f), fringe);
-        }
-        var dot = Art.Mat(new Color(1f, 0.95f, 0.97f), 0.2f);
-        for (int i = 0; i < 9; i++)
-            for (int j = 0; j < 3; j++)
-                if ((i + j) % 2 == 0) Art.Prim(PrimitiveType.Cylinder, root, new Vector3(-3.2f + i * 0.8f, -0.225f, bottom - 0.6f + j * 0.6f), new Vector3(0.3f, 0.01f, 0.3f), dot);
-        // shelf behind the faucet: bottles, cup, plant, towels
-        var shelf = Art.Mat(new Color(0.98f, 0.95f, 0.92f), 0.6f);
-        Art.Prim(PrimitiveType.Cube, root, new Vector3(0, -0.1f, top + 0.3f), new Vector3(w + 2.5f, 0.5f, 1.6f), shelf);
-        void Bottle(float x, Color body, Color cap, float hgt)
-        {
-            Art.Prim(PrimitiveType.Cylinder, root, new Vector3(x, 0.15f + hgt / 2, top), new Vector3(0.55f, hgt / 2, 0.55f), Art.Mat(body, 0.8f));
-            Art.Prim(PrimitiveType.Sphere, root, new Vector3(x, 0.15f + hgt, top), new Vector3(0.55f, 0.3f, 0.55f), Art.Mat(body, 0.8f));
-            Art.Prim(PrimitiveType.Cylinder, root, new Vector3(x, 0.32f + hgt, top), new Vector3(0.26f, 0.14f, 0.26f), Art.Mat(cap, 0.7f));
-            Art.Prim(PrimitiveType.Cube, root, new Vector3(x, 0.15f + hgt * 0.5f, top - 0.27f), new Vector3(0.34f, hgt * 0.45f, 0.02f), Art.Mat(Color.white, 0.3f));   // label
-            var fh = Art.Root("DecorFace", root); fh.localPosition = new Vector3(x, 0.15f + hgt * 0.5f, top);
-            Art.Face(fh, new Vector3(0, -0.06f, -0.5f), 0.36f);   // the bathroom bottles are characters too
-        }
-        Bottle(-3.4f, new Color(0.55f, 0.82f, 1f), new Color(0.25f, 0.45f, 0.85f), 1.2f);
-        Bottle(-2.7f, new Color(1f, 0.7f, 0.82f), new Color(0.9f, 0.35f, 0.55f), 0.9f);
-        Bottle(2.6f, new Color(0.7f, 0.92f, 0.6f), new Color(0.35f, 0.65f, 0.3f), 1.05f);
-        // toothbrush cup
-        Art.Prim(PrimitiveType.Cylinder, root, new Vector3(-1.6f, 0.45f, top), new Vector3(0.45f, 0.3f, 0.45f), Art.Mat(new Color(1f, 0.85f, 0.4f), 0.7f));
-        Art.Prim(PrimitiveType.Cylinder, root, new Vector3(-1.68f, 0.95f, top), new Vector3(0.07f, 0.35f, 0.07f), Art.Mat(new Color(0.4f, 0.75f, 1f), 0.6f), new Vector3(0, 0, 12));
-        Art.Prim(PrimitiveType.Cylinder, root, new Vector3(-1.5f, 0.95f, top), new Vector3(0.07f, 0.35f, 0.07f), Art.Mat(new Color(1f, 0.5f, 0.6f), 0.6f), new Vector3(0, 0, -10));
-        // potted plant on the right
-        Art.Prim(PrimitiveType.Cylinder, root, new Vector3(3.6f, 0.5f, top), new Vector3(0.8f, 0.35f, 0.8f), Art.Mat(new Color(0.93f, 0.55f, 0.4f), 0.4f));
-        { var ph = Art.Root("DecorFace", root); ph.localPosition = new Vector3(3.6f, 0.45f, top); Art.Face(ph, new Vector3(0, -0.05f, -0.65f), 0.46f); }
-        var leaf = Art.Mat(new Color(0.45f, 0.8f, 0.45f), 0.5f); var leaf2 = Art.Mat(new Color(0.35f, 0.68f, 0.4f), 0.5f);
-        for (int i = 0; i < 7; i++)
-        {
-            float a = i / 7f * Mathf.PI * 2;
-            Art.Prim(PrimitiveType.Sphere, root, new Vector3(3.6f + Mathf.Cos(a) * 0.35f, 1.2f + (i % 2) * 0.2f, top + Mathf.Sin(a) * 0.3f), new Vector3(0.35f, 0.75f, 0.2f), i % 2 == 0 ? leaf : leaf2, new Vector3(Mathf.Sin(a) * 30, -a * Mathf.Rad2Deg, Mathf.Cos(a) * 30));
-        }
-        // rolled towels
-        var towelA = Art.Mat(new Color(1f, 0.78f, 0.86f), 0.1f); var towelB = Art.Mat(new Color(0.75f, 0.88f, 1f), 0.1f);
-        Art.Prim(PrimitiveType.Capsule, root, new Vector3(1.2f, 0.45f, top), new Vector3(0.6f, 0.55f, 0.6f), towelA, new Vector3(0, 0, 90));
-        Art.Prim(PrimitiveType.Capsule, root, new Vector3(1.6f, 0.45f, top - 0.1f), new Vector3(0.6f, 0.55f, 0.6f), towelB, new Vector3(0, 0, 90));
-        Art.Prim(PrimitiveType.Capsule, root, new Vector3(1.4f, 0.95f, top - 0.05f), new Vector3(0.55f, 0.5f, 0.55f), towelA, new Vector3(0, 0, 90));
-        // duck slippers on the rug: sole, puffy yellow duck head on top, little beak
-        var sole = Art.Mat(new Color(1f, 0.62f, 0.45f), 0.3f);
-        var slip = Art.Mat(new Color(1f, 0.86f, 0.3f), 0.6f);
-        var beak = Art.Mat(new Color(1f, 0.55f, 0.2f), 0.5f);
+        // calm bath rug: one soft neutral colour, rounded ends, no pattern (it is the stage for the waiting ducks)
+        var mat = Art.Mat(new Color(0.93f, 0.9f, 0.86f), 0.2f);
+        var edge = Art.Mat(new Color(0.84f, 0.8f, 0.76f), 0.2f);
+        Art.Prim(PrimitiveType.Cube, root, new Vector3(0, -0.32f, bottom), new Vector3(6.6f, 0.1f, 2.2f), edge);
+        foreach (float x in new[] { -3.3f, 3.3f }) Art.Prim(PrimitiveType.Cylinder, root, new Vector3(x, -0.32f, bottom), new Vector3(2.2f, 0.05f, 2.2f), edge);
+        Art.Prim(PrimitiveType.Cube, root, new Vector3(0, -0.28f, bottom), new Vector3(6.4f, 0.12f, 2.0f), mat);
+        foreach (float x in new[] { -3.2f, 3.2f }) Art.Prim(PrimitiveType.Cylinder, root, new Vector3(x, -0.28f, bottom), new Vector3(2.0f, 0.065f, 2.0f), mat);
+        // plain shelf behind the faucet
+        Art.Prim(PrimitiveType.Cube, root, new Vector3(0, -0.1f, top + 0.3f), new Vector3(w + 2.5f, 0.5f, 1.6f), Art.Mat(new Color(0.96f, 0.95f, 0.93f), 0.5f));
         rugZ = bottom;
-        foreach (var (x, yaw) in new (float, float)[0])
-        {
-            var sl = Art.Root("Slipper", root); sl.localPosition = new Vector3(x, -0.2f, bottom + 0.05f); sl.localEulerAngles = new Vector3(0, yaw, 0);
-            Art.Prim(PrimitiveType.Capsule, sl, new Vector3(0, 0, 0), new Vector3(0.55f, 0.55f, 0.16f), sole, new Vector3(90, 0, 0));
-            Art.Prim(PrimitiveType.Sphere, sl, new Vector3(0, 0.2f, -0.18f), new Vector3(0.55f, 0.38f, 0.62f), slip);
-            Art.Prim(PrimitiveType.Sphere, sl, new Vector3(0, 0.26f, -0.5f), new Vector3(0.24f, 0.1f, 0.2f), beak);
-            var fh = Art.Root("DecorFace", sl); fh.localPosition = new Vector3(0, 0.36f, -0.2f);
-            Art.Face(fh, new Vector3(0, 0, -0.25f), 0.3f);
-        }
         Art.Bake(root, "decor", 0.5f, OUTLINE_W);
     }
 
@@ -678,7 +622,12 @@ public class GameController : MonoBehaviour
         return v;
     }
 
-    void MakeView(Block b) { MakeViewInner(b); if (b.view) b.faces = b.view.GetComponentsInChildren<Renderer>(true).Where(r => r.name == "Face").ToArray(); }
+    void MakeView(Block b)
+    {
+        MakeViewInner(b); if (!b.view) return;
+        var fs = b.view.GetComponentsInChildren<Renderer>(true).Where(r => r.name == "Face").ToArray();
+        if (b.type == "boss") b.faces = fs; else { foreach (var f in fs) f.enabled = false; b.faces = null; }   // calm board: only the boss has a face
+    }
     void MakeViewInner(Block b)
     {
         // one shared mesh per block kind (instanced), one template per kind (cloned)
@@ -734,7 +683,8 @@ public class GameController : MonoBehaviour
         var root = Art.Root("Pips", b.view); root.localPosition = new Vector3(0, top, 0);
         for (int i = 0; i < b.max; i++)
         {
-            var pip = Art.Prim(PrimitiveType.Sphere, root, new Vector3((i - (b.max - 1) / 2f) * 0.17f, 0, 0), new Vector3(0.14f, 0.07f, 0.14f), pipMat);
+            // HP shown as a short row of flat bars (round white dots read as "eyes" on every block)
+            var pip = Art.Prim(PrimitiveType.Cube, root, new Vector3((i - (b.max - 1) / 2f) * 0.16f, 0, 0), new Vector3(0.12f, 0.04f, 0.06f), pipMat);
             pip.name = "Pip" + i; var r = pip.GetComponent<Renderer>(); r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
         }
         b.pips = root;
@@ -910,9 +860,9 @@ public class GameController : MonoBehaviour
     static bool Covered(Block b) => b.under != null && b.under.alive;
     // Feedback: "too much shaking / stutter on combos". Shake is much smaller and capped, off when the
     // Vibration setting is off; hitstops are short and at most one every 0.3 s (chains used to stack them).
-    void Shake(float a) { if (!SaveData.Vibration) return; shake = Mathf.Max(shake, Mathf.Min(0.2f, a * 0.4f)); }
+    void Shake(float a) { if (!SaveData.Vibration) return; shake = Mathf.Max(shake, Mathf.Min(0.08f, a * 0.2f)); }
     float lastStop = -9f;
-    void HitStop(float a) { if (t - lastStop < 0.3f) return; lastStop = t; freeze = Mathf.Max(freeze, Mathf.Min(a, 0.05f)); }
+    void HitStop(float a) { if (t - lastStop < 0.3f) return; lastStop = t; freeze = Mathf.Max(freeze, Mathf.Min(a, 0.035f)); }
 
     // ---------- physics ----------
     struct Hit { public Vector2 n; public float pen; }
@@ -1331,18 +1281,18 @@ public class GameController : MonoBehaviour
     {
         switch (b.type)
         {
-            case "ring": return new Color(1f, 0.38f, 0.36f);
+            case "ring": return new Color(0.95f, 0.28f, 0.29f);
             case "cookie": case "ice": case "boss": return new Color(0.94f, 0.63f, 0.29f);
             case "crate": return new Color(0.69f, 0.48f, 0.27f);
             case "chest": case "gold": return new Color(1f, 0.8f, 0.25f);
-            case "glass": return new Color(0.56f, 0.86f, 0.69f);
-            case "vase": return new Color(1f, 0.68f, 0.45f);
-            case "soap": return new Color(1f, 0.61f, 0.78f);
-            case "plates": return new Color(0.75f, 0.88f, 1f);
-            case "bathbomb": return new Color(0.65f, 0.42f, 1f);
+            case "glass": return new Color(0.3f, 0.77f, 0.43f);
+            case "vase": return new Color(1f, 0.49f, 0.35f);
+            case "soap": return new Color(0.95f, 0.28f, 0.29f);
+            case "plates": return new Color(0.18f, 0.48f, 0.94f);
+            case "bathbomb": return new Color(0.54f, 0.36f, 0.94f);
             case "domino": return new Color(1f, 0.97f, 0.9f);
             case "tnt": return new Color(0.91f, 0.28f, 0.23f);
-            case "laser": return new Color(0.7f, 0.53f, 1f);
+            case "laser": return new Color(0.54f, 0.36f, 0.94f);
             case "screw": return new Color(0.82f, 0.85f, 0.9f);
             case "pixel": return b.color;
             default: return Color.gray;
@@ -2955,7 +2905,7 @@ public class GameController : MonoBehaviour
                 float u = (x + 0.5f) / S, v = (y + 0.5f) / S;
                 float chev = (0.62f - Mathf.Abs(v - 0.5f) * 0.6f) - u;                       // ">" shape: tip at the +u side
                 float line = Mathf.Clamp01(1f - Mathf.Abs(chev) / 0.07f) * Mathf.Clamp01((0.42f - Mathf.Abs(v - 0.5f)) / 0.08f);
-                float band = 0.22f;
+                float band = 0.12f;
                 px[y * S + x] = Color.Lerp(new Color(0.55f, 0.95f, 1f, band), new Color(1f, 1f, 1f, 0.95f), line);
             }
         flowTex.SetPixels(px); flowTex.Apply();
@@ -3116,10 +3066,13 @@ public class GameController : MonoBehaviour
         }
     }
 
+    static readonly HashSet<string> NoiseWords = new HashSet<string> { "RẮC!", "XOẢNG!", "BÙM!", "ĐỔ!", "NẢY!", "Quạc!", "+xu", "XÌ XÈO!", "BỐP!", "ẦM!", "TRƯỢT!", "Trượt!", "RƠI XUỐNG!", "CHUI CỐNG!", "Mất chuỗi…" };
     void PopText(string s, Vector2 simPos, Color c, int size)
     {
+        if (NoiseWords.Contains(s) || (s.Length > 1 && (s[0] == '+' || s[0] == '-') && char.IsDigit(s[1]) && s.IndexOf(' ') < 0) || s.StartsWith("Chuỗi ") || s.StartsWith("BI-A")) return;   // calm: no onomatopoeia / score spam
+        size = Mathf.RoundToInt(size * 0.82f);
         // too many floating labels at once is unreadable and each one is an outlined UI mesh: drop the oldest
-        if (pops.Count >= (App.Mobile ? 6 : 10)) { RecyclePop(pops[0].t); pops.RemoveAt(0); }
+        if (pops.Count >= 3) { RecyclePop(pops[0].t); pops.RemoveAt(0); }
         var wp = W(simPos, 0.6f);
         foreach (var o in pops)
             if (o.t && o.t.text == s && o.max - o.life < 0.6f && (o.world - wp).sqrMagnitude < 9f)
@@ -3137,7 +3090,12 @@ public class GameController : MonoBehaviour
     void RecycleCoin(RectTransform rt) { if (rt == null) return; rt.gameObject.SetActive(false); if (coinPool.Count < 30) coinPool.Push(rt); else Destroy(rt.gameObject); }
     void RecyclePop(Text t) { if (t == null) return; t.gameObject.SetActive(false); if (popPool.Count < 24) popPool.Push(t); else Destroy(t.gameObject); }
 
-    void BigText(string s, Color c) { bigTxt.text = s; bigTxt.color = c; bigLife = 1.4f; }
+    static readonly HashSet<string> BigNoise = new HashSet<string> { "SMASH!", "MEGA SMASH!", "DUCKTASTROPHE!", "CRASH!", "PHÓNG!", "ĐỔ KỆ!", "CẦU VỒNG!" };
+    void BigText(string s, Color c)
+    {
+        if (BigNoise.Contains(s) || s.StartsWith("NỔ ") || s.StartsWith("SIÊU NỔ")) return;   // calm: big banners only for things that change the plan
+        bigTxt.text = s; bigTxt.color = c; bigLife = 1.2f;
+    }
 
     // =====================================================================
     // CAMERA
@@ -3184,7 +3142,8 @@ public class GameController : MonoBehaviour
     // =====================================================================
     // HUD
     // =====================================================================
-    static readonly Color Purple = new Color(0.6f, 0.53f, 0.93f), PurpleDark = new Color(0.49f, 0.42f, 0.84f), Ink = new Color(0.23f, 0.18f, 0.42f), Yellow = new Color(1f, 0.8f, 0.2f);
+    // clean theme: one basic blue for chrome, yellow for actions, dark navy ink (was a busy purple/lilac mix)
+    static readonly Color Purple = new Color(0.27f, 0.56f, 0.93f), PurpleDark = new Color(0.2f, 0.42f, 0.78f), Ink = new Color(0.15f, 0.2f, 0.32f), Yellow = new Color(1f, 0.8f, 0.2f);
 
     void BuildHud(Transform canvas)
     {
@@ -3192,15 +3151,14 @@ public class GameController : MonoBehaviour
         // soft purple vignette: frames the tub and pulls the eye to the middle
         var vig = UIKit.Stretch(UIKit.Rect("Vignette", hud)).gameObject.AddComponent<RawImage>();
         vig.texture = VignetteTex(); vig.raycastTarget = false; vig.color = new Color(0.35f, 0.2f, 0.45f, 0.55f);
-        if (App.Mobile) vig.gameObject.SetActive(false);   // full-screen alpha overlay = pure overdraw on phones
+        vig.gameObject.SetActive(false);   // calm: no tinted vignette   // full-screen alpha overlay = pure overdraw on phones
         flashImg = UIKit.Stretch(UIKit.Rect("Flash", hud)).gameObject.AddComponent<Image>();
         flashImg.color = new Color(1f, 0.97f, 0.9f, 0); flashImg.raycastTarget = false; flashImg.canvasRenderer.cullTransparentMesh = true;
         // top bar
         // slim top bar: the board gets the screen (players said "UI huge, game tiny")
         var top = UIKit.Panel(hud, PurpleDark, "TopBar").rectTransform; UIKit.Place(top, 0.5f, 1, 0, -74, 1060, 132);
-        var topIn = UIKit.Panel(top, Purple, "Inner").rectTransform; UIKit.Stretch(topIn, 0, 8, 0, 0);
-        UIKit.Gloss(topIn, 0.2f);
-        var mframe = UIKit.Panel(topIn, Yellow, "MovesFrame").rectTransform; UIKit.Place(mframe, 0, 0.5f, 72, 2, 116, 110);
+        var topIn = UIKit.Panel(top, Purple, "Inner").rectTransform; UIKit.Stretch(topIn, 0, 6, 0, 0);
+        var mframe = UIKit.Panel(topIn, PurpleDark, "MovesFrame").rectTransform; UIKit.Place(mframe, 0, 0.5f, 72, 2, 112, 106);
         var mb = UIKit.Panel(topIn, Color.white, "Moves").rectTransform; UIKit.Place(mb, 0, 0.5f, 72, 2, 104, 98);
         movesTxt = UIKit.Label(mb, "10", 60, Ink); movesTxt.rectTransform.offsetMin = new Vector2(0, 22);
         var ml = UIKit.Label(mb, "VỊT", 24, PurpleDark); ml.fontStyle = FontStyle.Bold; ml.rectTransform.offsetMax = new Vector2(0, -68);
@@ -3212,31 +3170,30 @@ public class GameController : MonoBehaviour
         goalsTxt = UIKit.Outlined(UIKit.Label(topIn, "", 30, Color.white, TextAnchor.MiddleLeft), Ink, 3); UIKit.Place(goalsTxt.rectTransform, 0, 0.5f, 470, 12, 400, 84);
         goalsTxt.horizontalOverflow = HorizontalWrapMode.Overflow; goalsTxt.verticalOverflow = VerticalWrapMode.Overflow; goalsTxt.lineSpacing = 0.95f;
         goalsTxt.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        var ob = UIKit.Panel(topIn, new Color(0.23f, 0.18f, 0.42f, 0.55f), "ObjBar").rectTransform; UIKit.Place(ob, 0, 0.5f, 470, -44, 400, 14);
+        var ob = UIKit.Panel(topIn, new Color(0.1f, 0.2f, 0.4f, 0.35f), "ObjBar").rectTransform; UIKit.Place(ob, 0, 0.5f, 470, -44, 400, 14);
         objFill = UIKit.Panel(ob, new Color(0.45f, 0.95f, 0.5f), "Fill").rectTransform;
         objFill.anchorMin = Vector2.zero; objFill.anchorMax = new Vector2(0, 1); objFill.offsetMin = objFill.offsetMax = Vector2.zero; objFill.pivot = new Vector2(0, 0.5f);
-        levelTxt = UIKit.Outlined(UIKit.Label(topIn, "", 28, Color.white, TextAnchor.MiddleRight), new Color(0.25f, 0.2f, 0.45f), 2); UIKit.Place(levelTxt.rectTransform, 1, 0.5f, -230, 24, 240, 44);
-        scoreTxt = UIKit.Label(topIn, "", 30, Yellow, TextAnchor.MiddleRight); UIKit.Place(scoreTxt.rectTransform, 1, 0.5f, -230, -20, 240, 44);
-        var gear = UIKit.Btn(topIn, "II", Yellow, Ink, 36, () => App.OpenSettings(true), "Settings");
+        levelTxt = UIKit.Label(topIn, "", 32, Color.white, TextAnchor.MiddleRight); UIKit.Place(levelTxt.rectTransform, 1, 0.5f, -230, 2, 240, 44);
+        scoreTxt = UIKit.Label(topIn, "", 30, Yellow, TextAnchor.MiddleRight); UIKit.Place(scoreTxt.rectTransform, 1, 0.5f, -230, -20, 240, 44); scoreTxt.enabled = false;   // calm: score is noise mid-level
+        var gear = UIKit.Btn(topIn, "II", Color.white, Ink, 36, () => App.OpenSettings(true), "Settings");
         UIKit.Place((RectTransform)gear.transform, 1, 0.5f, -56, 4, 84, 84);
         // fever bar
         // FRENZY meter: how much is banked, what a full bar gives, and what this shot will add
-        feverBar = UIKit.Panel(hud, new Color(0.47f, 0.42f, 0.74f, 0.95f), "Fever").rectTransform; UIKit.Place(feverBar, 0.5f, 1, -66, -164, 880, 38);
-        var ftrack = UIKit.Rect("Track", feverBar); UIKit.Stretch(ftrack, 4, 4, 4, 4);
-        UIKit.Gloss(feverBar, 0.16f);
+        feverBar = UIKit.Panel(hud, new Color(0.1f, 0.2f, 0.4f, 0.35f), "Fever").rectTransform; UIKit.Place(feverBar, 0.5f, 1, 0, -154, 1000, 16);   // slim, quiet FRENZY meter
+        var ftrack = UIKit.Rect("Track", feverBar); UIKit.Stretch(ftrack, 2, 2, 2, 2);
         feverGhost = UIKit.Panel(ftrack, new Color(1f, 1f, 1f, 0.4f), "Ghost").rectTransform;
         var ff = UIKit.Panel(ftrack, new Color(1f, 0.42f, 0.68f), "Fill"); feverFill = ff.rectTransform;
         foreach (var r in new[] { feverGhost, feverFill }) { r.anchorMin = Vector2.zero; r.anchorMax = new Vector2(0, 1); r.offsetMin = r.offsetMax = Vector2.zero; r.pivot = new Vector2(0, 0.5f); }
         for (int i = 1; i < 7; i++)
         {   // a tick every 10 points
-            var tk = UIKit.Panel(ftrack, new Color(1f, 1f, 1f, 0.35f), "Tick").rectTransform; tk.anchorMin = tk.anchorMax = new Vector2(i / 7f, 0.5f); tk.sizeDelta = new Vector2(3, 26);
+            var tk = UIKit.Panel(ftrack, new Color(1f, 1f, 1f, 0.35f), "Tick").rectTransform; tk.gameObject.SetActive(false); tk.anchorMin = tk.anchorMax = new Vector2(i / 7f, 0.5f); tk.sizeDelta = new Vector2(3, 26);
         }
-        var fl = UIKit.Outlined(UIKit.Label(feverBar, "FRENZY", 24, Color.white, TextAnchor.MiddleLeft), new Color(0.6f, 0.15f, 0.4f), 2); UIKit.Place(fl.rectTransform, 0, 0.5f, 80, 0, 150, 38);
-        feverTxt = UIKit.Outlined(UIKit.Label(feverBar, "0 / 70", 24, Color.white), Ink, 2); UIKit.Place(feverTxt.rectTransform, 0.5f, 0.5f, 0, 0, 400, 38);
-        feverHint = UIKit.Outlined(UIKit.Label(feverBar, "phá 1 món = +1", 20, Color.white, TextAnchor.MiddleRight), new Color(0.25f, 0.2f, 0.45f), 2); UIKit.Place(feverHint.rectTransform, 1, 0.5f, -100, 0, 200, 38);
+        var fl = UIKit.Outlined(UIKit.Label(feverBar, "", 24, Color.white, TextAnchor.MiddleLeft), new Color(0.6f, 0.15f, 0.4f), 2); UIKit.Place(fl.rectTransform, 0, 0.5f, 80, 0, 150, 38);
+        feverTxt = UIKit.Outlined(UIKit.Label(feverBar, "0 / 70", 24, Color.white), Ink, 2); UIKit.Place(feverTxt.rectTransform, 0.5f, 0.5f, 0, 0, 400, 38); feverTxt.enabled = false;
+        feverHint = UIKit.Outlined(UIKit.Label(feverBar, "phá 1 món = +1", 20, Color.white, TextAnchor.MiddleRight), new Color(0.25f, 0.2f, 0.45f), 2); UIKit.Place(feverHint.rectTransform, 1, 0.5f, -100, 0, 200, 38); feverHint.enabled = false;
         feverPop = UIKit.Outlined(UIKit.Label(hud, "", 40, new Color(1f, 0.55f, 0.8f)), Color.white, 3); UIKit.Place(feverPop.rectTransform, 0.5f, 1, 300, -210, 400, 60);
         feverPop.raycastTarget = false; feverPop.gameObject.SetActive(false);
-        streakTxt = UIKit.Outlined(UIKit.Label(hud, "", 26, new Color(1f, 0.85f, 0.4f), TextAnchor.MiddleRight), new Color(0.25f, 0.2f, 0.45f), 2); UIKit.Place(streakTxt.rectTransform, 1, 1, -170, -210, 300, 36);
+        streakTxt = UIKit.Outlined(UIKit.Label(hud, "", 26, new Color(1f, 0.85f, 0.4f), TextAnchor.MiddleRight), new Color(0.25f, 0.2f, 0.45f), 2); UIKit.Place(streakTxt.rectTransform, 1, 1, -170, -210, 300, 36); streakTxt.enabled = false;
         // boss bar
         bossBar = UIKit.Panel(hud, new Color(0.23f, 0.18f, 0.42f, 0.7f), "BossBar").rectTransform; UIKit.Place(bossBar, 0.5f, 1, 0, -360, 700, 40);
         var bf = UIKit.Panel(bossBar, new Color(1f, 0.35f, 0.2f), "Fill"); bossFill = bf.rectTransform;
@@ -3245,23 +3202,23 @@ public class GameController : MonoBehaviour
         BuildComboBar();
         BuildComboGuide();
         // combo + big text
-        comboTxt = UIKit.Outlined(UIKit.Label(hud, "", 90, Yellow), Ink, 6); UIKit.Place(comboTxt.rectTransform, 0.5f, 0, 0, 540, 1000, 220); comboTxt.lineSpacing = 0.85f; comboTxt.verticalOverflow = VerticalWrapMode.Overflow;
-        bigTxt = UIKit.Outlined(UIKit.Label(hud, "", 110, Color.white), new Color(1f, 0.5f, 0.75f), 8); UIKit.Place(bigTxt.rectTransform, 0.5f, 0.5f, 0, 120, 1000, 200);
+        comboTxt = UIKit.Outlined(UIKit.Label(hud, "", 64, Yellow), Ink, 4); UIKit.Place(comboTxt.rectTransform, 0.5f, 0, 0, 540, 1000, 220); comboTxt.lineSpacing = 0.85f; comboTxt.verticalOverflow = VerticalWrapMode.Overflow;
+        bigTxt = UIKit.Outlined(UIKit.Label(hud, "", 84, Color.white), Ink, 5); UIKit.Place(bigTxt.rectTransform, 0.5f, 0.5f, 0, 120, 1000, 200);
         bigTxt.color = new Color(1, 1, 1, 0);
         // hint
-        hintPanel = UIKit.Panel(hud, new Color(1, 1, 1, 0.82f), "Hint").rectTransform; UIKit.Place(hintPanel, 0.5f, 0, 0, 150, 960, 46);
+        hintPanel = UIKit.Panel(hud, new Color(1, 1, 1, 0.92f), "Hint").rectTransform; UIKit.Place(hintPanel, 0.5f, 0, 0, 150, 960, 46);
         hintTxt = UIKit.Label(hintPanel, "", 30, Ink); hintTxt.fontStyle = FontStyle.Bold; hintTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
         BuildTray();
         // booster bar
         var bar = UIKit.Rect("Boosters", hud); UIKit.Place(bar, 0.5f, 0, 0, 66, 1060, 112);
-        var mapBtn = UIKit.Btn(bar, "BẢN\nĐỒ", PurpleDark, Color.white, 24, App.ShowMap, "Map");
+        var mapBtn = UIKit.Btn(bar, "BẢN\nĐỒ", Purple, Color.white, 24, App.ShowMap, "Map");
         UIKit.Place((RectTransform)mapBtn.transform, 0, 0.5f, 68, 0, 120, 100);
         string[] keys = { "hammer", "bomb", "moves" };
         for (int i = 0; i < 3; i++)
         {
             string k = keys[i];
-            var b = UIKit.Btn(bar, "", Yellow, Ink, 36, () => UseBooster(k), "Boost_" + k);
-            UIKit.Place((RectTransform)b.transform, 0, 0.5f, 290 + i * 296, 0, 280, 100);
+            var b = UIKit.Btn(bar, "", Color.white, Ink, 36, () => UseBooster(k), "Boost_" + k);
+            UIKit.Place((RectTransform)b.transform, 0, 0.5f, 290 + i * 296, 0, 276, 92);
             var lbl = UIKit.BtnText(b); lbl.lineSpacing = 1f; lbl.fontSize = 24;
             lbl.rectTransform.offsetMin = new Vector2(84, lbl.rectTransform.offsetMin.y);   // room for the icon
             var bIcon = UIKit.Rect("Icon", b.transform).gameObject.AddComponent<RawImage>(); bIcon.raycastTarget = false;
@@ -3271,25 +3228,25 @@ public class GameController : MonoBehaviour
         // popup
         popupRoot = UIKit.Stretch(UIKit.Rect("Popup", hud));
         var dim = popupRoot.gameObject.AddComponent<Image>(); dim.color = new Color(0.11f, 0.08f, 0.25f, 0.45f);
-        var card = UIKit.Panel(popupRoot, Purple, "Card").rectTransform; UIKit.Place(card, 0.5f, 0.5f, 0, 0, 900, 1000); card.localScale = Vector3.one * 0.74f;
-        popTitle = UIKit.Outlined(UIKit.Label(card, "", 90, Color.white), Ink, 5); UIKit.Place(popTitle.rectTransform, 0.5f, 1, 0, -120, 860, 140);
+        var card = UIKit.Panel(popupRoot, new Color(0.98f, 0.98f, 1f), "Card").rectTransform; UIKit.Place(card, 0.5f, 0.5f, 0, 0, 900, 1000); card.localScale = Vector3.one * 0.74f;
+        popTitle = UIKit.Label(card, "", 80, Ink); UIKit.Place(popTitle.rectTransform, 0.5f, 1, 0, -120, 860, 140);
         popStars = UIKit.Label(card, "", 130, Yellow); UIKit.Place(popStars.rectTransform, 0.5f, 1, 0, -290, 860, 170);
         sunburst = UIKit.Rect("Sunburst", popStars.transform).gameObject.AddComponent<RawImage>(); sunburst.raycastTarget = false;
-        sunburst.texture = SunburstTex(); sunburst.color = new Color(1f, 0.9f, 0.45f, 0.55f);
+        sunburst.texture = SunburstTex(); sunburst.color = new Color(1f, 0.9f, 0.45f, 0f); sunburst.enabled = false;
         UIKit.Place(sunburst.rectTransform, 0.5f, 0.5f, 0, 0, 620, 620);
         popStarImgs = UIKit.StarRow(popStars.transform, 3, 150, 24);
-        popBody = UIKit.Label(card, "", 44, Color.white); UIKit.Place(popBody.rectTransform, 0.5f, 1, 0, -440, 860, 120);
-        popReward = UIKit.Outlined(UIKit.Label(card, "", 64, Yellow), Ink, 4); UIKit.Place(popReward.rectTransform, 0.5f, 1, 0, -540, 860, 100);
-        var paBg = UIKit.Dot(card, Color.white, "ArtBg"); UIKit.Place(paBg.rectTransform, 0.5f, 1, 335, -300, 150, 150); paBg.raycastTarget = false;
+        popBody = UIKit.Label(card, "", 42, Ink); UIKit.Place(popBody.rectTransform, 0.5f, 1, 0, -440, 860, 120);
+        popReward = UIKit.Label(card, "", 58, new Color(0.85f, 0.55f, 0f)); UIKit.Place(popReward.rectTransform, 0.5f, 1, 0, -540, 860, 100);
+        var paBg = UIKit.Dot(card, new Color(0.92f, 0.94f, 0.98f), "ArtBg"); UIKit.Place(paBg.rectTransform, 0.5f, 1, 335, -300, 150, 150); paBg.raycastTarget = false;
         popArt = UIKit.Rect("Art", paBg.transform).gameObject.AddComponent<RawImage>(); UIKit.Place(popArt.rectTransform, 0.5f, 0.5f, 0, 0, 104, 104); popArt.raycastTarget = false;
         popArtBg = paBg.gameObject; popArtBg.SetActive(false);
         popA = UIKit.Btn(card, "", new Color(0.37f, 0.83f, 0.37f), Color.white, 50, OnPopA, "A"); UIKit.Place((RectTransform)popA.transform, 0.5f, 0, 0, 280, 640, 150);
         popB = UIKit.Btn(card, "", Yellow, Ink, 44, OnPopB, "B"); UIKit.Place((RectTransform)popB.transform, 0.5f, 0, 0, 110, 640, 130);
         // level intro card
         introRoot = UIKit.Rect("Intro", hud); UIKit.Place(introRoot, 0.5f, 0, 0, 214, 1020, 236);
-        var ic = UIKit.Panel(introRoot, new Color(1f, 0.97f, 0.94f, 0.96f), "IntroCard"); UIKit.Stretch(ic.rectTransform);
+        var ic = UIKit.Panel(introRoot, new Color(1f, 1f, 1f, 0.95f), "IntroCard"); UIKit.Stretch(ic.rectTransform);
         var ish = ic.gameObject.AddComponent<Shadow>(); ish.effectColor = new Color(0.3f, 0.2f, 0.5f, 0.3f); ish.effectDistance = new Vector2(0, -12);
-        introTitle = UIKit.Outlined(UIKit.Label(introRoot, "", 48, Purple), Ink, 3); UIKit.Place(introTitle.rectTransform, 0.5f, 1, 0, -40, 980, 64);
+        introTitle = UIKit.Label(introRoot, "", 46, Purple); UIKit.Place(introTitle.rectTransform, 0.5f, 1, 0, -40, 980, 64);
         introBody = UIKit.Label(introRoot, "", 34, Ink); UIKit.Place(introBody.rectTransform, 0.5f, 0.5f, 0, -30, 980, 150);
         introRoot.gameObject.SetActive(false);
         // tutorial hand (white fingertip)
@@ -3320,7 +3277,7 @@ public class GameController : MonoBehaviour
         introRoot.SetAsLastSibling(); popupRoot.SetAsLastSibling();
         // level-start curtain: fades out over ~0.3 s so entering a level is a transition, not a cut
         curtain = UIKit.Stretch(UIKit.Rect("Curtain", hud)).gameObject.AddComponent<Image>();
-        curtain.color = new Color(0.36f, 0.27f, 0.6f, 0); curtain.raycastTarget = false; curtain.canvasRenderer.cullTransparentMesh = true;
+        curtain.color = new Color(0.9f, 0.93f, 0.97f, 0); curtain.raycastTarget = false; curtain.canvasRenderer.cullTransparentMesh = true;
         curtain.transform.SetAsLastSibling();
         popupRoot.gameObject.SetActive(false);
     }
@@ -3389,7 +3346,7 @@ public class GameController : MonoBehaviour
         bool show = false;   // minimal HUD: the milestone bar is gone (the tray shows what you earn)
         if (comboBar.gameObject.activeSelf != show) comboBar.gameObject.SetActive(show);
         // first lessons: no combo help, no FRENZY bar (one idea at a time)
-        bool help = level > LevelLibrary.Onboarding || LevelLibrary.IsSandbox(level);
+        bool help = false;   // calm HUD: the combo guide lives in the level intro, not a floating button
         if (comboHelp != null && comboHelp.activeSelf != help) comboHelp.SetActive(help);
         bool fev = level > 2 || LevelLibrary.IsSandbox(level);
         if (feverBar.gameObject.activeSelf != fev) feverBar.gameObject.SetActive(fev);
@@ -3510,7 +3467,7 @@ public class GameController : MonoBehaviour
         {
             int n = SaveData.GetBoost(k);
             boostTxt[k].text = BNAME[k] + "\n" + (n > 0 ? "còn " + n : PRICE[k] + " xu");
-            boostImg[k].color = target == k ? new Color(0.37f, 0.83f, 0.37f) : Yellow;
+            boostImg[k].color = target == k ? new Color(0.37f, 0.83f, 0.37f) : Color.white;
         }
         }
         Sfx.MusicMood(state != "play" ? 1f : frenzyReady || frenzyShot ? 1.07f : moves <= 1 && shownLeft > 0 ? 1.05f : 1f);

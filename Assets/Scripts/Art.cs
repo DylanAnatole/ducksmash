@@ -547,7 +547,7 @@ public static class Art
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.1f, 0), new Vector3(d, 0.1f, d), Mat(CookieSide, 0.3f));
         Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.2f, 0), new Vector3(d * 0.94f, 0.12f, d * 0.94f), Mat(CookieTop, 0.35f, 0, 0, 0f));
         var chip = Mat(Chip, 0.7f, 0, 0, 0f);
-        Vector2[] pts = { new Vector2(-0.2f, -0.15f), new Vector2(0.18f, -0.2f), new Vector2(0.04f, 0.1f), new Vector2(-0.16f, 0.2f), new Vector2(0.24f, 0.12f), new Vector2(-0.02f, -0.3f) };
+        Vector2[] pts = { new Vector2(-0.2f, -0.12f), new Vector2(0.2f, -0.05f), new Vector2(0f, 0.22f) };   // fewer chips: calmer
         foreach (var p in pts) Prim(PrimitiveType.Sphere, root, new Vector3(p.x * d, 0.25f, p.y * d), new Vector3(0.15f, 0.08f, 0.13f) * d, chip);
         return root;
     }
@@ -556,13 +556,12 @@ public static class Art
     public static Transform Glass(Transform parent, float d)
     {
         var root = Root("Glass", parent);
-        var g = Mat(Hex("8fdcb0"), 1f, 0, 0.1f, 0.003f);   // mint bottle (softer than the old lime)
+        var g = Mat(Hex("4cc46e"), 1f, 0, 0.05f, 0.003f);   // basic green bottle
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.3f, 0), new Vector3(d * 0.72f, 0.28f, d * 0.72f), g);
         Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.58f, 0), new Vector3(d * 0.72f, 0.22f, d * 0.72f), g);
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.76f, 0), new Vector3(d * 0.28f, 0.12f, d * 0.28f), g);
-        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.9f, 0), new Vector3(d * 0.33f, 0.04f, d * 0.33f), Mat(Hex("ff8a8a"), 0.7f));
-        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.22f, 0), new Vector3(d * 0.74f, 0.1f, d * 0.74f), Mat(Hex("5fbf8c"), 0.9f, 0, 0.1f)); // liquid
-        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.38f, 0), new Vector3(d * 0.735f, 0.05f, d * 0.735f), Mat(Hex("fff6e8"), 0.7f));   // paper label band
+        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.9f, 0), new Vector3(d * 0.33f, 0.04f, d * 0.33f), Mat(Hex("2f9a52"), 0.7f));
+        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.22f, 0), new Vector3(d * 0.74f, 0.1f, d * 0.74f), Mat(Hex("2f9a52"), 0.9f)); // liquid
         Prim(PrimitiveType.Cube, root, new Vector3(d * 0.16f, 0.42f, -d * 0.34f), new Vector3(0.035f, 0.3f, 0.02f), Mat(Color.white, 1f, 0, 0.9f));   // glint
         Face(root, new Vector3(0, 0.4f, -d * 0.4f), d * 0.5f);
         return root;
@@ -571,13 +570,12 @@ public static class Art
     public static Transform Vase(Transform parent, float d)
     {
         var root = Root("Vase", parent);
-        var body = Mat(Hex("ffad73"), 0.85f, 0, 0, 0.003f);   // peach vase
+        var body = Mat(Hex("ff7d5a"), 0.85f, 0, 0, 0.003f);   // coral vase: a red variant for later levels
         Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.32f, 0), new Vector3(d * 0.86f, 0.56f, d * 0.86f), body);
         Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.34f, 0), new Vector3(d * 0.88f, 0.035f, d * 0.88f), Mat(Color.white, 0.6f));
-        Prim(PrimitiveType.Cylinder, root, new Vector3(0, 0.22f, 0), new Vector3(d * 0.8f, 0.02f, d * 0.8f), Mat(Hex("ffd34d"), 0.6f));
         var dotM = Mat(Hex("fff3e3"), 0.7f);
-        for (int i = 0; i < 6; i++)
-        {   // painted dots around the belly: prettier, and the vase reads at a glance
+        for (int i = 0; i < 0; i++)
+        {   // (dots removed: too much detail) painted dots around the belly: prettier, and the vase reads at a glance
             float an = i / 6f * Mathf.PI * 2;
             Prim(PrimitiveType.Sphere, root, new Vector3(Mathf.Cos(an) * d * 0.4f, 0.44f, Mathf.Sin(an) * d * 0.4f), Vector3.one * d * 0.11f, dotM);
         }
@@ -590,13 +588,12 @@ public static class Art
     public static Transform Soap(Transform parent, float d)
     {
         var root = Root("Soap", parent);
-        var pink = Mat(Hex("ff9cc6"), 0.95f, 0, 0, 0.003f);
+        var pink = Mat(Hex("f2484a"), 0.95f, 0, 0, 0.003f);   // basic red
         Prim(PrimitiveType.Cube, root, new Vector3(0, 0.12f, 0), new Vector3(d * 0.92f, 0.18f, d * 0.64f), pink);
-        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.21f, 0), new Vector3(d * 0.9f, 0.08f, d * 0.62f), Mat(Hex("ffc2de"), 0.95f));
+        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.21f, 0), new Vector3(d * 0.9f, 0.08f, d * 0.62f), Mat(Hex("ff7272"), 0.95f));
         var foam = Mat(Color.white, 0.9f);
         Prim(PrimitiveType.Sphere, root, new Vector3(-d * 0.18f, 0.27f, 0.02f), Vector3.one * d * 0.24f, foam);
         Prim(PrimitiveType.Sphere, root, new Vector3(d * 0.1f, 0.28f, -0.03f), Vector3.one * d * 0.3f, foam);
-        Prim(PrimitiveType.Sphere, root, new Vector3(d * 0.26f, 0.26f, 0.05f), Vector3.one * d * 0.18f, foam);
         Face(root, new Vector3(0, 0.16f, -d * 0.34f), d * 0.46f);
         return root;
     }
@@ -605,7 +602,7 @@ public static class Art
     public static Transform Plates(Transform parent, float d)
     {
         var root = Root("Plates", parent);
-        var white = Mat(Hex("fbfaff"), 0.95f, 0, 0, 0.003f); var rim = Mat(Hex("6cb4ff"), 0.8f);   // sky-blue rims: no more red-on-red rows
+        var white = Mat(Hex("fbfaff"), 0.95f, 0, 0, 0.003f); var rim = Mat(Hex("2f7bf0"), 0.8f);   // sky-blue rims: no more red-on-red rows
         for (int i = 1; i <= 3; i++)
         {
             var p = Root("Plate" + i, root); p.localPosition = new Vector3(0, 0.02f + i * 0.1f, 0);
@@ -624,7 +621,7 @@ public static class Art
         {
             float a = i / 10f * Mathf.PI * 2;
             Prim(PrimitiveType.Sphere, root, new Vector3(Mathf.Cos(a) * d * 0.34f, 0.2f, Mathf.Sin(a) * d * 0.34f), new Vector3(d * 0.34f, d * 0.26f, d * 0.34f),
-                Mat(i % 2 == 0 ? Hex("ff7f78") : Color.white, 0.85f, 0, 0, 0.003f));
+                Mat(i % 2 == 0 ? Hex("f2484a") : Color.white, 0.85f, 0, 0, 0.003f));
         }
         Face(root, new Vector3(0, 0.22f, -d * 0.42f), d * 0.42f);
         return root;
@@ -633,12 +630,12 @@ public static class Art
     public static Transform BathBomb(Transform parent, float d)
     {
         var root = Root("BathBomb", parent);
-        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.3f, 0), new Vector3(d * 0.92f, d * 0.85f, d * 0.92f), Mat(Hex("b38dff"), 0.45f, 0, 0, 0.003f));   // softer lavender
-        string[] dots = { "ff8fb0", "ffe066", "7fe0a0", "ffffff" };
-        for (int i = 0; i < 8; i++)
+        Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.3f, 0), new Vector3(d * 0.92f, d * 0.85f, d * 0.92f), Mat(Hex("8a5cf0"), 0.45f, 0, 0, 0.003f));   // purple: a blue variant for later levels
+        string[] dots = { "ffffff" };
+        for (int i = 0; i < 5; i++)
         {
-            float a = i / 8f * Mathf.PI * 2, yy = 0.32f + Mathf.Sin(i * 1.7f) * 0.12f;
-            Prim(PrimitiveType.Sphere, root, new Vector3(Mathf.Cos(a) * d * 0.4f, yy, Mathf.Sin(a) * d * 0.4f), Vector3.one * d * 0.14f, Mat(Hex(dots[i % 4]), 0.5f));
+            float a = i / 5f * Mathf.PI * 2, yy = 0.32f + Mathf.Sin(i * 1.7f) * 0.12f;
+            Prim(PrimitiveType.Sphere, root, new Vector3(Mathf.Cos(a) * d * 0.4f, yy, Mathf.Sin(a) * d * 0.4f), Vector3.one * d * 0.14f, Mat(Hex(dots[0]), 0.5f));
         }
         Prim(PrimitiveType.Sphere, root, new Vector3(0, 0.62f, 0), Vector3.one * d * 0.2f, Mat(Color.white, 1f, 0, 2f, 0f)).name = "Spark";
         Face(root, new Vector3(0, 0.3f, -d * 0.48f), d * 0.55f);

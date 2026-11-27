@@ -6,7 +6,7 @@ using UnityEngine.UI;
 public class SettingsPopup : MonoBehaviour
 {
     RectTransform root; Button snd, mus, vib, reset, replay, toMap; bool confirmReset;
-    static readonly Color Purple = new Color(0.6f, 0.53f, 0.93f), Ink = new Color(0.23f, 0.18f, 0.42f),
+    static readonly Color Purple = new Color(0.27f, 0.56f, 0.93f), Ink = new Color(0.15f, 0.2f, 0.32f),
         On = new Color(0.37f, 0.83f, 0.37f), Off = new Color(0.72f, 0.7f, 0.78f), Yellow = new Color(1f, 0.8f, 0.2f);
 
     public void Build(Transform canvas)

@@ -37,14 +37,20 @@ public static class FxKit
     }
 
     // ---------------- public effects ----------------
+    // calm mode: far fewer particles so the board stays readable (play-tester feedback: "too busy")
+    public static float Calm = 0.4f;
+    static int N(int n) => n <= 0 ? 0 : Mathf.Max(1, Mathf.RoundToInt(n * Calm));
+    static bool Skip(float keep) => Random.value > keep;
     public static void Sparkle(Vector3 p, Color c, int n = 6)
     {
+        n = N(n);
         for (int i = 0; i < n; i++)
             Emit(sparkle, p + Vector3.up * 0.2f, Random.onUnitSphere * Random.Range(1.5f, 3.5f) + Vector3.up, Color.Lerp(c, Color.white, 0.5f), Random.Range(0.15f, 0.32f), Random.Range(0.25f, 0.45f));
     }
 
     public static void Crumbs(Vector3 p, Color c, int n = 8)
     {
+        n = N(n);
         for (int i = 0; i < n; i++)
         {
             var d = Random.insideUnitCircle.normalized;
@@ -55,27 +61,28 @@ public static class FxKit
 
     public static void Splash(Vector3 p, int n = 8, float power = 1f)
     {
+        n = N(n);
         for (int i = 0; i < n; i++)
         {
             var d = Random.insideUnitCircle.normalized;
             Emit(drops, p + Vector3.up * 0.1f, new Vector3(d.x * 1.5f, Random.Range(2.5f, 4.5f), d.y * 1.5f) * power,
                 new Color(0.92f, 0.99f, 1f, 0.95f), Random.Range(0.06f, 0.12f), Random.Range(0.4f, 0.65f));
         }
-        Emit(ripple, p + Vector3.up * 0.02f, Vector3.zero, new Color(1, 1, 1, 0.7f), 0.5f * power, 0.5f);
+        Emit(ripple, p + Vector3.up * 0.02f, Vector3.zero, new Color(1, 1, 1, 0.45f), 0.5f * power, 0.5f);
     }
 
     // quick white "pop" where something breaks (one additive sprite, very cheap)
-    public static void PopFlash(Vector3 p, float size) => Emit(flash, p, Vector3.zero, new Color(1f, 1f, 0.95f, 0.85f), size, 0.13f);
+    public static void PopFlash(Vector3 p, float size) => Emit(flash, p, Vector3.zero, new Color(1f, 1f, 0.95f, 0.5f), size * 0.8f, 0.12f);
 
-    public static void Ripple(Vector3 p, float size = 0.6f) => Emit(ripple, p + Vector3.up * 0.02f, Vector3.zero, new Color(1, 1, 1, 0.55f), size, 0.6f);
+    public static void Ripple(Vector3 p, float size = 0.6f) { if (!Skip(0.6f)) Emit(ripple, p + Vector3.up * 0.02f, Vector3.zero, new Color(1, 1, 1, 0.4f), size, 0.6f); }
 
-    public static void Wake(Vector3 p) => Emit(wake, p + Vector3.up * 0.02f, Vector3.zero, new Color(1, 1, 1, 0.45f), Random.Range(0.25f, 0.4f), 0.55f);
+    public static void Wake(Vector3 p) { if (!Skip(0.5f)) Emit(wake, p + Vector3.up * 0.02f, Vector3.zero, new Color(1, 1, 1, 0.45f), Random.Range(0.25f, 0.4f), 0.55f); }
 
     public static void Explosion(Vector3 p, float radius)
     {
-        Emit(flash, p + Vector3.up * 0.4f, Vector3.zero, new Color(1f, 0.95f, 0.8f, 1f), radius * 1.6f, 0.18f);
+        Emit(flash, p + Vector3.up * 0.4f, Vector3.zero, new Color(1f, 0.95f, 0.8f, 0.6f), radius * 1.3f, 0.15f);
         // phones: big soft fire/smoke sprites are pure overdraw, so emit far fewer
-        int fires = App.Mobile ? 7 : 18, smokes = App.Mobile ? 3 : 10, sparkN = App.Mobile ? 8 : 20;
+        int fires = App.Mobile ? 5 : 9, smokes = App.Mobile ? 2 : 4, sparkN = App.Mobile ? 4 : 8;
         for (int i = 0; i < fires; i++)
         {
             var d = Random.onUnitSphere; d.y = Mathf.Abs(d.y) * 0.8f + 0.2f;
@@ -96,11 +103,12 @@ public static class FxKit
     }
 
     // flat ring racing out across the water (cheap: one particle, no GameObject)
-    public static void Shockwave(Vector3 p, float size, Color c, float life = 0.32f) => Emit(shock, p + Vector3.up * 0.04f, Vector3.zero, c, size, life);
+    public static void Shockwave(Vector3 p, float size, Color c, float life = 0.32f) { c.a *= 0.55f; Emit(shock, p + Vector3.up * 0.04f, Vector3.zero, c, size * 0.85f, life); }
 
     // glowing embers that float up and drift after a blast
     public static void Embers(Vector3 p, float radius, int n)
     {
+        n = N(n);
         for (int i = 0; i < n; i++)
         {
             var d = Random.insideUnitCircle;
@@ -116,6 +124,7 @@ public static class FxKit
 
     public static void Smoke(Vector3 p, float size, int n = 8)
     {
+        n = N(n);
         for (int i = 0; i < n; i++)
         {
             var d = Random.insideUnitCircle;
@@ -125,12 +134,14 @@ public static class FxKit
 
     public static void StarBurst(Vector3 p, int n = 14)
     {
+        n = N(n);
         for (int i = 0; i < n; i++)
             Emit(stars, p, Random.onUnitSphere * Random.Range(2f, 5f) + Vector3.up * 2f, new Color(1f, 0.88f, 0.35f), Random.Range(0.25f, 0.45f), Random.Range(0.6f, 1f));
     }
 
     public static void Confetti(Vector3 center, float width, int n = 120)
     {
+        n = N(n);
         Color[] cols = { new Color(1f, 0.5f, 0.7f), new Color(1f, 0.85f, 0.3f), new Color(0.4f, 0.85f, 1f), new Color(0.5f, 0.9f, 0.5f), new Color(0.7f, 0.55f, 1f) };
         for (int i = 0; i < n; i++)
         {
@@ -140,9 +151,12 @@ public static class FxKit
     }
 
     // ambient soap bubbles drifting up from the bath water
-    public static void Bubble(Vector3 p) =>
+    public static void Bubble(Vector3 p)
+    {
+        if (Skip(0.3f)) return;
         Emit(bubbles, p + Vector3.up * 0.05f, new Vector3(Random.Range(-0.1f, 0.1f), Random.Range(0.25f, 0.5f), Random.Range(-0.1f, 0.1f)),
-            new Color(1f, 1f, 1f, 0.7f), Random.Range(0.12f, 0.28f), Random.Range(1.6f, 2.6f));
+            new Color(1f, 1f, 1f, 0.5f), Random.Range(0.12f, 0.24f), Random.Range(1.6f, 2.6f));
+    }
 
     public static void Clear()
     {
