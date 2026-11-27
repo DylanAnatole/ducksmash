@@ -59,8 +59,8 @@ public class MapScreen : MonoBehaviour
 
         for (int n = 1; n <= LevelLibrary.Count; n++)
         {
-            int lvl = n; bool boss = LevelLibrary.IsHard(n);
-            float size = boss ? 190 : 150;
+            int lvl = n, tier = LevelLibrary.Tier(n); bool boss = tier >= 2;
+            float size = tier == 3 ? 200 : tier == 2 ? 175 : 150;   // harder = bigger node
             var img = UIKit.Dot(content, Color.white, "Node" + n);
             var rt = img.rectTransform; rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0); rt.sizeDelta = new Vector2(size, size); rt.anchoredPosition = NodePos(n);
             var sh = img.gameObject.AddComponent<Shadow>(); sh.effectColor = new Color(0.1f, 0.2f, 0.4f, 0.22f); sh.effectDistance = new Vector2(0, -8);
@@ -73,11 +73,12 @@ public class MapScreen : MonoBehaviour
                 var srt = sp.rectTransform; srt.anchorMin = srt.anchorMax = new Vector2(0.3f, 0.76f); srt.sizeDelta = new Vector2(size * 0.13f, size * 0.09f); srt.localEulerAngles = new Vector3(0, 0, 35);
             }
             var num = UIKit.Outlined(UIKit.Label(img.transform, n.ToString(), boss ? 64 : 58, Color.white), Ink, 3);
-            var tag = UIKit.Label(img.transform, boss ? (LevelLibrary.IsSuperHard(n) ? "SIÊU KHÓ" : "KHÓ") : LevelLibrary.NewSpecialAt(n) != null ? "VỊT MỚI" : n == 19 ? "CỐNG NƯỚC" : n == 23 ? "DÒNG CHẢY" : n == 13 || n == 26 ? "BỒN MỚI" : "", 28, Color.white); tag.fontSize = 24; tag.rectTransform.offsetMin = new Vector2(0, -size * 0.74f); tag.rectTransform.offsetMax = new Vector2(0, -size * 0.56f);
+            // every level after the tutorial shows its difficulty tier; tutorial levels show what they teach
+            var tag = UIKit.Label(img.transform, n > LevelLibrary.Onboarding ? LevelLibrary.TierName(tier).ToUpper() : LevelLibrary.NewSpecialAt(n) != null ? "VỊT MỚI" : "", 28, Color.white); tag.fontSize = 24; tag.rectTransform.offsetMin = new Vector2(0, -size * 0.6f); tag.rectTransform.offsetMax = new Vector2(0, -size * 0.4f);   // pill sits on the node rim (no clash with the next node)
             if (tag.text.Length > 0)
             {   // pill behind the tag text
-                var pill = UIKit.Panel(img.transform, boss ? new Color(0.92f, 0.36f, 0.32f) : Ink, "TagPill"); pill.raycastTarget = false;
-                var prt = pill.rectTransform; prt.anchorMin = prt.anchorMax = new Vector2(0.5f, 0.5f); prt.sizeDelta = new Vector2(tag.text.Length * 15 + 36, 40); prt.anchoredPosition = new Vector2(0, -size * 0.65f);
+                var pill = UIKit.Panel(img.transform, n > LevelLibrary.Onboarding ? LevelLibrary.TierColor(tier) : Ink, "TagPill"); pill.raycastTarget = false;
+                var prt = pill.rectTransform; prt.anchorMin = prt.anchorMax = new Vector2(0.5f, 0.5f); prt.sizeDelta = new Vector2(tag.text.Length * 15 + 36, 40); prt.anchoredPosition = new Vector2(0, -size * 0.5f);
                 tag.transform.SetAsLastSibling();
             }
             var st = UIKit.Outlined(UIKit.Label(img.transform, "", 44, Yellow), Ink, 2); st.rectTransform.offsetMin = new Vector2(0, size * 0.62f); st.rectTransform.offsetMax = new Vector2(0, size * 0.62f);
@@ -236,8 +237,10 @@ public class MapScreen : MonoBehaviour
         foreach (var nd in nodes)
         {
             int n = nd.n, s = SaveData.GetStars(n); totalStars += s;
-            bool open = n <= max, boss = LevelLibrary.IsHard(n);
-            nd.img.color = !open ? (boss ? new Color(0.86f, 0.62f, 0.64f) : n <= LevelLibrary.Onboarding ? new Color(0.62f, 0.82f, 0.81f) : Locked) :boss ? Red : n <= LevelLibrary.Onboarding ? Teal : s > 0 ? Green : Yellow;
+            int tier = LevelLibrary.Tier(n); bool open = n <= max;
+            // open nodes: hard = orange, extreme = red; otherwise done = green, current = yellow, tutorial = teal. Locked = pale tint of that colour.
+            Color c = tier == 3 ? new Color(0.9f, 0.25f, 0.25f) : tier == 2 ? new Color(1f, 0.55f, 0.15f) : n <= LevelLibrary.Onboarding ? Teal : s > 0 ? Green : Yellow;
+            nd.img.color = open ? c : Color.Lerp(tier >= 2 ? c : Locked, Color.white, tier >= 2 ? 0.55f : 0f);
             nd.num.text = n.ToString();
             nd.num.color = open ? Color.white : new Color(0.6f, 0.65f, 0.74f);
             nd.stars.text = "";

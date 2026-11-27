@@ -36,7 +36,22 @@ public static partial class LevelLibrary
     public const int SmashLevel = 101, SmashCount = 3;   // "phá đồ" destruction test levels 101..103
     public static bool IsSandbox(int n) => n >= TestLevel;
     public static string Title(int n) => n == TestLevel ? "Màn thử" : n >= SmashLevel ? "Phá đồ " + (n - SmashLevel + 1)
-        : IsSuperHard(n) ? "Siêu khó " + n : IsHard(n) ? "Màn khó " + n : (n <= Onboarding ? "Hướng dẫn " : "Màn ") + n;
+        : n <= Onboarding ? "Hướng dẫn " + n : "Màn " + n + " · " + TierName(Tier(n));
+
+    // Difficulty tiers: 0 = Dễ, 1 = Vừa (trung bình), 2 = Khó, 3 = Cực khó.
+    // A saw-tooth that climbs: each block of five ends on a spike, with an easy breather right after it.
+    // The tier is enforced by the move budget (see MovesTable): easy = generous, extreme = almost no spare shot.
+    static readonly int[] TierOf = { 0,
+        0, 0, 0, 0, 0,      //  1- 5 onboarding
+        0, 1, 1, 0, 2,      //  6-10
+        1, 0, 1, 2, 3,      // 11-15
+        0, 1, 2, 1, 3,      // 16-20
+        0, 1, 2, 1, 3,      // 21-25
+        1, 2, 1, 2, 3 };    // 26-30
+    public static int Tier(int n) => n >= 1 && n < TierOf.Length ? TierOf[n] : 1;
+    public static string TierName(int t) => t == 0 ? "Dễ" : t == 1 ? "Vừa" : t == 2 ? "Khó" : "Cực khó";
+    public static string TierHex(int t) => t == 0 ? "#2e9e52" : t == 1 ? "#2f6fd0" : t == 2 ? "#e07b12" : "#d63031";
+    public static Color TierColor(int t) => t == 0 ? new Color(0.3f, 0.75f, 0.4f) : t == 1 ? new Color(0.27f, 0.56f, 0.93f) : t == 2 ? new Color(1f, 0.55f, 0.15f) : new Color(0.9f, 0.25f, 0.25f);
 
     // ---------- pixel-art album ----------
     public static readonly string[] ArtIds = { "star", "duck", "heart", "straw", "fish", "flower", "mush", "sun", "apple", "boat", "cat", "rainbow" };
@@ -167,21 +182,22 @@ public static partial class LevelLibrary
     static BumperDef BumperL(float y, float h = 140) => new BumperDef { x = 32, y = y, w = 12, h = h };
     static BumperDef BumperR(float y, float h = 140) => new BumperDef { x = 496, y = y, w = 12, h = h };
 
-    // Move budgets re-measured with the smart bot (picks dock + duck kind, 5 runs per level, unlimited moves):
-    // normal levels ~ bot median + 2-3 (combo/chest bonus moves add more slack in play), onboarding a bit more,
-    // hard levels (10/15/20/25/30) ~ bot median + 1-2 and no bonus moves. The old table was 2-5x too generous on many levels.
+    // Move budgets from smart-bot runs (dock + kind choice, unlimited moves, 5 runs/level), set by TIER and with
+    // no refunds in play any more (bumps, coins, chests and combos no longer give moves):
+    //   Dễ = worst bot run + 2 · Vừa = median + 2 · Khó = median + 1 · Cực khó = median (every shot must count)
     static readonly Dictionary<int, int> MovesTable = new Dictionary<int, int>
     {
-        { 1, 7 }, { 2, 9 }, { 3, 7 }, { 4, 8 }, { 5, 12 }, { 6, 5 }, { 7, 13 }, { 8, 15 }, { 9, 6 }, { 10, 12 },
-        { 11, 11 }, { 12, 5 }, { 13, 7 }, { 14, 7 }, { 15, 18 }, { 16, 6 }, { 17, 16 }, { 18, 4 }, { 19, 5 }, { 20, 9 },
-        { 21, 5 }, { 22, 5 }, { 23, 4 }, { 24, 6 }, { 25, 9 }, { 26, 5 }, { 27, 10 }, { 28, 14 }, { 29, 4 }, { 30, 15 },
+        { 1, 7 }, { 2, 9 }, { 3, 7 }, { 4, 8 }, { 5, 12 }, { 6, 5 }, { 7, 14 }, { 8, 15 }, { 9, 8 }, { 10, 11 },
+        { 11, 11 }, { 12, 6 }, { 13, 7 }, { 14, 6 }, { 15, 14 }, { 16, 8 }, { 17, 17 }, { 18, 3 }, { 19, 5 }, { 20, 7 },
+        { 21, 6 }, { 22, 5 }, { 23, 3 }, { 24, 6 }, { 25, 7 }, { 26, 5 }, { 27, 8 }, { 28, 14 }, { 29, 3 }, { 30, 14 },
     };
-    // (3-star par, 2-star par) in shots: ~best bot run / median bot run
+    // (3-star par, 2-star par) in shots: ~best bot run / median bot run (clamped to the budget)
     static readonly Dictionary<int, (int, int)> ParTable = new Dictionary<int, (int, int)>
     {
         { 1, (4, 5) }, { 2, (5, 6) }, { 3, (4, 5) }, { 4, (4, 5) }, { 5, (8, 9) }, { 6, (3, 4) }, { 7, (6, 8) }, { 8, (10, 13) }, { 9, (3, 4) },
-        { 11, (6, 8) }, { 12, (3, 4) }, { 13, (4, 5) }, { 14, (5, 6) }, { 16, (3, 4) }, { 17, (11, 13) }, { 18, (2, 3) }, { 19, (3, 4) },
-        { 21, (3, 4) }, { 22, (3, 4) }, { 23, (2, 3) }, { 24, (4, 5) }, { 26, (3, 4) }, { 27, (5, 7) }, { 28, (9, 11) }, { 29, (2, 3) },
+        { 10, (9, 10) }, { 11, (6, 8) }, { 12, (3, 4) }, { 13, (4, 5) }, { 14, (5, 5) }, { 15, (10, 12) }, { 16, (3, 4) }, { 17, (11, 13) },
+        { 18, (2, 2) }, { 19, (3, 4) }, { 20, (6, 7) }, { 21, (3, 4) }, { 22, (3, 4) }, { 23, (2, 2) }, { 24, (4, 5) }, { 25, (6, 7) },
+        { 26, (3, 4) }, { 27, (5, 6) }, { 28, (9, 11) }, { 29, (2, 2) }, { 30, (12, 14) },
     };
 
     static LevelDef L(int moves, string hint, params (float x, float y, string k)[] ducks)

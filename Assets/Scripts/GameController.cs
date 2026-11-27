@@ -306,7 +306,7 @@ public class GameController : MonoBehaviour
         fever = 0; frenzyReady = false; feverShown = 0; feverShownInt = -1; feverMode = 0;   // frenzy starts empty in every level: no banking it for the next one
         par3 = L.par3; par2 = L.par2;
         moves = startMoves = L.moves; state = "play"; moving = false; shotSmash = streak = pushes = score = 0;
-        frenzyShot = bossKilled = rewarded = false; hardLevel = L.hard; target = null; hint = level <= LevelLibrary.Onboarding || LevelLibrary.IsSandbox(level) ? L.hint : ""; freeze = shake = 0; drag = null;
+        frenzyShot = bossKilled = rewarded = false; hardLevel = L.hard || (level >= 1 && level <= LevelLibrary.Count && LevelLibrary.Tier(level) >= 2); target = null; hint = level <= LevelLibrary.Onboarding || LevelLibrary.IsSandbox(level) ? L.hint : ""; freeze = shake = 0; drag = null;
 
         FxKit.Clear(); ClearTags();
         cam.cullingMask = ~0;
@@ -358,7 +358,7 @@ public class GameController : MonoBehaviour
         // build-in animation: blocks drop onto the water row by row
         foreach (var b in blocks) { b.appear = 0; b.delay = 0.15f + (b.p.y - TY) / TH * 0.7f + UnityEngine.Random.value * 0.08f; }
         foreach (var b in blocks) MakeView(b);
-        foreach (var cb in blocks) if (cb.type == "chest" && cb.view != null) cb.tag = MakeTag("+2 vịt", new Color(1f, 0.7f, 0.2f), true);
+        foreach (var cb in blocks) if (cb.type == "chest" && cb.view != null) cb.tag = MakeTag("2 vịt", new Color(1f, 0.7f, 0.2f), true);
         if (level <= 19) foreach (var cb in blocks) if (cb.type == "ring" && cb.view != null) cb.tag = MakeTag("ĐẨY TRƯỢT", new Color(1f, 0.42f, 0.4f), false);
         if (level <= 16) foreach (var cb in blocks) if (cb.type == "gold" && cb.mvAmp > 0 && cb.view != null) cb.tag = MakeTag("+1 LƯỢT", new Color(0.95f, 0.65f, 0.1f), false);
         // water colour by chapter: the bath changes as you progress (blue -> teal -> lavender bubble bath; hard = deeper)
@@ -1092,10 +1092,7 @@ public class GameController : MonoBehaviour
                         if (newBoost) { FxKit.Shockwave(W(mid), 2.6f, new Color(1f, 0.85f, 0.3f, 0.9f), 0.35f); FxKit.StarBurst(W(mid, 0.4f), 8); }
                         Splash(mid, 8); FxKit.Sparkle(W(mid), Color.white, 8); AddRing(mid, 38 + Mathf.Min(pushes, 6) * 6, new Color(0.55f, 0.95f, 1f, 0.75f)); Shake(0.15f); HitStop(0.03f); pushes++; shotSmash++; comboPulse = 0.18f;
                         PopText(LevelLibrary.Unlocked("zap", level) && pushes == ZAP_PUSHES ? "ĐỦ 3 CỐC → VỊT SÉT!" : pushes == 1 ? "PHÁ x2!" : LevelLibrary.Unlocked("zap", level) && pushes < ZAP_PUSHES ? "CỐC! " + pushes + "/" + ZAP_PUSHES : "CỐC x" + pushes + "!", mid, pushes == 1 ? new Color(1f, 0.85f, 0.3f) : Color.white, 46 + Mathf.Min(20, pushes * 4));
-                        if (pushes == 2 && state == "play" && moving && bumpMoves < 2 && !LevelLibrary.IsHard(level))
-                        {   // reward real billiards: two ducks bumped in one shot gives the move back (twice per level: packed ducks can't farm it)
-                            bumpMoves++; moves++; movesPulse = 0.45f; PopText("+1 LƯỢT!", mid + new Vector2(0, -70), new Color(0.45f, 0.95f, 0.5f), 56); Sfx.Play("coin", 0.9f, 1.3f);
-                        }
+                        // (no move refund for bumping ducks any more: the move budget is the puzzle)
                         Sfx.Play(pushes % 2 == 1 ? "quack" : "squeak", 0.9f, 1f + pushes * 0.08f); Sfx.Play("thud", 0.5f, 1.35f);   // the "clack" has weight
                     }
                 }
@@ -1237,8 +1234,7 @@ public class GameController : MonoBehaviour
             case "gold":
                 if (state == "play")
                 {
-                    moves++; movesPulse = 0.45f; SpawnCoin(b.p); SpawnCoin(b.p + Vector2.one * 12);
-                    PopText("+1 LƯỢT!", b.p + new Vector2(0, -40), new Color(1f, 0.85f, 0.3f), 60);
+                    SpawnCoin(b.p); SpawnCoin(b.p + Vector2.one * 12); SpawnCoin(b.p - Vector2.one * 12); rushCoins += 10;   // coins only, no extra move
                     FxKit.StarBurst(W(b.p, 0.4f), 16); Sfx.Play("coin", 0.9f, 1.2f); Sfx.Play("star", 0.6f, 1.4f);
                 }
                 break;
@@ -1249,7 +1245,7 @@ public class GameController : MonoBehaviour
                 if (pl != null && pl.falling <= 0 && pl.screws.All(s => !s.alive)) { pl.falling = 0.0001f; PopText("RƠI XUỐNG!", pl.p, new Color(1f, 0.88f, 0.3f), 56); Later(0.35f, () => Crash(pl)); }
                 break;
             case "chest":
-                HitStop(0.06f); Shake(0.3f); PopText("+2 Vịt!", b.p, new Color(1f, 0.88f, 0.3f), 56); Sfx.Play("coin"); FxKit.StarBurst(W(b.p, 0.5f));
+                HitStop(0.06f); Shake(0.3f); PopText("Bung 2 vịt!", b.p, new Color(1f, 0.88f, 0.3f), 50); Sfx.Play("coin"); FxKit.StarBurst(W(b.p, 0.5f));
                 for (int i = 0; i < 2; i++)
                 {
                     // they burst out fast and powered up (break 2 hits per touch), then STAY in the tub as billiard balls
@@ -1257,7 +1253,6 @@ public class GameController : MonoBehaviour
                     var aim = b.hitDir.sqrMagnitude > 1 ? b.hitDir.normalized : Vector2.down;
                     nd.v = Rot(aim, i == 0 ? -0.55f : 0.55f) * 950f; nd.stretch = 0.2f;
                 }
-                if (state == "play") { moves += 2; movesPulse = 0.45f; trayDirty = true; trayPulse = 1f; }   // ...and two more ducks land in the tray
                 break;
             case "boss":
                 HitStop(0.15f); Shake(0.9f); slowTimer = 1f; Flash(0.7f); camZoom = 1f; BigText("HẠ VUA BÁNH QUY!", new Color(1f, 0.88f, 0.3f)); FxKit.Confetti(W(b.p, 1f), 3f, 80); bossKilled = true; Sfx.Play("boom"); Sfx.Vibrate();
@@ -1798,7 +1793,7 @@ public class GameController : MonoBehaviour
             foreach (var tr in TIERS) if (n >= tr.need && LevelLibrary.Unlocked(tr.kind, level)) { HatchSpecial(tr.kind, tr.name, tr.col); given = true; break; }
             if (!given && pushes >= ZAP_PUSHES && LevelLibrary.Unlocked("zap", level)) HatchSpecial("zap", "VỊT SÉT", new Color(0.45f, 0.85f, 1f));
         }
-        int bonus = n >= 30 && !LevelLibrary.IsHard(level) ? 1 : 0;   // hard levels: the move budget is the puzzle, no refunds
+        int bonus = 0;   // no move refunds anywhere: the move budget is the puzzle
         if (bonus > 0 && state == "play" && GoalsLeft() > 0)
         {
             moves += bonus; movesPulse = 0.35f;
@@ -1889,7 +1884,7 @@ public class GameController : MonoBehaviour
     {
         var g = new List<string> { "<b>PHÁ SẠCH BỒN</b>", "<size=40>đập vỡ hết " + GoalsLeft() + " món</size>" };
         introTitle.text = LevelLibrary.Title(level);
-        introTitle.color = hardLevel ? new Color(1f, 0.35f, 0.3f) : new Color(0.6f, 0.53f, 0.93f);
+        introTitle.color = level > LevelLibrary.Onboarding && level <= LevelLibrary.Count ? LevelLibrary.TierColor(LevelLibrary.Tier(level)) : new Color(0.27f, 0.56f, 0.93f);
         // reminder of the combo ducks the player has already unlocked
         var known = LevelLibrary.Specials.Where(s => LevelLibrary.Unlocked(s.kind, level) && LevelLibrary.NewSpecialAt(level) != s).ToList();
         string combos = "";   // no combo recipe reminder on every level (players found it patronising); the COMBO ? guide has it
@@ -1907,7 +1902,7 @@ public class GameController : MonoBehaviour
             // two short lines: the idea of the level, then key / rule / goal
             introBody.text = "<b>" + L.hint + "</b>\n<size=28><color=#a14a00>"
                 + (keyName != "" && level > LevelLibrary.Onboarding ? "Chìa khoá: <b>" + keyName.Split(':')[0] + "</b> · " : "")
-                + (LevelLibrary.IsHard(level) ? "<color=#b0283c>Màn khó</color> · " : "")
+                + "<color=" + LevelLibrary.TierHex(LevelLibrary.Tier(level)) + ">" + LevelLibrary.TierName(LevelLibrary.Tier(level)) + "</color> · "
                 + GoalsLeft() + " món · <color=#c98a00>3 sao: " + par3 + " vịt</color></color></size>";
             introMax = introTimer = level <= LevelLibrary.Onboarding || level == 19 || level == 23 ? 5f : 4.5f;
         }
@@ -3451,13 +3446,13 @@ public class GameController : MonoBehaviour
             string use = sp.kind == "bomb" ? "nổ tung" : sp.kind == "zap" ? "phóng sét" : sp.kind == "rocket" ? "xuyên thẳng" : "sét 16 món";
             sb.Append(ok ? "• <b>" + Cap(sp.name) + "</b> (" + need + "): " + use + "\n" : "• <color=#6f6890>" + Cap(sp.name) + " – màn " + sp.level + "</color>\n");
         }
-        sb.Append("\n• Húc vịt: phá x2 · húc 2 con: +1 lượt\n• Nảy tường: điểm x2\n• Đầy FRENZY: bắn 5 vịt");
+        sb.Append("\n• Húc vịt: phá x2\n• Nảy tường: điểm x2\n• Đầy FRENZY: bắn 5 vịt");
         if (level >= 17 && !LevelLibrary.IsSandbox(level)) sb.Append("\n• Phao: bắn trúng là trượt đi");
         if (whirls.Count > 0) sb.Append("\n• Xoáy nước: bẻ cong đường bay");
         if (flows.Count > 0) sb.Append("\n• Dòng chảy: đẩy vịt theo mũi tên");
         if (portals.Count > 0) sb.Append("\n• Cống: vào 1 đầu, ra đầu kia");
         if (blocks.Any(b => b.type == "ice" && b.alive)) sb.Append("\n• Băng: cần 2 cú");
-        if (blocks.Any(b => b.type == "gold" && b.mvAmp > 0 && b.alive)) sb.Append("\n• Xu vàng trôi: trúng = +1 lượt");
+        if (blocks.Any(b => b.type == "gold" && b.mvAmp > 0 && b.alive)) sb.Append("\n• Xu vàng trôi: trúng = thêm xu");
         guideBody.text = sb.ToString();
         guideRoot.gameObject.SetActive(true); guideRoot.SetAsLastSibling(); Time.timeScale = 0f;
     }
