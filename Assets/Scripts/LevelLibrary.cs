@@ -167,18 +167,21 @@ public static partial class LevelLibrary
     static BumperDef BumperL(float y, float h = 140) => new BumperDef { x = 32, y = y, w = 12, h = h };
     static BumperDef BumperR(float y, float h = 140) => new BumperDef { x = 496, y = y, w = 12, h = h };
 
+    // Move budgets re-measured with the smart bot (picks dock + duck kind, 5 runs per level, unlimited moves):
+    // normal levels ~ bot median + 2-3 (combo/chest bonus moves add more slack in play), onboarding a bit more,
+    // hard levels (10/15/20/25/30) ~ bot median + 1-2 and no bonus moves. The old table was 2-5x too generous on many levels.
     static readonly Dictionary<int, int> MovesTable = new Dictionary<int, int>
     {
-        { 4, 15 }, { 5, 13 }, { 6, 6 }, { 7, 12 }, { 8, 19 }, { 9, 8 }, { 10, 15 }, { 11, 23 }, { 12, 5 }, { 13, 6 }, { 14, 9 }, { 15, 18 },
-        { 16, 6 }, { 17, 18 }, { 18, 6 }, { 19, 11 }, { 20, 8 }, { 21, 6 }, { 22, 6 }, { 23, 7 }, { 24, 14 }, { 25, 12 },
-        { 26, 7 }, { 27, 9 }, { 28, 13 }, { 29, 8 }, { 30, 15 },
+        { 1, 7 }, { 2, 9 }, { 3, 7 }, { 4, 8 }, { 5, 12 }, { 6, 5 }, { 7, 13 }, { 8, 15 }, { 9, 6 }, { 10, 12 },
+        { 11, 11 }, { 12, 5 }, { 13, 7 }, { 14, 7 }, { 15, 18 }, { 16, 6 }, { 17, 16 }, { 18, 4 }, { 19, 5 }, { 20, 9 },
+        { 21, 5 }, { 22, 5 }, { 23, 4 }, { 24, 6 }, { 25, 9 }, { 26, 5 }, { 27, 10 }, { 28, 14 }, { 29, 4 }, { 30, 15 },
     };
-    // (3-star par, 2-star par) in shots: ~best 20% / median of bot runs - beat it by finding the key shots
+    // (3-star par, 2-star par) in shots: ~best bot run / median bot run
     static readonly Dictionary<int, (int, int)> ParTable = new Dictionary<int, (int, int)>
     {
-        { 1, (4, 5) }, { 2, (4, 5) }, { 3, (3, 4) }, { 4, (8, 11) }, { 5, (9, 10) }, { 6, (3, 4) }, { 7, (6, 8) }, { 8, (10, 13) }, { 9, (4, 5) },
-        { 11, (14, 16) }, { 12, (2, 3) }, { 13, (3, 4) }, { 14, (5, 6) }, { 16, (3, 4) }, { 17, (11, 13) }, { 18, (2, 3) }, { 19, (5, 7) },
-        { 21, (3, 4) }, { 22, (3, 4) }, { 23, (4, 5) }, { 24, (7, 8) }, { 26, (4, 5) }, { 27, (5, 6) }, { 28, (7, 9) }, { 29, (3, 4) },
+        { 1, (4, 5) }, { 2, (5, 6) }, { 3, (4, 5) }, { 4, (4, 5) }, { 5, (8, 9) }, { 6, (3, 4) }, { 7, (6, 8) }, { 8, (10, 13) }, { 9, (3, 4) },
+        { 11, (6, 8) }, { 12, (3, 4) }, { 13, (4, 5) }, { 14, (5, 6) }, { 16, (3, 4) }, { 17, (11, 13) }, { 18, (2, 3) }, { 19, (3, 4) },
+        { 21, (3, 4) }, { 22, (3, 4) }, { 23, (2, 3) }, { 24, (4, 5) }, { 26, (3, 4) }, { 27, (5, 7) }, { 28, (9, 11) }, { 29, (2, 3) },
     };
 
     static LevelDef L(int moves, string hint, params (float x, float y, string k)[] ducks)

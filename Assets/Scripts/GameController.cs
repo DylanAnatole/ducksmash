@@ -1588,7 +1588,8 @@ public class GameController : MonoBehaviour
         {
             var v = dockViews[i]; if (!v) continue;
             bool act = i == dock;   // still and calm: no spinning or pulsing (it read as jitter under the duck)
-            float s = act ? 1.06f : 0.88f;
+            bool suggest = hintShown && hintReady && i == hintBestDock && i != dock;   // the hint's better dock breathes gently
+            float s = act ? 1.06f : suggest ? 1.0f + Mathf.Sin(Time.unscaledTime * 5f) * 0.08f : 0.88f;
             v.localScale = Vector3.Lerp(v.localScale, Vector3.one * s, 1 - Mathf.Exp(-10f * dt));
         }
     }
@@ -2160,14 +2161,41 @@ public class GameController : MonoBehaviour
         return true;
     }
 
+    // pointer source: the real mouse/touch, or a scripted pointer for automated tests (same code path)
+    bool simInput, simDown, simHeld, simUp; Vector3 simPos;
+    bool PDown() => simInput ? simDown : Input.GetMouseButtonDown(0);
+    bool PHeld() => simInput ? simHeld : Input.GetMouseButton(0);
+    bool PUp() => simInput ? simUp : Input.GetMouseButtonUp(0);
+    Vector3 PPos() => simInput ? simPos : Input.mousePosition;
+    static bool SimOverUI(Vector3 pos)
+    {
+        if (EventSystem.current == null) return false;
+        var ped = new PointerEventData(EventSystem.current) { position = pos }; var hits = new List<RaycastResult>();
+        EventSystem.current.RaycastAll(ped, hits); return hits.Count > 0;
+    }
+    // test: press where the duck is DRAWN, pull `pull` screen px in screen direction `dir`, release. Returns "launched" or why not.
+    public string DebugTouchShot(Vector2 dir, float pull)
+    {
+        if (loaded == null || loaded.view == null) return "no duck";
+        var sp = (Vector2)cam.WorldToScreenPoint(loaded.view.position + Vector3.up * 0.45f);
+        int before = shotsTaken; simInput = true;
+        simPos = sp; simDown = true; simHeld = true; simUp = false; HandleInput(); simDown = false;
+        bool grabbed = drag != null;
+        for (int i = 1; i <= 10; i++) { simPos = sp + dir.normalized * pull * i / 10f; HandleInput(); }
+        simHeld = false; simUp = true; HandleInput(); simUp = false; simInput = false;
+        return (grabbed ? "grabbed" : "NOT grabbed") + " at " + sp + (shotsTaken > before || moving ? " launched" : " no shot") + " overUI " + SimOverUI(sp);
+    }
+
     void HandleInput()
     {
-        if (introTimer > 0) { if (Input.GetMouseButtonDown(0)) introTimer = Mathf.Min(introTimer, 0.25f); return; }
+        // the intro card never eats a touch: the first press hides it AND grabs the duck / picks a dock right away
+        // (it used to only dismiss the card for ~5 s - with the duck far from the card, e.g. top docks in level 10, taps "didn't register")
+        if (introTimer > 0) { if (PDown()) { introTimer = 0; introRoot.gameObject.SetActive(false); } else return; }
         if (state != "play") return;
-        bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject() ||
+        bool overUI = simInput ? SimOverUI(simPos) : EventSystem.current != null && EventSystem.current.IsPointerOverGameObject() ||
                       (Input.touchCount > 0 && EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId));
-        if (Input.GetMouseButtonDown(0) && !overUI && !moving && target == null && TryPickRugDuck(Input.mousePosition)) return;
-        if (Input.GetMouseButtonDown(0) && !overUI && !moving && ScreenToSim(Input.mousePosition, out var p))
+        if (PDown() && !overUI && !moving && target == null && TryPickRugDuck(PPos())) return;
+        if (PDown() && !overUI && !moving && ScreenToSim(PPos(), out var p))
         {
             if (target != null) { if (p.y > TY && p.y < TY + TH) ApplyTarget(p); return; }
             Duck best = null;
@@ -2182,8 +2210,8 @@ public class GameController : MonoBehaviour
             drag = best; dragPt = dragSm = p;
             if (best != null) { best.squash = 0.12f; Sfx.Play("squeak", 0.35f, 1.5f); }
         }
-        if (drag != null && Input.GetMouseButton(0) && ScreenToSim(Input.mousePosition, out var q)) dragPt = q;
-        if (drag != null && Input.GetMouseButtonUp(0))
+        if (drag != null && PHeld() && ScreenToSim(PPos(), out var q)) dragPt = q;
+        if (drag != null && PUp())
         {
             var pv = Pull(); var d = drag; drag = null; d.pullVis = 0;
             if (pv.z >= CANCEL_PULL) Launch(d, AimAssist(d, new Vector2(pv.x, pv.y), MAX_PULL) * MAX_SPEED);   // same full power every shot: only the direction is yours
@@ -2317,7 +2345,7 @@ public class GameController : MonoBehaviour
     void UpdateHint(float rdt)
     {
         UpdateKeys(rdt);
-        if (bumpTeach && state == "play" && !moving && drag == null && introTimer <= 0 && shotsTaken == 0 && !Input.GetMouseButton(0) && ducks.Count >= 2)
+        if (bumpTeach && state == "play" && !moving && drag == null && introTimer <= 0 && shotsTaken == 0 && !PHeld() && ducks.Count >= 2)
         {   // one-time lesson: show a shot from one duck straight into another (why there are several ducks)
             int ia = -1, ib = -1; float best = 1e9f;
             for (int i = 0; i < ducks.Count; i++) for (int j = 0; j < ducks.Count; j++)
@@ -2334,7 +2362,7 @@ public class GameController : MonoBehaviour
         }
         bool can = state == "play" && !moving && drag == null && introTimer <= 0 && target == null && ducks.Count > 0
                    && !popupRoot.gameObject.activeSelf && (guideRoot == null || !guideRoot.gameObject.activeSelf) && Time.timeScale > 0;
-        if (!can || Input.GetMouseButton(0)) { idleT = 0; hintReady = false; hintSearch = -1; if (hintShown) HideHint(); return; }
+        if (!can || PHeld()) { idleT = 0; hintReady = false; hintSearch = -1; if (hintShown) HideHint(); return; }
         idleT += rdt;
         // help arrives early: before the first shot and right after a weak one (so a stuck player always learns where to aim)
         float hintAt = shotsTaken == 0 || lastShotWeak ? 2.5f : 6f;
@@ -2356,8 +2384,12 @@ public class GameController : MonoBehaviour
             if (hintSearch >= total)
             {
                 hintSearch = -1; hintReady = hintBestDuck >= 0;
-                if (hintReady && hintBestDock != dock) { MoveToDock(hintBestDock); hintReady = true; idleT = hintAt + 1f; PopText("Thử bến này!", loaded.p + new Vector2(0, -70), new Color(0.6f, 1f, 0.6f), 44); }
-                if (hintReady) { hintBestDuck = ducks.IndexOf(loaded); loaded.p = docks[dock]; PredictShot(loaded, hintBestDir, hintPath); }
+                if (hintReady)
+                {
+                    hintBestDuck = ducks.IndexOf(loaded); var home2 = loaded.p;
+                    loaded.p = docks[hintBestDock]; PredictShot(loaded, hintBestDir, hintPath); loaded.p = home2;   // path drawn from the suggested dock
+                    if (hintBestDock != dock) PopText("Chạm bến này!", docks[hintBestDock] + new Vector2(0, -62), new Color(0.6f, 1f, 0.6f), 40);
+                }
             }
         }
         if (hintReady && idleT > hintAt + 1.5f && hintBestDuck >= 0 && hintBestDuck < ducks.Count)

@@ -113,5 +113,10 @@
     };
     document.body.appendChild(s);
   </script>
+  <script>
+    // phones: a drag that starts on the game must never turn into page scroll / pull-to-refresh
+    // (pulling a top-row duck UP is exactly the gesture browsers like to steal)
+    document.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
+  </script>
 </body>
 </html>
