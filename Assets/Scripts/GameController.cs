@@ -545,7 +545,6 @@ public class GameController : MonoBehaviour
         Art.Prim(PrimitiveType.Cube, root, new Vector3(0, -0.28f, bottom), new Vector3(6.4f, 0.12f, 2.0f), mat);
         foreach (float x in new[] { -3.2f, 3.2f }) Art.Prim(PrimitiveType.Cylinder, root, new Vector3(x, -0.28f, bottom), new Vector3(2.0f, 0.065f, 2.0f), mat);
         // plain shelf behind the faucet
-        Art.Prim(PrimitiveType.Cube, root, new Vector3(0, -0.1f, top + 0.3f), new Vector3(w + 2.5f, 0.5f, 1.6f), Art.Mat(new Color(0.96f, 0.95f, 0.93f), 0.5f));
         rugZ = bottom;
         Art.Bake(root, "decor", 0.5f, OUTLINE_W);
     }
@@ -1915,13 +1914,13 @@ public class GameController : MonoBehaviour
         {
             introTitle.text = "VỊT MỚI: " + Cap(nw.name).Replace("Vịt ", "").ToUpper();
             introBody.text = "<b>Cách tạo:</b> " + nw.how + "\n<b>Tác dụng:</b> " + nw.use + "\n<size=26><color=#a14a00>Tặng 1 con để thử ngay!</color></size>";
-            if (introIcon != null) { introIcon.texture = DuckIcon(nw.kind); introIcon.gameObject.SetActive(true); UIKit.Place(introBody.rectTransform, 0.5f, 0.5f, 70, -36, 780, 150); }
+            if (introIcon != null) { introIcon.texture = DuckIcon(nw.kind); introIcon.gameObject.SetActive(true); UIKit.Place(introBody.rectTransform, 0.5f, 0.5f, 70, -30, 780, 160); }
             introMax = introTimer = 6f;
             traySpecials.Add(nw.kind); if (moves < traySpecials.Count + 1) moves = startMoves = traySpecials.Count + 1;
             loadKind = nw.kind; LoadDuck(false); trayDirty = true;
             hint = "Thử ngay " + Cap(nw.name) + "!";
         }
-        if (nw == null && introIcon != null) { introIcon.gameObject.SetActive(false); UIKit.Place(introBody.rectTransform, 0.5f, 0.5f, 0, -36, 920, 150); }
+        if (nw == null && introIcon != null) { introIcon.gameObject.SetActive(false); UIKit.Place(introBody.rectTransform, 0.5f, 0.5f, 0, -30, 920, 160); }
         introBody.verticalOverflow = VerticalWrapMode.Overflow; introBody.horizontalOverflow = HorizontalWrapMode.Wrap;
         introRoot.gameObject.SetActive(true);
     }
@@ -3219,21 +3218,21 @@ public class GameController : MonoBehaviour
         // FRENZY meter: how much is banked, what a full bar gives, and what this shot will add
         // FRENZY meter: labelled, with an icon and the count; tap = how it works
         var fbg = UIKit.SkinPanel(hud, "bar_track", "FrenzyRow", 1.3f); feverBar = fbg.rectTransform; fbg.raycastTarget = false;
-        UIKit.Place(feverBar, 0.5f, 1, 20, -190, 600, 36);   // compact: sits just under the top row, centred on the tub
+        UIKit.Place(feverBar, 0.5f, 1, 20, -222, 640, 44);   // compact: sits just under the top row, centred on the tub
         var ftrack = UIKit.Rect("Track", feverBar); UIKit.Stretch(ftrack, 4, 4, 4, 4);
         feverGhost = UIKit.Panel(ftrack, new Color(1f, 1f, 1f, 0.35f), "Ghost").rectTransform;
         var ff = UIKit.Panel(ftrack, new Color(1f, 0.42f, 0.68f), "Fill"); feverFill = ff.rectTransform;
         if (UIKit.Skin("btn_white") != null) { ff.sprite = UIKit.Skin("btn_white"); ff.type = Image.Type.Sliced; ff.pixelsPerUnitMultiplier = 4.5f; }
         foreach (var r in new[] { feverGhost, feverFill }) { r.anchorMin = Vector2.zero; r.anchorMax = new Vector2(0, 1); r.offsetMin = r.offsetMax = Vector2.zero; r.pivot = new Vector2(0, 0.5f); }
-        var fIcon = UIKit.Dot(feverBar, new Color(1f, 0.42f, 0.68f), "FrenzyIcon"); UIKit.Place(fIcon.rectTransform, 0, 0.5f, -14, 0, 58, 58); fIcon.raycastTarget = false;
+        var fIcon = UIKit.Dot(feverBar, new Color(1f, 0.42f, 0.68f), "FrenzyIcon"); UIKit.Place(fIcon.rectTransform, 0, 0.5f, -10, 0, 64, 64); fIcon.raycastTarget = false;
         var fo = fIcon.gameObject.AddComponent<Outline>(); fo.effectColor = Color.white; fo.effectDistance = new Vector2(3, -3);
-        var fDuck = UIKit.Rect("Duck", fIcon.transform).gameObject.AddComponent<RawImage>(); fDuck.raycastTarget = false; UIKit.Place(fDuck.rectTransform, 0.5f, 0.5f, 0, 2, 40, 40); fDuck.texture = DuckIcon("normal");
+        var fDuck = UIKit.Rect("Duck", fIcon.transform).gameObject.AddComponent<RawImage>(); fDuck.raycastTarget = false; UIKit.Place(fDuck.rectTransform, 0.5f, 0.5f, 0, 2, 44, 44); fDuck.texture = DuckIcon("normal");
         
-        feverTxt = UIKit.Outlined(UIKit.Label(feverBar, "FRENZY 0/70", 22, Color.white), new Color(0.3f, 0.05f, 0.2f, 0.55f), 2); feverTxt.rectTransform.offsetMin = new Vector2(24, 0);
+        feverTxt = UIKit.Outlined(UIKit.Label(feverBar, "FRENZY 0/70", 26, Color.white), new Color(0.3f, 0.05f, 0.2f, 0.55f), 2); feverTxt.rectTransform.offsetMin = new Vector2(24, 0);
         var fl = UIKit.Label(feverBar, "", 1, Color.clear); fl.gameObject.SetActive(false);
         feverHint = UIKit.Label(feverBar, "", 1, Color.clear); feverHint.enabled = false;
         comboRow = null;   // no persistent combo explainer: each special duck is introduced on its unlock level
-        feverPop = UIKit.Outlined(UIKit.Label(hud, "", 40, new Color(1f, 0.55f, 0.8f)), Color.white, 3); UIKit.Place(feverPop.rectTransform, 0.5f, 1, 300, -210, 400, 60);
+        feverPop = UIKit.Outlined(UIKit.Label(hud, "", 40, new Color(1f, 0.55f, 0.8f)), Color.white, 3); UIKit.Place(feverPop.rectTransform, 0.5f, 1, 300, -268, 400, 60);
         feverPop.raycastTarget = false; feverPop.gameObject.SetActive(false);
         streakTxt = UIKit.Outlined(UIKit.Label(hud, "", 26, new Color(1f, 0.85f, 0.4f), TextAnchor.MiddleRight), new Color(0.25f, 0.2f, 0.45f), 2); UIKit.Place(streakTxt.rectTransform, 1, 1, -170, -210, 300, 36); streakTxt.enabled = false;
         // boss bar
@@ -3248,26 +3247,26 @@ public class GameController : MonoBehaviour
         bigTxt = UIKit.Outlined(UIKit.Label(hud, "", 84, Color.white), Ink, 5); UIKit.Place(bigTxt.rectTransform, 0.5f, 0.5f, 0, 120, 1000, 200);
         bigTxt.color = new Color(1, 1, 1, 0);
         // hint
-        hintPanel = UIKit.SkinPanel(hud, "pill_cream", "Hint", 1.6f).rectTransform; UIKit.Place(hintPanel, 0.5f, 0, 0, 176, 940, 66);
+        hintPanel = UIKit.SkinPanel(hud, "pill_cream", "Hint", 1.6f).rectTransform; UIKit.Place(hintPanel, 0.5f, 0, 0, 186, 940, 62);
         hintTxt = UIKit.Label(hintPanel, "", 30, Ink); hintTxt.fontStyle = FontStyle.Bold; hintTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
         BuildTray();
         // booster bar
         var bar = UIKit.Rect("Boosters", hud); UIKit.Place(bar, 0.5f, 0, 0, 80, 1060, 136);
-        var mapBtn = UIKit.Btn(bar, "BẢN\nĐỒ", Purple, Color.white, 26, App.ShowMap, "Map");
-        UIKit.Place((RectTransform)mapBtn.transform, 0, 0.5f, 92, 0, 150, 116); UIKit.BtnText(mapBtn).lineSpacing = 0.9f;
+        var mapBtn = UIKit.Btn(bar, "BẢN ĐỒ", Purple, Color.white, 26, App.ShowMap, "Map");
+        UIKit.Place((RectTransform)mapBtn.transform, 0, 0.5f, 92, 4, 156, 116); UIKit.BtnText(mapBtn).lineSpacing = 0.9f;
         string[] keys = { "hammer", "bomb", "moves" };
         for (int i = 0; i < 3; i++)
         {
             string k = keys[i];
             var b = UIKit.Btn(bar, "", Color.white, Color.white, 24, () => UseBooster(k), "Boost_" + k);
-            UIKit.Place((RectTransform)b.transform, 0, 0.5f, 430 + i * 200, 4, 160, 128);
+            UIKit.Place((RectTransform)b.transform, 0, 0.5f, 350 + i * 190, 4, 164, 128);
             var bimg = b.GetComponent<Image>();
             if (UIKit.Skin("booster") != null) { bimg.sprite = UIKit.Skin("booster"); bimg.type = Image.Type.Sliced; bimg.color = Color.white; bimg.pixelsPerUnitMultiplier = 1.8f; }
             var lbl = UIKit.BtnText(b); lbl.fontSize = 24; lbl.rectTransform.offsetMin = new Vector2(0, 10); lbl.rectTransform.offsetMax = new Vector2(0, -88);   // name along the bottom
             lbl.alignment = TextAnchor.LowerCenter;
             var bIcon = UIKit.Rect("Icon", b.transform).gameObject.AddComponent<RawImage>(); bIcon.raycastTarget = false;
             UIKit.Place(bIcon.rectTransform, 0.5f, 0.5f, 0, 14, 68, 68); bIcon.texture = BoosterIcon(k);
-            var badge = UIKit.Dot(b.transform, Color.white, "Badge"); UIKit.Place(badge.rectTransform, 1, 1, -8, -8, 54, 54); badge.raycastTarget = false;
+            var badge = UIKit.Dot(b.transform, Color.white, "Badge"); UIKit.Place(badge.rectTransform, 1, 1, -14, -16, 48, 48); badge.raycastTarget = false;
             if (UIKit.Skin("badge_yellow") != null) badge.sprite = UIKit.Skin("badge_yellow"); else badge.color = Yellow;
             var bt = UIKit.Label(badge.transform, "", 26, Ink); boostBadge[k] = bt; boostBadgeImg[k] = badge;
             boostTxt[k] = lbl; boostImg[k] = bimg;
@@ -3307,12 +3306,12 @@ public class GameController : MonoBehaviour
         popB = UIKit.Btn(card, "", Yellow, Ink, 38, OnPopB, "B"); UIKit.Place((RectTransform)popB.transform, 0.5f, 0, -178, 95, 324, 112);
         popC = UIKit.Btn(card, "Bản đồ", Purple, Color.white, 38, () => App.ShowMap(), "C"); UIKit.Place((RectTransform)popC.transform, 0.5f, 0, 178, 95, 324, 112);
         // level intro card
-        introRoot = UIKit.Rect("Intro", hud); UIKit.Place(introRoot, 0.5f, 0, 0, 340, 1000, 240);
+        introRoot = UIKit.Rect("Intro", hud); UIKit.Place(introRoot, 0.5f, 0, 0, 356, 1000, 272);
         var ic = UIKit.SkinPanel(introRoot, "board", "IntroCard", 1.8f); UIKit.Stretch(ic.rectTransform);
         var ish = ic.gameObject.AddComponent<Shadow>(); ish.effectColor = new Color(0.3f, 0.2f, 0.5f, 0.3f); ish.effectDistance = new Vector2(0, -12);
         introPlate = UIKit.SkinPanel(introRoot, "bar_blue", "IntroPlate", 0.8f); UIKit.Place(introPlate.rectTransform, 0.5f, 1, 0, -8, 520, 88);
         introTitle = UIKit.Outlined(UIKit.Label(introPlate.transform, "", 40, Color.white), new Color(0.1f, 0.1f, 0.3f, 0.6f), 2); introTitle.rectTransform.offsetMin = new Vector2(0, 4);
-        introBody = UIKit.Label(introRoot, "", 32, Ink); UIKit.Place(introBody.rectTransform, 0.5f, 0.5f, 0, -36, 920, 150);
+        introBody = UIKit.Label(introRoot, "", 32, Ink); UIKit.Place(introBody.rectTransform, 0.5f, 0.5f, 0, -30, 920, 160);
         introIcon = UIKit.Rect("NewDuck", introRoot).gameObject.AddComponent<RawImage>(); introIcon.raycastTarget = false; UIKit.Place(introIcon.rectTransform, 0, 0.5f, 110, -30, 130, 130); introIcon.gameObject.SetActive(false);
         introRoot.gameObject.SetActive(false);
         // tutorial hand (white fingertip)

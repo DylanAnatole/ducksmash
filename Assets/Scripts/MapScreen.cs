@@ -55,7 +55,7 @@ public class MapScreen : MonoBehaviour
         // section banners
         Banner("HƯỚNG DẪN  ·  MÀN 1–5", 150, NodePos(1).y - 20, Teal);
         Banner("THỬ THÁCH  ·  MÀN 6–" + LevelLibrary.Count, -200, NodePos(6).y - 90, PurpleDark);
-        Banner("ĐÍCH: MÀN " + LevelLibrary.Count + " SIÊU KHÓ", 0, NodePos(LevelLibrary.Count).y + 340, new Color(1f, 0.55f, 0.3f));   // end of the road
+        Banner("ĐÍCH: MÀN " + LevelLibrary.Count + " · CỰC KHÓ", 0, NodePos(LevelLibrary.Count).y + 340, new Color(1f, 0.55f, 0.3f));   // end of the road
 
         for (int n = 1; n <= LevelLibrary.Count; n++)
         {
@@ -76,14 +76,14 @@ public class MapScreen : MonoBehaviour
             }
             var num = UIKit.Outlined(UIKit.Label(img.transform, n.ToString(), boss ? 64 : 58, Color.white), Ink, 3);
             // every level after the tutorial shows its difficulty tier; tutorial levels show what they teach
-            var tag = UIKit.Label(img.transform, n > LevelLibrary.Onboarding ? LevelLibrary.TierName(tier).ToUpper() : LevelLibrary.NewSpecialAt(n) != null ? "VỊT MỚI" : "", 28, Color.white); tag.fontSize = 24; tag.rectTransform.offsetMin = new Vector2(0, -size * 0.6f); tag.rectTransform.offsetMax = new Vector2(0, -size * 0.4f);   // pill sits on the node rim (no clash with the next node)
+            var tag = UIKit.Label(img.transform, n > LevelLibrary.Onboarding ? LevelLibrary.TierName(tier).ToUpper() : LevelLibrary.NewSpecialAt(n) != null ? "VỊT MỚI" : "", 28, Color.white); tag.fontSize = 28; tag.rectTransform.offsetMin = new Vector2(0, -size * 0.62f); tag.rectTransform.offsetMax = new Vector2(0, -size * 0.38f);   // pill sits on the node rim (no clash with the next node)
             if (tag.text.Length > 0)
             {   // pill behind the tag text
                 var pill = UIKit.Panel(img.transform, n > LevelLibrary.Onboarding ? LevelLibrary.TierColor(tier) : Ink, "TagPill"); pill.raycastTarget = false;
                 string ps = n <= LevelLibrary.Onboarding ? "bar_blue" : tier == 0 ? "bar_green" : tier == 1 ? "bar_blue" : tier == 2 ? "pill_red" : "pill_purple";
                 if (UIKit.Skin(ps) != null) { pill.sprite = UIKit.Skin(ps); pill.type = Image.Type.Sliced; pill.color = Color.white; pill.pixelsPerUnitMultiplier = 2.2f; }
                 UIKit.Outlined(tag, new Color(0.1f, 0.1f, 0.3f, 0.6f), 2);
-                var prt = pill.rectTransform; prt.anchorMin = prt.anchorMax = new Vector2(0.5f, 0.5f); prt.sizeDelta = new Vector2(tag.text.Length * 15 + 36, 40); prt.anchoredPosition = new Vector2(0, -size * 0.5f);
+                var prt = pill.rectTransform; prt.anchorMin = prt.anchorMax = new Vector2(0.5f, 0.5f); prt.sizeDelta = new Vector2(tag.text.Length * 18 + 48, 50); prt.anchoredPosition = new Vector2(0, -size * 0.5f);
                 tag.transform.SetAsLastSibling();
             }
             var st = UIKit.Outlined(UIKit.Label(img.transform, "", 44, Yellow), Ink, 2); st.rectTransform.offsetMin = new Vector2(0, size * 0.62f); st.rectTransform.offsetMax = new Vector2(0, size * 0.62f);
@@ -94,7 +94,7 @@ public class MapScreen : MonoBehaviour
             {
                 var bdg = UIKit.Dot(img.transform, Color.white, "BadgeBg"); bdg.raycastTarget = false;
                 var bgrt = bdg.rectTransform; bgrt.anchorMin = bgrt.anchorMax = new Vector2(0.5f, 0.5f); bgrt.sizeDelta = new Vector2(86, 86);
-                bgrt.anchoredPosition = new Vector2(size * 0.42f, size * 0.36f);
+                bgrt.anchoredPosition = new Vector2(size * 0.52f, size * 0.02f);
                 var badge = UIKit.Rect("ArtBadge", img.transform).gameObject.AddComponent<RawImage>(); badge.raycastTarget = false;
                 var brt = badge.rectTransform; brt.anchorMin = brt.anchorMax = new Vector2(0.5f, 0.5f); brt.sizeDelta = new Vector2(60, 60);
                 brt.anchoredPosition = bgrt.anchoredPosition;
@@ -131,13 +131,13 @@ public class MapScreen : MonoBehaviour
         // bottom dock: album · PLAY · smash levels · sandbox
         var dock = UIKit.SkinPanel(root, "panel", "Dock", 1.4f).rectTransform; UIKit.Place(dock, 0.5f, 0, 0, 105, 1040, 190);
         var dsh = dock.gameObject.AddComponent<Shadow>(); dsh.effectColor = new Color(0.1f, 0.2f, 0.4f, 0.18f); dsh.effectDistance = new Vector2(0, 8);
-        var album = UIKit.Btn(dock, "ALBUM", Teal, Color.white, 32, OpenAlbum, "Album");
+        var album = UIKit.Btn(dock, "ALBUM", Teal, Color.white, 30, OpenAlbum, "Album");
         UIKit.Place((RectTransform)album.transform, 0.5f, 0.5f, -390, 4, 170, 130);
         playBtn = UIKit.Btn(dock, "", new Color(0.3f, 0.75f, 0.4f), Color.white, 46, () => { Sfx.Play("click"); App.StartLevel(Mathf.Min(SaveData.MaxLevel, LevelLibrary.Count)); }, "Play");
         UIKit.Place((RectTransform)playBtn.transform, 0.5f, 0.5f, -95, 4, 380, 140);
-        var smash = UIKit.Btn(dock, "PHÁ\nĐỒ", new Color(0.55f, 0.4f, 0.95f), Color.white, 32, () => { Sfx.Play("click"); App.StartLevel(LevelLibrary.SmashLevel); }, "SmashLevels");
+        var smash = UIKit.Btn(dock, "PHÁ ĐỒ", new Color(0.55f, 0.4f, 0.95f), Color.white, 30, () => { Sfx.Play("click"); App.StartLevel(LevelLibrary.SmashLevel); }, "SmashLevels");
         UIKit.Place((RectTransform)smash.transform, 0.5f, 0.5f, 200, 4, 170, 130);
-        var test = UIKit.Btn(dock, "MÀN\nTHỬ", Red, Color.white, 32, () => { Sfx.Play("click"); App.StartLevel(LevelLibrary.TestLevel); }, "TestLevel");
+        var test = UIKit.Btn(dock, "MÀN THỬ", Red, Color.white, 30, () => { Sfx.Play("click"); App.StartLevel(LevelLibrary.TestLevel); }, "TestLevel");
         UIKit.Place((RectTransform)test.transform, 0.5f, 0.5f, 390, 4, 170, 130);
         foreach (var b in new[] { album, smash, test }) UIKit.BtnText(b).lineSpacing = 0.9f;
 
