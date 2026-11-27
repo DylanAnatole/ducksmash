@@ -2262,11 +2262,46 @@ public class GameController : MonoBehaviour
     int predJump = -1;
 
     // cheap straight-line prediction (same rules as the aim preview); weights chain-reaction blocks higher
+    int predBounces;
+    readonly Stack<Block> chainStack = new Stack<Block>();
+    // how many MORE pieces a broken piece takes with it (bath bomb / TNT blasts, laser rows, domino lines, chained),
+    // mirroring the real rules so the hint picks the shot that really clears the most
+    float ChainValue(Block first)
+    {
+        float extra = 0; chainStack.Clear(); chainStack.Push(first);
+        while (chainStack.Count > 0)
+        {
+            var c = chainStack.Pop();
+            bool blast = c.type == "bathbomb" || c.type == "tnt", laser = c.type == "laser", dom = c.type == "domino";
+            if (c.type == "screw")
+            {   // shelf legs: snap both and the whole shelf crashes, taking everything standing on it
+                bool other = blocks.Any(o => o != c && o.type == "screw" && o.pid == c.pid && o.alive && !simHits.Contains(o));
+                float w = other ? 0.5f : 1f;
+                foreach (var o in blocks) if (o.alive && !o.Hard && o.under != null && o.under.pid == c.pid && !simHits.Contains(o)) { extra += w; if (!other) simHits.Add(o); }
+                continue;
+            }
+            if (!blast && !laser && !dom) continue;
+            float R = c.type == "tnt" ? 95f : 85f; int pow = c.type == "tnt" ? 3 : 2;
+            foreach (var o in blocks)
+            {
+                if (!o.alive || o.Hard || o.falling > 0 || simHits.Contains(o)) continue;
+                bool takes = blast ? (o.p - c.p).sqrMagnitude < R * R && o.hp <= pow
+                           : laser ? (c.dir == "h" ? Mathf.Abs(o.p.y - c.p.y) < 24f : Mathf.Abs(o.p.x - c.p.x) < 24f) && o.hp <= 2
+                           : o.type == "domino" && o.pid == c.pid;
+                if (!takes) continue;
+                simHits.Add(o); extra += 1f;
+                if (o.type == "bathbomb" || o.type == "tnt" || o.type == "laser" || o.type == "domino") chainStack.Push(o);
+            }
+            if (dom && c == first) extra += 1.5f;   // the last tile slams into what's at the end of the line (once per line)
+        }
+        return extra;
+    }
+
     float PredictShot(Duck d, Vector2 dir, List<Vector2> path)
     {
         Vector2 gp = d.p, gv = dir; float len = 260 + MAX_PULL * 4.5f, score = 0; simHits.Clear();
         path?.Clear(); path?.Add(gp);
-        int dmg = d.kind == "rocket" ? 3 : d.Dmg; float r2 = 0; bool jumped = false; if (path != null) predJump = -1;
+        int dmg = d.kind == "rocket" ? 3 : d.Dmg; float r2 = 0; bool jumped = false; if (path != null) predJump = -1; predBounces = 0;
         for (float st = 0; st < len; st += 6)
         {
             gp += gv * 6;
@@ -2280,27 +2315,40 @@ public class GameController : MonoBehaviour
                 {
                     bool inA = (gp - pt.a).sqrMagnitude < PORTAL_R * PORTAL_R, inB = !inA && (gp - pt.b).sqrMagnitude < PORTAL_R * PORTAL_R;
                     if (!inA && !inB) continue;
-                    path?.Add(gp); gp = (inA ? pt.b : pt.a) + gv * 4f; jumped = true; score += 30f;   // a pipe shot is the thing to show off (and the straight-line guess undersells its bounces)
+                    path?.Add(gp); gp = (inA ? pt.b : pt.a) + gv * 4f; jumped = true; score += 1.5f;   // small nudge only: what the duck smashes AFTER the pipe is what counts
                     if (path != null) { predJump = path.Count; path.Add(gp); }   // the hop itself is not drawn
                     break;
                 }
             bool stop = false;
-            for (int i = 0; i < ducks.Count; i++) { var o = ducks[i]; if (o == d) continue; r2 = o.r + d.r; if ((o.p - gp).sqrMagnitude < r2 * r2) { stop = true; score += 2f; break; } }
+            for (int i = 0; i < ducks.Count; i++) { var o = ducks[i]; if (o == d) continue; r2 = o.r + d.r; if ((o.p - gp).sqrMagnitude < r2 * r2) { stop = true; score += 3f; break; } }   // billiards: the bumped duck flies off powered up
             if (!stop)
                 for (int i = 0; i < blocks.Count; i++)
                 {
                     var b = blocks[i];
                     if (!b.alive || Covered(b) || b.falling > 0 || simHits.Contains(b)) continue;
-                    bool hitIt;
+                    bool hitIt; Hit hh;
                     if (b.mvAmp > 0)
                     {   // moving target: where it will be when the duck gets there (same rule as the aim preview)
                         var saved = b.p; b.p.x = b.mvCx + Mathf.Sin(b.mvPhase + st / (MAX_SPEED * 0.85f) * b.mvSp) * b.mvAmp;
-                        hitIt = Collide(gp, d.r, b, out _); b.p = saved;
+                        hitIt = Collide(gp, d.r, b, out hh); b.p = saved;
                     }
-                    else hitIt = Collide(gp, d.r, b, out _);
+                    else hitIt = Collide(gp, d.r, b, out hh);
                     if (!hitIt) continue;
-                    if (!b.Hard && b.hp <= dmg) { simHits.Add(b); len -= 10; score += b.type == "bathbomb" || b.type == "tnt" || b.type == "laser" || b.type == "domino" || b.type == "screw" ? 5f : b.type == "gold" ? 6f : 1f; }
-                    else { if (b.type == "ring" && b.hp > 1) score += 4f; else if (b.type == "boss") score += 3f; stop = true; break; }   // knocking a ring sends it skating; boss hits count
+                    if (!b.Hard && b.hp <= dmg)
+                    {   // breaks: count it AND everything its chain reaction takes with it
+                        simHits.Add(b); len -= 10;
+                        score += (b.type == "gold" ? 6f : b.type == "chest" ? 3f : 1f) + ChainValue(b);
+                    }
+                    else if (b.type == "ring" && b.hp > 1) { score += 4f; stop = true; break; }   // knocking a ring sends it skating
+                    else if (b.type == "boss") { score += 3f; stop = true; break; }
+                    else
+                    {   // won't break (stone, shelf, multi-hit): a dent is worth a little, then the duck bounces on like the real one
+                        if (!b.Hard) score += 0.35f * Mathf.Min(dmg, b.hp);
+                        if (++predBounces > 3) { stop = true; break; }
+                        gp += hh.n * (hh.pen + 1f); Reflect(ref gv, hh.n, 1f); gv.Normalize(); path?.Add(gp);
+                        len = st + (len - st) * 0.55f;   // loses pace on every bounce
+                        break;
+                    }
                 }
             if (stop) break;
         }
