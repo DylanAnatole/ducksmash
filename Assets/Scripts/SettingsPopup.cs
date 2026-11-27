@@ -16,14 +16,15 @@ public class SettingsPopup : MonoBehaviour
     {
         root = UIKit.Stretch(UIKit.Rect("Settings", canvas));
         var dim = root.gameObject.AddComponent<Image>(); dim.color = new Color(0.08f, 0.12f, 0.22f, 0.6f);
-        card = UIKit.Panel(root, Color.white, "Card").rectTransform; UIKit.Place(card, 0.5f, 0.5f, 0, 0, 860, 1080);
+        card = UIKit.SkinPanel(root, "panel", "Card").rectTransform; UIKit.Place(card, 0.5f, 0.5f, 0, 0, 860, 1080);
         var csh = card.gameObject.AddComponent<Shadow>(); csh.effectColor = new Color(0.05f, 0.1f, 0.2f, 0.35f); csh.effectDistance = new Vector2(0, -16);
-        var head = UIKit.Panel(card, Blue, "Header"); UIKit.Place(head.rectTransform, 0.5f, 1, 0, -85, 860, 170);
-        var lip = UIKit.Panel(head.transform, new Color(0, 0, 0, 0.1f), "Lip"); var lrt = lip.rectTransform; lrt.anchorMin = Vector2.zero; lrt.anchorMax = new Vector2(1, 0); lrt.sizeDelta = new Vector2(0, 12); lrt.anchoredPosition = new Vector2(0, 6);
-        UIKit.Outlined(UIKit.Label(head.transform, "CÀI ĐẶT", 64, Color.white), new Color(0, 0, 0, 0.18f), 3);
+        var head = UIKit.SkinPanel(card, "ribbon_purple", "Header"); UIKit.Place(head.rectTransform, 0.5f, 1, 0, -30, 1000, 240);
+        var lip = UIKit.Panel(head.transform, new Color(0, 0, 0, 0f), "Lip"); var lrt = lip.rectTransform; lrt.anchorMin = Vector2.zero; lrt.anchorMax = new Vector2(1, 0); lrt.sizeDelta = new Vector2(0, 12); lrt.anchoredPosition = new Vector2(0, 6);
+        var ht = UIKit.Outlined(UIKit.Label(head.transform, "CÀI ĐẶT", 60, Color.white), new Color(0.15f, 0.05f, 0.3f, 0.5f), 3); ht.rectTransform.offsetMin = new Vector2(0, 40);
         // round close (X) button on the header
-        close = UIKit.Btn(head.transform, "", Color.white, Ink, 40, Close, "CloseX"); UIKit.Place((RectTransform)close.transform, 1, 0.5f, -70, 4, 92, 92);
-        foreach (float a in new[] { 45f, -45f })
+        close = UIKit.Btn(card, "", Color.white, Ink, 40, Close, "CloseX"); UIKit.Place((RectTransform)close.transform, 1, 1, -40, -40, 110, 110);
+        if (UIKit.Skin("close") != null) { var ci = close.GetComponent<Image>(); ci.sprite = UIKit.Skin("close"); ci.type = Image.Type.Simple; ci.color = Color.white; ci.pixelsPerUnitMultiplier = 1; }
+        if (UIKit.Skin("close") == null) foreach (float a in new[] { 45f, -45f })
         {
             var bar = UIKit.Panel(close.transform, Ink, "X"); bar.raycastTarget = false;
             UIKit.Place(bar.rectTransform, 0.5f, 0.5f, 0, 0, 46, 10); bar.rectTransform.localEulerAngles = new Vector3(0, 0, a);
@@ -49,7 +50,7 @@ public class SettingsPopup : MonoBehaviour
     Button RowToggle(int i, string name, System.Action toggle)
     {
         float y = -260 - i * 140;
-        var row = UIKit.Panel(card, Row, "Row" + i).rectTransform; UIKit.Place(row, 0.5f, 1, 0, y, 720, 116);
+        var row = UIKit.SkinPanel(card, "row", "Row" + i, 1.4f).rectTransform; UIKit.Place(row, 0.5f, 1, 0, y, 720, 116);
         var lbl = UIKit.Label(row, name, 44, Ink, TextAnchor.MiddleLeft); UIKit.Place(lbl.rectTransform, 0, 0.5f, 260, 0, 420, 100);
         lbl.name = "RowLabel";
         // switch: pill track + white knob
@@ -63,7 +64,14 @@ public class SettingsPopup : MonoBehaviour
 
     void Set(Button b, bool on)
     {
-        b.GetComponent<Image>().color = on ? On : Off;
+        var im = b.GetComponent<Image>();
+        if (UIKit.Skin("toggle_on") != null)
+        {   // the kit's own switch art: no knob child needed
+            im.sprite = UIKit.Skin(on ? "toggle_on" : "toggle_off"); im.type = Image.Type.Simple; im.color = Color.white; im.pixelsPerUnitMultiplier = 1;
+            var kn = b.transform.Find("Knob"); if (kn) kn.gameObject.SetActive(false);
+            return;
+        }
+        im.color = on ? On : Off;
         var k = b.transform.Find("Knob"); if (k) ((RectTransform)k).anchoredPosition = new Vector2(on ? 38 : -38, 0);
     }
 
@@ -71,7 +79,7 @@ public class SettingsPopup : MonoBehaviour
     {
         Set(snd, SaveData.Sound); Set(mus, SaveData.Music); Set(vib, SaveData.Vibration);
         UIKit.BtnText(reset).text = confirmReset ? "Chạm lần nữa để XOÁ hết tiến trình" : "Xoá tiến trình chơi";
-        reset.GetComponent<Image>().color = confirmReset ? new Color(1f, 0.9f, 0.88f) : Color.white;
+        UIKit.SkinButton(reset.GetComponent<Image>(), confirmReset ? new Color(1f, 0.9f, 0.88f) : Color.white); reset.GetComponent<Image>().enabled = confirmReset;
     }
 
     void OnReset()

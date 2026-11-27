@@ -10,7 +10,44 @@ public static class UIKit
     static bool customFont;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { font = null; round = circle = star = null; customFont = false; }
+    static void ResetStatics() { font = null; round = circle = star = null; customFont = false; skins.Clear(); }
+
+    // ---------------- skin: glossy sprites from the studio UI kit (Resources/UIKit, used with permission) ----------------
+    static readonly System.Collections.Generic.Dictionary<string, Sprite> skins = new System.Collections.Generic.Dictionary<string, Sprite>();
+    public static Sprite Skin(string name)
+    {
+        if (skins.TryGetValue(name, out var sp) && sp != null) return sp;
+        sp = Resources.Load<Sprite>("UIKit/" + name); skins[name] = sp; return sp;
+    }
+    // pick the button sprite closest to the wanted colour (the kit has green / yellow / red / purple / pink / blue / white)
+    public static string BtnSkinName(Color c)
+    {
+        Color.RGBToHSV(c, out float h, out float s, out float v); h *= 360f;
+        if (s < 0.22f) return "btn_white";
+        if (h < 18 || h >= 345) return "btn_red";
+        if (h < 65) return "btn_yellow";
+        if (h < 165) return "btn_green";
+        if (h < 245) return "btn_blue";
+        if (h < 290) return "btn_purple";
+        return "btn_pink";
+    }
+    // apply a skin to an image; white/grey buttons keep a tint so a "disabled" grey still reads
+    public static void SkinButton(Image img, Color c)
+    {
+        var name = BtnSkinName(c); var sp = Skin(name);
+        if (sp == null) { img.color = c; return; }
+        img.sprite = sp; img.type = Image.Type.Sliced;
+        Color.RGBToHSV(c, out _, out float s, out float v);
+        img.color = name == "btn_white" ? new Color(Mathf.Min(1, c.r + 0.05f), Mathf.Min(1, c.g + 0.05f), Mathf.Min(1, c.b + 0.05f), c.a) : Color.white;
+        img.pixelsPerUnitMultiplier = sp.rect.height / 110f;   // keep the rounded caps at button size
+    }
+    // a sliced skin panel (popup cards, rows, bars)
+    public static Image SkinPanel(Transform parent, string skin, string name, float ppuMul = 1f)
+    {
+        var img = Panel(parent, Color.white, name); var sp = Skin(skin);
+        if (sp != null) { img.sprite = sp; img.type = sp.border.sqrMagnitude > 0 ? Image.Type.Sliced : Image.Type.Simple; img.pixelsPerUnitMultiplier = ppuMul; }
+        return img;
+    }
 
     // Noto Sans Display Bold (OFL) has full Vietnamese coverage; WebGL has no OS font fallback.
     public static Font Font
@@ -30,6 +67,7 @@ public static class UIKit
         get
         {
             if (star != null) return star;
+            var kit = Skin("star_on"); if (kit != null) return star = kit;
             const int s = 128;
             var tex = new Texture2D(s, s, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
             var px = new Color[s * s];
@@ -49,6 +87,12 @@ public static class UIKit
         }
     }
 
+    // earned star = gold kit art, missing star = grey kit art (no tinting: the art has its own shading)
+    public static void SetStar(Image img, bool on, Color fallbackOn, Color fallbackOff, float offAlpha = 1f)
+    {
+        if (Skin("star_on") == null) { img.color = on ? fallbackOn : fallbackOff; return; }
+        img.sprite = Skin(on ? "star_on" : "star_off"); img.color = new Color(1, 1, 1, on ? 1f : offAlpha);
+    }
     // A row of star images; returns them so callers can recolor.
     public static Image[] StarRow(Transform parent, int count, float size, float gap)
     {
@@ -57,8 +101,8 @@ public static class UIKit
         {
             var rt = Rect("Star" + i, parent);
             Place(rt, 0.5f, 0.5f, (i - (count - 1) / 2f) * (size + gap), 0, size, size);
-            imgs[i] = rt.gameObject.AddComponent<Image>(); imgs[i].sprite = Star; imgs[i].raycastTarget = false;
-            var o = rt.gameObject.AddComponent<Outline>(); o.effectColor = new Color(0.23f, 0.18f, 0.42f, 0.8f); o.effectDistance = new Vector2(3, -3);
+            imgs[i] = rt.gameObject.AddComponent<Image>(); imgs[i].sprite = Star; imgs[i].raycastTarget = false; imgs[i].preserveAspect = true;
+            if (Skin("star_on") == null) { var o = rt.gameObject.AddComponent<Outline>(); o.effectColor = new Color(0.23f, 0.18f, 0.42f, 0.8f); o.effectDistance = new Vector2(3, -3); }
         }
         return imgs;
     }
@@ -236,13 +280,18 @@ public static class UIKit
     public static Button Btn(Transform parent, string label, Color bg, Color fg, int size, Action onClick, string name = "Button")
     {
         var img = Panel(parent, bg, name);
-        var sh = img.gameObject.AddComponent<Shadow>();   // a darker lip of the same colour under the button: chunky, toy-like
-        var lip = Color.Lerp(bg, new Color(0.15f, 0.2f, 0.32f), 0.3f); lip.a = 1f;   // flatter, cleaner buttons: a thin lip, faint gloss
-        sh.effectColor = lip; sh.effectDistance = new Vector2(0, -6);
-        Gloss(img.transform, 0.1f);
+        if (Skin("btn_green") != null) SkinButton(img, bg);
+        else
+        {
+            var sh = img.gameObject.AddComponent<Shadow>();
+            var lip = Color.Lerp(bg, new Color(0.15f, 0.2f, 0.32f), 0.3f); lip.a = 1f;
+            sh.effectColor = lip; sh.effectDistance = new Vector2(0, -6);
+            Gloss(img.transform, 0.1f);
+        }
         var b = img.gameObject.AddComponent<Button>();
         var cb = b.colors; cb.pressedColor = new Color(0.85f, 0.85f, 0.85f); b.colors = cb;
-        Label(img.transform, label, size, fg);
+        var lt = Label(img.transform, label, size, fg); lt.rectTransform.offsetMin = new Vector2(0, 6);   // the kit buttons have a bottom lip: centre text on the face
+        if (fg.r > 0.9f && fg.g > 0.9f && fg.b > 0.9f) { var to = lt.gameObject.AddComponent<Outline>(); to.effectColor = new Color(0, 0, 0, 0.25f); to.effectDistance = new Vector2(2, -2); }
         b.onClick.AddListener(() => { Sfx.Play("click"); onClick?.Invoke(); });
         return b;
     }

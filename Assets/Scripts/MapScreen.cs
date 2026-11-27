@@ -61,11 +61,13 @@ public class MapScreen : MonoBehaviour
         {
             int lvl = n, tier = LevelLibrary.Tier(n); bool boss = tier >= 2;
             float size = tier == 3 ? 200 : tier == 2 ? 175 : 150;   // harder = bigger node
-            var img = UIKit.Dot(content, Color.white, "Node" + n);
+            var img = UIKit.Dot(content, Color.white, "Node" + n); img.preserveAspect = true;
             var rt = img.rectTransform; rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0); rt.sizeDelta = new Vector2(size, size); rt.anchoredPosition = NodePos(n);
             var sh = img.gameObject.AddComponent<Shadow>(); sh.effectColor = new Color(0.1f, 0.2f, 0.4f, 0.22f); sh.effectDistance = new Vector2(0, -8);
             var btn = img.gameObject.AddComponent<Button>(); btn.onClick.AddListener(() => { if (lvl <= SaveData.MaxLevel) { Sfx.Play("click"); App.StartLevel(lvl); } });
-            var inner = UIKit.Dot(img.transform, Color.white, "Inner"); UIKit.Stretch(inner.rectTransform, 12, 12, 12, 12); inner.raycastTarget = false;
+            var inner = UIKit.Dot(img.transform, Color.white, "Inner"); UIKit.Stretch(inner.rectTransform, 12, 12, 12, 12); inner.raycastTarget = false; inner.preserveAspect = true;
+            if (UIKit.Skin("node_grey") != null) { img.color = new Color(1, 1, 1, 0); UIKit.Stretch(inner.rectTransform, 0, 0, 0, 0); }   // the kit node art has its own rim
+            if (UIKit.Skin("node_grey") == null)
             {   // glossy cap: the node reads as a shiny round candy instead of a flat disc
                 var gl = UIKit.Dot(inner.transform, new Color(1f, 1f, 1f, 0.18f), "Gloss"); gl.raycastTarget = false;
                 var grt = gl.rectTransform; grt.anchorMin = new Vector2(0.17f, 0.52f); grt.anchorMax = new Vector2(0.83f, 0.92f); grt.offsetMin = grt.offsetMax = Vector2.zero;
@@ -110,12 +112,13 @@ public class MapScreen : MonoBehaviour
         var headIn = UIKit.Panel(head, Purple, "Inner").rectTransform; UIKit.Stretch(headIn, 0, 8, 0, 0);
         var title = UIKit.Outlined(UIKit.Label(headIn, "Duck Smash", 66, Color.white, TextAnchor.MiddleLeft), new Color(0, 0, 0, 0.18f), 3); UIKit.Place(title.rectTransform, 0, 0.5f, 270, 52, 480, 80);
         var sub = UIKit.Label(headIn, "Bắn vịt · Phá tung bồn tắm", 28, new Color(1, 1, 1, 0.85f), TextAnchor.MiddleLeft, false); UIKit.Place(sub.rectTransform, 0, 0.5f, 270, 4, 480, 40);
-        coinsTxt = Pill(headIn, -75, -62, Yellow, out _);
-        starsTxt = Pill(headIn, 155, -62, Yellow, out var starIcon); starIcon.sprite = UIKit.Star; starIcon.color = Yellow;
+        coinsTxt = Pill(headIn, -75, -62, Yellow, out var coinIcon); if (UIKit.Skin("coin") != null) { coinIcon.sprite = UIKit.Skin("coin"); coinIcon.color = Color.white; }
+        starsTxt = Pill(headIn, 155, -62, Yellow, out var starIcon); starIcon.sprite = UIKit.Star; starIcon.color = Color.white; starIcon.preserveAspect = true;
         boostTxt = UIKit.Label(headIn, "", 1, Color.clear); boostTxt.gameObject.SetActive(false);   // booster counts live in-game now
         var gear = UIKit.Btn(headIn, "", Color.white, Ink, 30, () => App.OpenSettings(false), "Settings");
         UIKit.Place((RectTransform)gear.transform, 1, 0.5f, -78, 0, 116, 116);
-        for (int i = 0; i < 3; i++)
+        if (UIKit.Skin("gear") != null) { var gi = gear.GetComponent<Image>(); gi.sprite = UIKit.Skin("gear"); gi.type = Image.Type.Simple; gi.color = Color.white; gi.preserveAspect = true; }
+        else for (int i = 0; i < 3; i++)
         {   // "menu" icon: three bars
             var bar = UIKit.Panel(gear.transform, Ink, "Bar"); bar.raycastTarget = false; UIKit.Place(bar.rectTransform, 0.5f, 0.5f, 0, 22 - i * 22, 52, 11);
         }
@@ -163,8 +166,8 @@ public class MapScreen : MonoBehaviour
     {
         albumRoot = UIKit.Stretch(UIKit.Rect("AlbumPopup", root));
         var dim = albumRoot.gameObject.AddComponent<Image>(); dim.color = new Color(0.08f, 0.12f, 0.22f, 0.6f);
-        var card = UIKit.Panel(albumRoot, Color.white, "Card").rectTransform; UIKit.Place(card, 0.5f, 0.5f, 0, 0, 980, 1500);
-        var ahead = UIKit.Panel(card, Teal, "Header"); UIKit.Place(ahead.rectTransform, 0.5f, 1, 0, -85, 980, 170);
+        var card = UIKit.SkinPanel(albumRoot, "panel", "Card").rectTransform; UIKit.Place(card, 0.5f, 0.5f, 0, 0, 980, 1500);
+        var ahead = UIKit.SkinPanel(card, "ribbon_purple", "Header"); UIKit.Place(ahead.rectTransform, 0.5f, 1, 0, -40, 1080, 250);
         albumTitle = UIKit.Outlined(UIKit.Label(ahead.transform, "", 64, Color.white), new Color(0, 0, 0, 0.18f), 3);
         var ids = LevelLibrary.ArtIds;
         for (int i = 0; i < ids.Length; i++)
@@ -241,10 +244,15 @@ public class MapScreen : MonoBehaviour
             // open nodes: hard = orange, extreme = red; otherwise done = green, current = yellow, tutorial = teal. Locked = pale tint of that colour.
             Color c = tier == 3 ? new Color(0.9f, 0.25f, 0.25f) : tier == 2 ? new Color(1f, 0.55f, 0.15f) : n <= LevelLibrary.Onboarding ? Teal : s > 0 ? Green : Yellow;
             nd.img.color = open ? c : Color.Lerp(tier >= 2 ? c : Locked, Color.white, tier >= 2 ? 0.55f : 0f);
+            if (UIKit.Skin("node_grey") != null)
+            {   // kit art: yellow = current, red = hard, purple = extreme, blue = done, grey = locked / tutorial
+                string sk = !open ? "node_grey" : n == max ? "node_yellow" : tier == 3 ? "node_purple" : tier == 2 ? "node_red" : "node_blue";
+                nd.img.sprite = UIKit.Skin(sk); nd.img.color = !open ? new Color(0.85f, 0.87f, 0.92f) : n <= LevelLibrary.Onboarding && n != max ? new Color(0.75f, 1f, 0.95f) : Color.white;
+            }
             nd.num.text = n.ToString();
             nd.num.color = open ? Color.white : new Color(0.6f, 0.65f, 0.74f);
             nd.stars.text = "";
-            for (int i = 0; i < 3; i++) { nodeStars[n][i].gameObject.SetActive(s > 0); nodeStars[n][i].color = i < s ? Yellow : new Color(1, 1, 1, 0.55f); }
+            for (int i = 0; i < 3; i++) { nodeStars[n][i].gameObject.SetActive(s > 0); UIKit.SetStar(nodeStars[n][i], i < s, Yellow, new Color(1, 1, 1, 0.55f), 0.85f); }
             nd.img.transform.parent.localScale = Vector3.one * (n == max ? 1.12f : 1f);
         }
         coinsTxt.text = SaveData.Coins >= 100000 ? (SaveData.Coins / 1000) + "k" : SaveData.Coins.ToString();

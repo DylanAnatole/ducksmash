@@ -50,8 +50,8 @@ public static partial class LevelLibrary
         1, 2, 1, 2, 3 };    // 26-30
     public static int Tier(int n) => n >= 1 && n < TierOf.Length ? TierOf[n] : 1;
     public static string TierName(int t) => t == 0 ? "Dễ" : t == 1 ? "Vừa" : t == 2 ? "Khó" : "Cực khó";
-    public static string TierHex(int t) => t == 0 ? "#2e9e52" : t == 1 ? "#2f6fd0" : t == 2 ? "#e07b12" : "#d63031";
-    public static Color TierColor(int t) => t == 0 ? new Color(0.3f, 0.75f, 0.4f) : t == 1 ? new Color(0.27f, 0.56f, 0.93f) : t == 2 ? new Color(1f, 0.55f, 0.15f) : new Color(0.9f, 0.25f, 0.25f);
+    public static string TierHex(int t) => t == 0 ? "#2e9e52" : t == 1 ? "#2f6fd0" : t == 2 ? "#d63031" : "#8a3ad6";
+    public static Color TierColor(int t) => t == 0 ? new Color(0.3f, 0.75f, 0.4f) : t == 1 ? new Color(0.27f, 0.56f, 0.93f) : t == 2 ? new Color(0.9f, 0.25f, 0.27f) : new Color(0.55f, 0.25f, 0.88f);
 
     // ---------- pixel-art album ----------
     public static readonly string[] ArtIds = { "star", "duck", "heart", "straw", "fish", "flower", "mush", "sun", "apple", "boat", "cat", "rainbow" };
