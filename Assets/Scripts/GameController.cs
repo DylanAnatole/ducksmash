@@ -244,9 +244,10 @@ public class GameController : MonoBehaviour
     // ---------- UI ----------
     RectTransform hud, feverFill, bossFill, bossBar, hintPanel, popupRoot;
     Text movesTxt, goalsTxt, levelTxt, scoreTxt, feverTxt, streakTxt, hintTxt, comboTxt, bigTxt, bossTxt, popTitle, popBody, popStars, popReward;
-    Button popA, popB; float bigLife; Image[] popStarImgs;
+    Button popA, popB, popC; float bigLife; Image[] popStarImgs; Image popHeader; Text popLevel, popProgTxt; RawImage popSad; RectTransform popStat, popProg, popProgFill;
     readonly Dictionary<string, Text> boostTxt = new Dictionary<string, Text>();
     readonly Dictionary<string, Image> boostImg = new Dictionary<string, Image>();
+    readonly Dictionary<string, Text> boostBadge = new Dictionary<string, Text>(); readonly Dictionary<string, Image> boostBadgeImg = new Dictionary<string, Image>();
     Transform aimRoot; readonly List<Transform> aimDots = new List<Transform>(); Transform aimX; LineRenderer band;
 
     // =====================================================================
@@ -3162,17 +3163,17 @@ public class GameController : MonoBehaviour
         var mb = UIKit.Panel(topIn, Color.white, "Moves").rectTransform; UIKit.Place(mb, 0, 0.5f, 72, 2, 104, 98);
         movesTxt = UIKit.Label(mb, "10", 60, Ink); movesTxt.rectTransform.offsetMin = new Vector2(0, 22);
         var ml = UIKit.Label(mb, "VỊT", 24, PurpleDark); ml.fontStyle = FontStyle.Bold; ml.rectTransform.offsetMax = new Vector2(0, -68);
-        var sp = UIKit.Rect("StarPreview", topIn); UIKit.Place(sp, 0, 0.5f, 210, -32, 110, 28);
+        var sp = UIKit.Rect("StarPreview", topIn); UIKit.Place(sp, 0, 0.5f, 720, -30, 110, 28);
         starPreview = UIKit.StarRow(sp, 3, 26, 4);
         aimCount = UIKit.Outlined(UIKit.Label(hud, "", 64, Color.white), Ink, 4); aimCount.verticalOverflow = VerticalWrapMode.Overflow; aimCount.horizontalOverflow = HorizontalWrapMode.Overflow; aimCount.lineSpacing = 0.85f;
         aimCount.rectTransform.anchorMin = aimCount.rectTransform.anchorMax = new Vector2(0.5f, 0.5f); aimCount.rectTransform.sizeDelta = new Vector2(300, 100);
         aimCount.gameObject.SetActive(false);
-        goalsTxt = UIKit.Outlined(UIKit.Label(topIn, "", 30, Color.white, TextAnchor.MiddleLeft), Ink, 3); UIKit.Place(goalsTxt.rectTransform, 0, 0.5f, 470, 12, 400, 84);
+        goalsTxt = UIKit.Outlined(UIKit.Label(topIn, "", 30, Color.white, TextAnchor.MiddleLeft), Ink, 3); UIKit.Place(goalsTxt.rectTransform, 0, 0.5f, 520, 18, 500, 60);
         goalsTxt.horizontalOverflow = HorizontalWrapMode.Overflow; goalsTxt.verticalOverflow = VerticalWrapMode.Overflow; goalsTxt.lineSpacing = 0.95f;
         goalsTxt.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        var ob = UIKit.Panel(topIn, new Color(0.1f, 0.2f, 0.4f, 0.35f), "ObjBar").rectTransform; UIKit.Place(ob, 0, 0.5f, 470, -44, 400, 14);
-        objFill = UIKit.Panel(ob, new Color(0.45f, 0.95f, 0.5f), "Fill").rectTransform;
-        objFill.anchorMin = Vector2.zero; objFill.anchorMax = new Vector2(0, 1); objFill.offsetMin = objFill.offsetMax = Vector2.zero; objFill.pivot = new Vector2(0, 0.5f);
+        var ob = UIKit.Panel(topIn, new Color(0.1f, 0.2f, 0.4f, 0.35f), "ObjBar").rectTransform; UIKit.Place(ob, 0, 0.5f, 470, -30, 400, 24);
+        objFill = UIKit.Panel(ob, new Color(0.45f, 0.92f, 0.5f), "Fill").rectTransform;
+        objFill.anchorMin = Vector2.zero; objFill.anchorMax = new Vector2(0, 1); objFill.offsetMin = new Vector2(3, 3); objFill.offsetMax = new Vector2(-3, -3); objFill.pivot = new Vector2(0, 0.5f);
         levelTxt = UIKit.Label(topIn, "", 32, Color.white, TextAnchor.MiddleRight); UIKit.Place(levelTxt.rectTransform, 1, 0.5f, -230, 2, 240, 44);
         scoreTxt = UIKit.Label(topIn, "", 30, Yellow, TextAnchor.MiddleRight); UIKit.Place(scoreTxt.rectTransform, 1, 0.5f, -230, -20, 240, 44); scoreTxt.enabled = false;   // calm: score is noise mid-level
         var gear = UIKit.Btn(topIn, "II", Color.white, Ink, 36, () => App.OpenSettings(true), "Settings");
@@ -3219,31 +3220,50 @@ public class GameController : MonoBehaviour
             string k = keys[i];
             var b = UIKit.Btn(bar, "", Color.white, Ink, 36, () => UseBooster(k), "Boost_" + k);
             UIKit.Place((RectTransform)b.transform, 0, 0.5f, 290 + i * 296, 0, 276, 92);
-            var lbl = UIKit.BtnText(b); lbl.lineSpacing = 1f; lbl.fontSize = 24;
+            var lbl = UIKit.BtnText(b); lbl.lineSpacing = 1f; lbl.fontSize = 28;
             lbl.rectTransform.offsetMin = new Vector2(84, lbl.rectTransform.offsetMin.y);   // room for the icon
+            var badge = UIKit.Panel(b.transform, new Color(0.95f, 0.42f, 0.36f), "Badge"); UIKit.Place(badge.rectTransform, 1, 1, -36, -4, 92, 40); badge.raycastTarget = false;
+            var bt = UIKit.Label(badge.transform, "", 24, Color.white); boostBadge[k] = bt; boostBadgeImg[k] = badge;
             var bIcon = UIKit.Rect("Icon", b.transform).gameObject.AddComponent<RawImage>(); bIcon.raycastTarget = false;
             UIKit.Place(bIcon.rectTransform, 0, 0.5f, 48, 2, 62, 62); bIcon.texture = BoosterIcon(k);
             boostTxt[k] = lbl; boostImg[k] = b.GetComponent<Image>();
         }
-        // popup
+        // result popup: coloured ribbon header, stars / sad duck, one stat row, a big primary button and
+        // a row of two secondary buttons (retry + map) so the map is always one tap away
         popupRoot = UIKit.Stretch(UIKit.Rect("Popup", hud));
-        var dim = popupRoot.gameObject.AddComponent<Image>(); dim.color = new Color(0.11f, 0.08f, 0.25f, 0.45f);
-        var card = UIKit.Panel(popupRoot, new Color(0.98f, 0.98f, 1f), "Card").rectTransform; UIKit.Place(card, 0.5f, 0.5f, 0, 0, 900, 1000); card.localScale = Vector3.one * 0.74f;
-        popTitle = UIKit.Label(card, "", 80, Ink); UIKit.Place(popTitle.rectTransform, 0.5f, 1, 0, -120, 860, 140);
-        popStars = UIKit.Label(card, "", 130, Yellow); UIKit.Place(popStars.rectTransform, 0.5f, 1, 0, -290, 860, 170);
+        var dim = popupRoot.gameObject.AddComponent<Image>(); dim.color = new Color(0.08f, 0.12f, 0.22f, 0.55f);
+        var card = UIKit.Panel(popupRoot, Color.white, "Card").rectTransform; UIKit.Place(card, 0.5f, 0.5f, 0, -20, 900, 1120);
+        var csh = card.gameObject.AddComponent<Shadow>(); csh.effectColor = new Color(0.05f, 0.1f, 0.2f, 0.35f); csh.effectDistance = new Vector2(0, -16);
+        popHeader = UIKit.Panel(card, new Color(0.3f, 0.75f, 0.4f), "Header"); UIKit.Place(popHeader.rectTransform, 0.5f, 1, 0, -105, 900, 210);
+        var hdrLow = UIKit.Panel(popHeader.transform, new Color(0, 0, 0, 0.1f), "HeaderLip"); var hl2 = hdrLow.rectTransform; hl2.anchorMin = new Vector2(0, 0); hl2.anchorMax = new Vector2(1, 0); hl2.sizeDelta = new Vector2(0, 14); hl2.anchoredPosition = new Vector2(0, 7);
+        popLevel = UIKit.Label(popHeader.transform, "", 32, new Color(1, 1, 1, 0.85f)); UIKit.Place(popLevel.rectTransform, 0.5f, 1, 0, -48, 860, 44);
+        popTitle = UIKit.Outlined(UIKit.Label(popHeader.transform, "", 76, Color.white), new Color(0, 0, 0, 0.18f), 3); UIKit.Place(popTitle.rectTransform, 0.5f, 1, 0, -122, 860, 100);
+        popStars = UIKit.Label(card, "", 130, Yellow); UIKit.Place(popStars.rectTransform, 0.5f, 1, 0, -330, 860, 170);
         sunburst = UIKit.Rect("Sunburst", popStars.transform).gameObject.AddComponent<RawImage>(); sunburst.raycastTarget = false;
-        sunburst.texture = SunburstTex(); sunburst.color = new Color(1f, 0.9f, 0.45f, 0f); sunburst.enabled = false;
-        UIKit.Place(sunburst.rectTransform, 0.5f, 0.5f, 0, 0, 620, 620);
-        popStarImgs = UIKit.StarRow(popStars.transform, 3, 150, 24);
-        popBody = UIKit.Label(card, "", 42, Ink); UIKit.Place(popBody.rectTransform, 0.5f, 1, 0, -440, 860, 120);
-        popReward = UIKit.Label(card, "", 58, new Color(0.85f, 0.55f, 0f)); UIKit.Place(popReward.rectTransform, 0.5f, 1, 0, -540, 860, 100);
-        var paBg = UIKit.Dot(card, new Color(0.92f, 0.94f, 0.98f), "ArtBg"); UIKit.Place(paBg.rectTransform, 0.5f, 1, 335, -300, 150, 150); paBg.raycastTarget = false;
-        popArt = UIKit.Rect("Art", paBg.transform).gameObject.AddComponent<RawImage>(); UIKit.Place(popArt.rectTransform, 0.5f, 0.5f, 0, 0, 104, 104); popArt.raycastTarget = false;
+        sunburst.texture = SunburstTex(); sunburst.color = new Color(1f, 0.85f, 0.3f, 0.22f);   // a faint warm glow behind the stars
+        UIKit.Place(sunburst.rectTransform, 0.5f, 0.5f, 0, 0, 520, 520);
+        var starTray = UIKit.Panel(popStars.transform, new Color(0.94f, 0.95f, 0.98f), "StarTray"); UIKit.Place(starTray.rectTransform, 0.5f, 0.5f, 0, -6, 560, 150); starTray.raycastTarget = false;
+        popStarImgs = UIKit.StarRow(popStars.transform, 3, 140, 26);
+        popSad = UIKit.Rect("SadDuck", card).gameObject.AddComponent<RawImage>(); popSad.raycastTarget = false; UIKit.Place(popSad.rectTransform, 0.5f, 1, 0, -330, 170, 170);
+        popBody = UIKit.Label(card, "", 40, Ink); UIKit.Place(popBody.rectTransform, 0.5f, 1, 0, -500, 820, 110);
+        popBody.horizontalOverflow = HorizontalWrapMode.Wrap; popBody.lineSpacing = 1.05f;
+        // stat row: coins earned (win) or how much is broken (lose)
+        popStat = UIKit.Panel(card, new Color(1f, 0.96f, 0.82f), "Stat").rectTransform; UIKit.Place(popStat, 0.5f, 1, 0, -620, 520, 92);
+        var coinDot = UIKit.Dot(popStat, Yellow, "Coin"); UIKit.Place(coinDot.rectTransform, 0, 0.5f, 62, 0, 58, 58);
+        var coinIn = UIKit.Dot(coinDot.transform, new Color(1f, 0.92f, 0.55f), "In"); UIKit.Place(coinIn.rectTransform, 0.5f, 0.5f, 0, 0, 34, 34);
+        popReward = UIKit.Label(popStat, "", 50, new Color(0.75f, 0.45f, 0f)); UIKit.Place(popReward.rectTransform, 0.5f, 0.5f, 26, 0, 420, 90);
+        popProg = UIKit.Panel(card, new Color(0.9f, 0.92f, 0.96f), "Prog").rectTransform; UIKit.Place(popProg, 0.5f, 1, 0, -620, 640, 52);
+        popProgFill = UIKit.Panel(popProg, new Color(1f, 0.55f, 0.35f), "Fill").rectTransform;
+        popProgFill.anchorMin = Vector2.zero; popProgFill.anchorMax = new Vector2(0.5f, 1); popProgFill.offsetMin = new Vector2(5, 5); popProgFill.offsetMax = new Vector2(-5, -5);
+        popProgTxt = UIKit.Label(popProg, "", 30, Ink);
+        var paBg = UIKit.Dot(card, new Color(0.92f, 0.94f, 0.98f), "ArtBg"); UIKit.Place(paBg.rectTransform, 0.5f, 1, 360, -250, 130, 130); paBg.raycastTarget = false;
+        popArt = UIKit.Rect("Art", paBg.transform).gameObject.AddComponent<RawImage>(); UIKit.Place(popArt.rectTransform, 0.5f, 0.5f, 0, 0, 96, 96); popArt.raycastTarget = false;
         popArtBg = paBg.gameObject; popArtBg.SetActive(false);
-        popA = UIKit.Btn(card, "", new Color(0.37f, 0.83f, 0.37f), Color.white, 50, OnPopA, "A"); UIKit.Place((RectTransform)popA.transform, 0.5f, 0, 0, 280, 640, 150);
-        popB = UIKit.Btn(card, "", Yellow, Ink, 44, OnPopB, "B"); UIKit.Place((RectTransform)popB.transform, 0.5f, 0, 0, 110, 640, 130);
+        popA = UIKit.Btn(card, "", new Color(0.3f, 0.75f, 0.4f), Color.white, 50, OnPopA, "A"); UIKit.Place((RectTransform)popA.transform, 0.5f, 0, 0, 250, 680, 140);
+        popB = UIKit.Btn(card, "", Yellow, Ink, 38, OnPopB, "B"); UIKit.Place((RectTransform)popB.transform, 0.5f, 0, -178, 95, 324, 112);
+        popC = UIKit.Btn(card, "Bản đồ", Purple, Color.white, 38, () => App.ShowMap(), "C"); UIKit.Place((RectTransform)popC.transform, 0.5f, 0, 178, 95, 324, 112);
         // level intro card
-        introRoot = UIKit.Rect("Intro", hud); UIKit.Place(introRoot, 0.5f, 0, 0, 214, 1020, 236);
+        introRoot = UIKit.Rect("Intro", hud); UIKit.Place(introRoot, 0.5f, 0, 0, 240, 1020, 230);
         var ic = UIKit.Panel(introRoot, new Color(1f, 1f, 1f, 0.95f), "IntroCard"); UIKit.Stretch(ic.rectTransform);
         var ish = ic.gameObject.AddComponent<Shadow>(); ish.effectColor = new Color(0.3f, 0.2f, 0.5f, 0.3f); ish.effectDistance = new Vector2(0, -12);
         introTitle = UIKit.Label(introRoot, "", 46, Purple); UIKit.Place(introTitle.rectTransform, 0.5f, 1, 0, -40, 980, 64);
@@ -3453,7 +3473,7 @@ public class GameController : MonoBehaviour
         {
             shownLeft = left;
             int done = goalTotal - left, pctDone = goalTotal > 0 ? Mathf.RoundToInt(100f * done / goalTotal) : 100;
-            goalsTxt.text = "<size=24>ĐÃ PHÁ <b>" + done + "/" + goalTotal + "</b> · <color=#9dffa0><b>" + pctDone + "%</b></color></size>\n<size=42><b>" + (left == 0 ? "XONG!" : "còn " + left + " món") + "</b></size>";
+            goalsTxt.text = "<size=40><b>" + (left == 0 ? "XONG!" : "Còn " + left + " món") + "</b></size>";
             objFill.anchorMax = new Vector2(goalTotal > 0 ? 1f - left / (float)goalTotal : 1f, 1);
             goalPulse = 0.25f;
             if (!halfShown && goalTotal >= 10 && left > 0 && left <= goalTotal / 2)
@@ -3466,7 +3486,8 @@ public class GameController : MonoBehaviour
         foreach (var k in PRICE.Keys)
         {
             int n = SaveData.GetBoost(k);
-            boostTxt[k].text = BNAME[k] + "\n" + (n > 0 ? "còn " + n : PRICE[k] + " xu");
+            boostTxt[k].text = BNAME[k];
+            boostBadge[k].text = n > 0 ? n.ToString() : PRICE[k] + " xu"; boostBadgeImg[k].color = n > 0 ? new Color(0.95f, 0.42f, 0.36f) : new Color(0.98f, 0.72f, 0.12f);
             boostImg[k].color = target == k ? new Color(0.37f, 0.83f, 0.37f) : Color.white;
         }
         }
@@ -3530,40 +3551,43 @@ public class GameController : MonoBehaviour
     {
         popupRoot.gameObject.SetActive(true); popAnim = 0; loseAnim = 0;
         introTimer = 0; introRoot.gameObject.SetActive(false); popupRoot.SetAsLastSibling();
+        popLevel.text = LevelLibrary.Title(level).ToUpper();
+        popHeader.color = win ? new Color(0.3f, 0.75f, 0.4f) : new Color(0.95f, 0.42f, 0.36f);
+        popStat.gameObject.SetActive(win); popProg.gameObject.SetActive(!win); popSad.gameObject.SetActive(!win);
+        popStars.gameObject.SetActive(win);
+        popBody.rectTransform.anchoredPosition = new Vector2(0, win ? -500 : -640); popProg.anchoredPosition = new Vector2(0, -515);   // lose: progress first, then the tip
         if (win)
         {
-            popTitle.text = level == LevelLibrary.Count ? "PHÁ ĐẢO!" : hardLevel ? "VƯỢT MÀN KHÓ!" : (stars >= 3 ? "Xuất sắc!" : level <= LevelLibrary.Onboarding ? "Giỏi lắm!" : "Hoàn thành!");
+            popTitle.text = level == LevelLibrary.Count ? "PHÁ ĐẢO!" : hardLevel ? "VƯỢT MÀN KHÓ!" : (stars >= 3 ? "XUẤT SẮC!" : level <= LevelLibrary.Onboarding ? "GIỎI LẮM!" : "HOÀN THÀNH!");
             popStars.text = "";
             popArtBg.SetActive(newArt);
             if (newArt) popArt.texture = LevelLibrary.ArtTexture(levelArt, false);
-            for (int i = 0; i < 3; i++) { popStarImgs[i].gameObject.SetActive(true); popStarImgs[i].color = i < stars ? Yellow : new Color(0.49f, 0.42f, 0.84f); popStarImgs[i].rectTransform.localScale = Vector3.one * (i == 1 ? 1.2f : 1f); }
-            // at most 3 short lines: score / coin bonuses / keepsakes (the old 5-line list ran into the reward counter)
-            var bonus = new List<string>();
-            if (leftAtWin > 0) bonus.Add("Lượt dư +" + leftAtWin * 5);
-            if (hardLevel) bonus.Add("Màn khó +80");
+            for (int i = 0; i < 3; i++) { popStarImgs[i].gameObject.SetActive(true); popStarImgs[i].color = i < stars ? Yellow : new Color(0.8f, 0.83f, 0.9f); popStarImgs[i].rectTransform.localScale = Vector3.one * (i == 1 ? 1.2f : 1f); }
             var keep = new List<string>();
-            if (newArt) keep.Add("<color=#a14a00>Tranh mới vào Album!</color>");
-            if (bossKilled) keep.Insert(0, "<color=#a14a00>Đã hạ Vua Bánh Quy!</color>");
-            popBody.text = "Điểm " + score.ToString("N0") + (bonus.Count > 0 ? "\n<size=32>" + string.Join(" · ", bonus) + " xu</size>" : "")
-                + (keep.Count > 0 ? "\n<size=32>" + string.Join(" · ", keep) + "</size>" : "");
-            popBody.verticalOverflow = VerticalWrapMode.Overflow;
+            if (bossKilled) keep.Add("Đã hạ Vua Bánh Quy!");
+            if (newArt) keep.Add("Tranh mới vào Album!");
+            string starLine = stars >= 3 ? "Dùng " + shotsTaken + " vịt · tối đa 3 sao" : "Dùng " + shotsTaken + " vịt · <color=#d97a00>còn " + (stars == 2 ? par3 : par2) + " vịt là thêm sao</color>";
+            popBody.text = starLine + (keep.Count > 0 ? "\n<size=32><color=#c0640a>" + string.Join(" · ", keep) + "</color></size>" : "");
             popReward.text = "+0 xu";
             UIKit.BtnText(popA).text = HasNext ? "MÀN TIẾP" : "VỀ BẢN ĐỒ";
-            UIKit.BtnText(popB).text = stars < 3 && !LevelLibrary.IsSandbox(level) ? "Chơi lại lấy 3 sao" : "Bản đồ";   // missing stars: offer the retry right here
+            UIKit.BtnText(popB).text = "Chơi lại";
+            popA.GetComponent<Image>().color = new Color(0.3f, 0.75f, 0.4f);
         }
         else
         {
-            popTitle.text = "Hết lượt!";
-            foreach (var im in popStarImgs) im.gameObject.SetActive(false);
-            popStars.text = "";
+            popTitle.text = "HẾT LƯỢT!";
+            popSad.texture = DuckIcon("normal"); popSad.color = new Color(0.85f, 0.87f, 0.92f);
             int lft = GoalsLeft(); int pct = goalTotal > 0 ? Mathf.RoundToInt(100f * (goalTotal - lft) / goalTotal) : 0;
-            popBody.text = "Đã phá <b>" + pct + "%</b> · còn <b>" + lft + "</b> món\n<size=34>" + (bossBlock != null && bossBlock.alive ? "Vua Bánh Quy còn " + bossBlock.hp + " máu: canh lúc vua trôi tới rồi bắn!" : pct >= 80 ? "Sắp xong rồi! Thêm lượt để phá nốt" : levelTip.Length > 0 ? "Mẹo: " + levelTip.Replace("MÀN KHÓ! ", "").Replace("SIÊU KHÓ! ", "") : "Thử góc khác hoặc dùng booster nhé") + "</size>";
+            popProgFill.anchorMax = new Vector2(Mathf.Clamp01(pct / 100f), 1);
+            popProgFill.GetComponent<Image>().color = pct >= 80 ? new Color(0.3f, 0.75f, 0.4f) : pct >= 50 ? new Color(1f, 0.72f, 0.2f) : new Color(1f, 0.5f, 0.38f);
+            popProgTxt.text = "Đã phá " + pct + "% · còn " + lft + " món";
+            popBody.text = "<size=34>" + (bossBlock != null && bossBlock.alive ? "Vua Bánh Quy còn " + bossBlock.hp + " máu: canh lúc vua trôi tới rồi bắn!" : pct >= 80 ? "Sắp xong rồi! Thêm lượt để phá nốt" : levelTip.Length > 0 ? "Mẹo: " + levelTip.Replace("MÀN KHÓ! ", "").Replace("SIÊU KHÓ! ", "") : "Thử góc khác hoặc dùng trợ giúp nhé") + "</size>";
             popReward.text = "";
-            UIKit.BtnText(popA).text = "+5 lượt — " + CONTINUE_PRICE + " xu";
-            popA.GetComponent<Image>().color = SaveData.Coins >= CONTINUE_PRICE ? new Color(0.37f, 0.83f, 0.37f) : new Color(0.7f, 0.7f, 0.75f);
+            bool canBuy = SaveData.Coins >= CONTINUE_PRICE;
+            UIKit.BtnText(popA).text = "+5 lượt · " + CONTINUE_PRICE + " xu";
+            popA.GetComponent<Image>().color = canBuy ? new Color(0.3f, 0.75f, 0.4f) : new Color(0.72f, 0.75f, 0.8f);
             UIKit.BtnText(popB).text = "Chơi lại";
         }
-        if (win) popA.GetComponent<Image>().color = new Color(0.37f, 0.83f, 0.37f);
     }
 
     void OnPopA()
@@ -3575,11 +3599,7 @@ public class GameController : MonoBehaviour
         }
     }
 
-    void OnPopB()
-    {
-        if (state == "win" && (stars >= 3 || LevelLibrary.IsSandbox(level))) App.ShowMap();
-        else Restart();
-    }
+    void OnPopB() => Restart();   // B is always "play again"; the map has its own button (C)
 
     public int Level => level;
 }

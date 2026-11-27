@@ -19,11 +19,11 @@ public class MapScreen : MonoBehaviour
     {
         root = UIKit.Stretch(UIKit.Rect("MapScreen", canvas));
         var bg = root.gameObject.AddComponent<RawImage>();
-        bg.texture = Art.TileTex(new Color(1f, 0.93f, 0.9f), new Color(0.94f, 0.84f, 0.84f)); bg.uvRect = new Rect(0, 0, 3, 5.3f);
+        bg.texture = Art.TileTex(new Color(0.94f, 0.97f, 1f), new Color(0.85f, 0.91f, 0.97f));   // calm pale-blue bathroom tiles bg.uvRect = new Rect(0, 0, 3, 5.3f);
 
         // soap bubbles drifting up behind the path
         var bub = UIKit.Stretch(UIKit.Rect("Bubbles", root)); bub.gameObject.AddComponent<Canvas>();
-        for (int i = 0; i < 12; i++)
+        for (int i = 0; i < 6; i++)
         {
             var b = UIKit.Dot(bub, new Color(1f, 1f, 1f, 0.32f), "Bubble"); b.raycastTarget = false;
             var o = b.gameObject.AddComponent<Outline>(); o.effectColor = new Color(0.75f, 0.9f, 1f, 0.6f); o.effectDistance = new Vector2(2, -2);
