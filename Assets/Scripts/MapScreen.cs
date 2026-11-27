@@ -80,6 +80,9 @@ public class MapScreen : MonoBehaviour
             if (tag.text.Length > 0)
             {   // pill behind the tag text
                 var pill = UIKit.Panel(img.transform, n > LevelLibrary.Onboarding ? LevelLibrary.TierColor(tier) : Ink, "TagPill"); pill.raycastTarget = false;
+                string ps = n <= LevelLibrary.Onboarding ? "bar_blue" : tier == 0 ? "bar_green" : tier == 1 ? "bar_blue" : tier == 2 ? "pill_red" : "pill_purple";
+                if (UIKit.Skin(ps) != null) { pill.sprite = UIKit.Skin(ps); pill.type = Image.Type.Sliced; pill.color = Color.white; pill.pixelsPerUnitMultiplier = 2.2f; }
+                UIKit.Outlined(tag, new Color(0.1f, 0.1f, 0.3f, 0.6f), 2);
                 var prt = pill.rectTransform; prt.anchorMin = prt.anchorMax = new Vector2(0.5f, 0.5f); prt.sizeDelta = new Vector2(tag.text.Length * 15 + 36, 40); prt.anchoredPosition = new Vector2(0, -size * 0.5f);
                 tag.transform.SetAsLastSibling();
             }
@@ -108,12 +111,14 @@ public class MapScreen : MonoBehaviour
         shadowDot.rectTransform.anchorMin = shadowDot.rectTransform.anchorMax = new Vector2(0.5f, 0); shadowDot.rectTransform.sizeDelta = new Vector2(70, 16);
         shadowDot.rectTransform.anchoredPosition = new Vector2(0, -6); shadowDot.transform.SetAsFirstSibling();
         // header: title on the left, coin + star pills, round settings button
-        var head = UIKit.Panel(root, PurpleDark, "Header").rectTransform; UIKit.Place(head, 0.5f, 1, 0, -128, 1040, 220);
-        var headIn = UIKit.Panel(head, Purple, "Inner").rectTransform; UIKit.Stretch(headIn, 0, 8, 0, 0);
-        var title = UIKit.Outlined(UIKit.Label(headIn, "Duck Smash", 66, Color.white, TextAnchor.MiddleLeft), new Color(0, 0, 0, 0.18f), 3); UIKit.Place(title.rectTransform, 0, 0.5f, 270, 52, 480, 80);
-        var sub = UIKit.Label(headIn, "Bắn vịt · Phá tung bồn tắm", 28, new Color(1, 1, 1, 0.85f), TextAnchor.MiddleLeft, false); UIKit.Place(sub.rectTransform, 0, 0.5f, 270, 4, 480, 40);
-        coinsTxt = Pill(headIn, -75, -62, Yellow, out var coinIcon); if (UIKit.Skin("coin") != null) { coinIcon.sprite = UIKit.Skin("coin"); coinIcon.color = Color.white; }
-        starsTxt = Pill(headIn, 155, -62, Yellow, out var starIcon); starIcon.sprite = UIKit.Star; starIcon.color = Color.white; starIcon.preserveAspect = true;
+        var head = UIKit.Panel(root, new Color(0, 0, 0, 0), "Header").rectTransform; UIKit.Place(head, 0.5f, 1, 0, -128, 1040, 220); head.GetComponent<Image>().raycastTarget = false;
+        var headIn = UIKit.Panel(head, new Color(0, 0, 0, 0), "Inner").rectTransform; UIKit.Stretch(headIn, 0, 8, 0, 0); headIn.GetComponent<Image>().raycastTarget = false;
+        // game name on the kit's purple cat-ear plate (studio style: floating header pieces, no slab)
+        var plate = UIKit.SkinPanel(headIn, "plate_title", "TitlePlate", 0.9f); UIKit.Place(plate.rectTransform, 0, 0.5f, 300, 38, 560, 140); plate.raycastTarget = false;
+        var title = UIKit.Outlined(UIKit.Label(plate.transform, "Duck Smash", 58, Color.white), new Color(0.25f, 0.05f, 0.45f, 0.7f), 3); title.rectTransform.offsetMin = new Vector2(0, -6);
+        var sub = UIKit.Label(headIn, "", 1, Color.clear); sub.gameObject.SetActive(false);
+        coinsTxt = Pill(headIn, -50, -72, Yellow, out var coinIcon); if (UIKit.Skin("coin") != null) { coinIcon.sprite = UIKit.Skin("coin"); coinIcon.color = Color.white; }
+        starsTxt = Pill(headIn, 200, -72, Yellow, out var starIcon); starIcon.sprite = UIKit.Star; starIcon.color = Color.white; starIcon.preserveAspect = true;
         boostTxt = UIKit.Label(headIn, "", 1, Color.clear); boostTxt.gameObject.SetActive(false);   // booster counts live in-game now
         var gear = UIKit.Btn(headIn, "", Color.white, Ink, 30, () => App.OpenSettings(false), "Settings");
         UIKit.Place((RectTransform)gear.transform, 1, 0.5f, -78, 0, 116, 116);
@@ -124,7 +129,7 @@ public class MapScreen : MonoBehaviour
         }
 
         // bottom dock: album · PLAY · smash levels · sandbox
-        var dock = UIKit.Panel(root, Color.white, "Dock").rectTransform; UIKit.Place(dock, 0.5f, 0, 0, 105, 1040, 190);
+        var dock = UIKit.SkinPanel(root, "panel", "Dock", 1.4f).rectTransform; UIKit.Place(dock, 0.5f, 0, 0, 105, 1040, 190);
         var dsh = dock.gameObject.AddComponent<Shadow>(); dsh.effectColor = new Color(0.1f, 0.2f, 0.4f, 0.18f); dsh.effectDistance = new Vector2(0, 8);
         var album = UIKit.Btn(dock, "ALBUM", Teal, Color.white, 32, OpenAlbum, "Album");
         UIKit.Place((RectTransform)album.transform, 0.5f, 0.5f, -390, 4, 170, 130);
@@ -152,9 +157,9 @@ public class MapScreen : MonoBehaviour
     // white pill with an icon on the left and a number
     Text Pill(RectTransform parent, float x, float y, Color iconCol, out Image icon)
     {
-        var p = UIKit.Panel(parent, new Color(0.1f, 0.2f, 0.45f, 0.35f), "Pill").rectTransform; UIKit.Place(p, 0, 0.5f, x + 210, y, 210, 58);
-        icon = UIKit.Dot(p, iconCol, "Icon"); UIKit.Place(icon.rectTransform, 0, 0.5f, 30, 0, 46, 46); icon.raycastTarget = false;
-        var t = UIKit.Label(p, "", 32, Color.white); UIKit.Place(t.rectTransform, 0.5f, 0.5f, 22, 0, 160, 58);
+        var p = UIKit.SkinPanel(parent, "currency", "Pill", 1.2f).rectTransform; UIKit.Place(p, 0, 0.5f, x + 210, y, 230, 68);
+        icon = UIKit.Dot(p, iconCol, "Icon"); UIKit.Place(icon.rectTransform, 0, 0.5f, 18, 2, 70, 70); icon.raycastTarget = false; icon.preserveAspect = true;   // icon overlaps the left cap, like the studio games
+        var t = UIKit.Outlined(UIKit.Label(p, "", 32, Color.white), new Color(0.1f, 0.25f, 0.5f, 0.9f), 2); UIKit.Place(t.rectTransform, 0.5f, 0.5f, 20, 2, 170, 64);
         return t;
     }
     RawImage duckMark; readonly List<(RectTransform rt, float speed, float phase)> bubbles = new List<(RectTransform, float, float)>();
@@ -199,10 +204,10 @@ public class MapScreen : MonoBehaviour
 
     void Banner(string text, float x, float y, Color c)
     {
-        var b = UIKit.Panel(content, c, "Banner").rectTransform;
-        b.anchorMin = b.anchorMax = new Vector2(0.5f, 0); b.sizeDelta = new Vector2(500, 64); b.anchoredPosition = new Vector2(x, y);
-        var bs = b.gameObject.AddComponent<Shadow>(); bs.effectColor = new Color(0.1f, 0.2f, 0.4f, 0.2f); bs.effectDistance = new Vector2(0, -6);
-        UIKit.Label(b, text, 28, Color.white);
+        var bi = UIKit.Skin("plate_title") != null ? UIKit.SkinPanel(content, "plate_title", "Banner", 1.1f) : UIKit.Panel(content, c, "Banner");
+        var b = bi.rectTransform; bi.raycastTarget = false;
+        b.anchorMin = b.anchorMax = new Vector2(0.5f, 0); b.sizeDelta = new Vector2(560, 104); b.anchoredPosition = new Vector2(x, y);
+        var bl = UIKit.Outlined(UIKit.Label(b, text, 28, Color.white), new Color(0.25f, 0.05f, 0.45f, 0.7f), 2); bl.rectTransform.offsetMin = new Vector2(0, -4);
     }
 
     // zig-zag: 4 columns going up

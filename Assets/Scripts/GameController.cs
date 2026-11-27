@@ -243,6 +243,7 @@ public class GameController : MonoBehaviour
 
     // ---------- UI ----------
     RectTransform hud, feverFill, bossFill, bossBar, hintPanel, popupRoot;
+    Image levelPlate, introPlate;
     Text movesTxt, goalsTxt, levelTxt, scoreTxt, feverTxt, streakTxt, hintTxt, comboTxt, bigTxt, bossTxt, popTitle, popBody, popStars, popReward;
     Button popA, popB, popC; float bigLife; Image[] popStarImgs; Image popHeader; Text popLevel, popProgTxt; RawImage popSad; RectTransform popStat, popProg, popProgFill;
     readonly Dictionary<string, Text> boostTxt = new Dictionary<string, Text>();
@@ -360,7 +361,7 @@ public class GameController : MonoBehaviour
         foreach (var b in blocks) MakeView(b);
         foreach (var cb in blocks) if (cb.type == "chest" && cb.view != null) cb.tag = MakeTag("2 vịt", new Color(1f, 0.7f, 0.2f), true);
         if (level <= 19) foreach (var cb in blocks) if (cb.type == "ring" && cb.view != null) cb.tag = MakeTag("ĐẨY TRƯỢT", new Color(1f, 0.42f, 0.4f), false);
-        if (level <= 16) foreach (var cb in blocks) if (cb.type == "gold" && cb.mvAmp > 0 && cb.view != null) cb.tag = MakeTag("+1 LƯỢT", new Color(0.95f, 0.65f, 0.1f), false);
+        if (level <= 16) foreach (var cb in blocks) if (cb.type == "gold" && cb.mvAmp > 0 && cb.view != null) cb.tag = MakeTag("+XU", new Color(0.95f, 0.65f, 0.1f), false);   // coins only (no more free moves)
         // water colour by chapter: the bath changes as you progress (blue -> teal -> lavender bubble bath; hard = deeper)
         if (waterMat != null)
             waterMat.SetColor("_Shift", LevelLibrary.IsSandbox(level) || level <= 12 ? new Color(1, 1, 1, 0)
@@ -1814,7 +1815,7 @@ public class GameController : MonoBehaviour
                 if (PlayerPrefs.GetInt("ds_frenzy_tut", 0) == 0 && state == "play")
                 {   // explain it once, the first time it happens
                     PlayerPrefs.SetInt("ds_frenzy_tut", 1); PlayerPrefs.Save();
-                    introTitle.text = "DUCK FRENZY!"; introTitle.color = new Color(1f, 0.45f, 0.72f);
+                    introTitle.text = "DUCK FRENZY!"; introTitle.color = Color.white;
                     introBody.text = "<b>FRENZY đầy!</b>\n<size=28>Phát sau: <b>5 vịt</b> lao ra, <b>xuyên qua</b> đồ vật</size>";
                     introMax = introTimer = 5f; introRoot.gameObject.SetActive(true); introRoot.SetAsLastSibling();
                 }
@@ -1884,7 +1885,7 @@ public class GameController : MonoBehaviour
     {
         var g = new List<string> { "<b>PHÁ SẠCH BỒN</b>", "<size=40>đập vỡ hết " + GoalsLeft() + " món</size>" };
         introTitle.text = LevelLibrary.Title(level);
-        introTitle.color = level > LevelLibrary.Onboarding && level <= LevelLibrary.Count ? LevelLibrary.TierColor(LevelLibrary.Tier(level)) : new Color(0.27f, 0.56f, 0.93f);
+        introTitle.color = Color.white; if (introPlate != null && UIKit.Skin(PlateFor(level)) != null) introPlate.sprite = UIKit.Skin(PlateFor(level));
         // reminder of the combo ducks the player has already unlocked
         var known = LevelLibrary.Specials.Where(s => LevelLibrary.Unlocked(s.kind, level) && LevelLibrary.NewSpecialAt(level) != s).ToList();
         string combos = "";   // no combo recipe reminder on every level (players found it patronising); the COMBO ? guide has it
@@ -3184,30 +3185,34 @@ public class GameController : MonoBehaviour
         flashImg.color = new Color(1f, 0.97f, 0.9f, 0); flashImg.raycastTarget = false; flashImg.canvasRenderer.cullTransparentMesh = true;
         // top bar
         // slim top bar: the board gets the screen (players said "UI huge, game tiny")
-        var top = UIKit.Panel(hud, PurpleDark, "TopBar").rectTransform; UIKit.Place(top, 0.5f, 1, 0, -74, 1060, 132);
-        var topIn = UIKit.Panel(top, Purple, "Inner").rectTransform; UIKit.Stretch(topIn, 0, 6, 0, 0);
-        var mframe = UIKit.Panel(topIn, PurpleDark, "MovesFrame").rectTransform; UIKit.Place(mframe, 0, 0.5f, 72, 2, 112, 106);
-        var mb = UIKit.Panel(topIn, Color.white, "Moves").rectTransform; UIKit.Place(mb, 0, 0.5f, 72, 2, 104, 98);
-        movesTxt = UIKit.Label(mb, "10", 60, Ink); movesTxt.rectTransform.offsetMin = new Vector2(0, 22);
-        var ml = UIKit.Label(mb, "VỊT", 24, PurpleDark); ml.fontStyle = FontStyle.Bold; ml.rectTransform.offsetMax = new Vector2(0, -68);
-        var sp = UIKit.Rect("StarPreview", topIn); UIKit.Place(sp, 0, 0.5f, 720, -30, 110, 28);
-        starPreview = UIKit.StarRow(sp, 3, 26, 4);
+        var top = UIKit.Rect("TopBar", hud); UIKit.Place(top, 0.5f, 1, 0, -86, 1060, 150);
+        var topIn = UIKit.Rect("Inner", top); UIKit.Stretch(topIn);
+        // moves: purple kit tile with a gold rim (the "how many ducks left" number is the most important thing)
+        var mb = UIKit.SkinPanel(topIn, "booster", "Moves", 1.8f).rectTransform; UIKit.Place(mb, 0, 0.5f, 82, 0, 150, 136);
+        movesTxt = UIKit.Outlined(UIKit.Label(mb, "10", 66, Color.white), new Color(0.2f, 0.05f, 0.4f, 0.45f), 2); movesTxt.rectTransform.offsetMin = new Vector2(0, 30);
+        var ml = UIKit.Label(mb, "VỊT", 26, new Color(1f, 0.88f, 0.4f)); ml.rectTransform.offsetMax = new Vector2(0, -88);
+        // level name on a plate whose art follows the tier (blue / red cat plate / purple cat plate)
+        levelPlate = UIKit.SkinPanel(topIn, "bar_blue", "LevelPlate", 0.8f); UIKit.Place(levelPlate.rectTransform, 0, 0.5f, 480, 36, 470, 84);
+        levelTxt = UIKit.Outlined(UIKit.Label(levelPlate.transform, "", 32, Color.white), new Color(0.1f, 0.1f, 0.3f, 0.6f), 2); levelTxt.rectTransform.offsetMin = new Vector2(0, 4);
+        // goal bar: kit track + green fill, the count sits on the bar
+        var ob = UIKit.SkinPanel(topIn, "bar_track", "ObjBar", 0.9f).rectTransform; UIKit.Place(ob, 0, 0.5f, 480, -34, 560, 50);
+        objFill = UIKit.SkinPanel(ob, "bar_green", "Fill", 1.8f).rectTransform;
+        objFill.anchorMin = Vector2.zero; objFill.anchorMax = new Vector2(0, 1); objFill.offsetMin = new Vector2(4, 4); objFill.offsetMax = new Vector2(-4, -4); objFill.pivot = new Vector2(0, 0.5f);
+        goalsTxt = UIKit.Outlined(UIKit.Label(ob, "", 28, Color.white), new Color(0.1f, 0.12f, 0.3f, 0.9f), 2);
+        goalsTxt.horizontalOverflow = HorizontalWrapMode.Overflow; goalsTxt.verticalOverflow = VerticalWrapMode.Overflow;
+        var sp = UIKit.Rect("StarPreview", topIn); UIKit.Place(sp, 0, 0.5f, 832, -32, 130, 40);
+        starPreview = UIKit.StarRow(sp, 3, 40, 2);
         aimCount = UIKit.Outlined(UIKit.Label(hud, "", 64, Color.white), Ink, 4); aimCount.verticalOverflow = VerticalWrapMode.Overflow; aimCount.horizontalOverflow = HorizontalWrapMode.Overflow; aimCount.lineSpacing = 0.85f;
         aimCount.rectTransform.anchorMin = aimCount.rectTransform.anchorMax = new Vector2(0.5f, 0.5f); aimCount.rectTransform.sizeDelta = new Vector2(300, 100);
         aimCount.gameObject.SetActive(false);
-        goalsTxt = UIKit.Outlined(UIKit.Label(topIn, "", 30, Color.white, TextAnchor.MiddleLeft), Ink, 3); UIKit.Place(goalsTxt.rectTransform, 0, 0.5f, 520, 18, 500, 60);
-        goalsTxt.horizontalOverflow = HorizontalWrapMode.Overflow; goalsTxt.verticalOverflow = VerticalWrapMode.Overflow; goalsTxt.lineSpacing = 0.95f;
-        goalsTxt.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        var ob = UIKit.SkinPanel(topIn, "bar_track", "ObjBar", 1.6f).rectTransform; UIKit.Place(ob, 0, 0.5f, 470, -30, 400, 24);
-        objFill = UIKit.SkinPanel(ob, "bar_green", "Fill", 3f).rectTransform;
-        objFill.anchorMin = Vector2.zero; objFill.anchorMax = new Vector2(0, 1); objFill.offsetMin = new Vector2(3, 3); objFill.offsetMax = new Vector2(-3, -3); objFill.pivot = new Vector2(0, 0.5f);
-        levelTxt = UIKit.Label(topIn, "", 32, Color.white, TextAnchor.MiddleRight); UIKit.Place(levelTxt.rectTransform, 1, 0.5f, -230, 2, 240, 44);
-        scoreTxt = UIKit.Label(topIn, "", 30, Yellow, TextAnchor.MiddleRight); UIKit.Place(scoreTxt.rectTransform, 1, 0.5f, -230, -20, 240, 44); scoreTxt.enabled = false;   // calm: score is noise mid-level
-        var gear = UIKit.Btn(topIn, "II", Color.white, Ink, 36, () => App.OpenSettings(true), "Settings");
-        UIKit.Place((RectTransform)gear.transform, 1, 0.5f, -56, 4, 84, 84);
+        scoreTxt = UIKit.Label(topIn, "", 30, Yellow, TextAnchor.MiddleRight); UIKit.Place(scoreTxt.rectTransform, 1, 0.5f, -230, -20, 240, 44); scoreTxt.enabled = false;
+        // pause = the kit's gear
+        var gear = UIKit.Btn(topIn, "", Color.white, Ink, 36, () => App.OpenSettings(true), "Settings");
+        UIKit.Place((RectTransform)gear.transform, 1, 0.5f, -62, 6, 112, 120);
+        if (UIKit.Skin("gear") != null) { var gi = gear.GetComponent<Image>(); gi.sprite = UIKit.Skin("gear"); gi.type = Image.Type.Simple; gi.color = Color.white; gi.preserveAspect = true; }
         // fever bar
         // FRENZY meter: how much is banked, what a full bar gives, and what this shot will add
-        feverBar = UIKit.Panel(hud, new Color(0.1f, 0.2f, 0.4f, 0.35f), "Fever").rectTransform; UIKit.Place(feverBar, 0.5f, 1, 0, -154, 1000, 16);   // slim, quiet FRENZY meter
+        feverBar = UIKit.Panel(hud, new Color(0.1f, 0.2f, 0.4f, 0.3f), "Fever").rectTransform; UIKit.Place(feverBar, 0.5f, 1, 0, -172, 900, 12);   // slim, quiet FRENZY meter
         var ftrack = UIKit.Rect("Track", feverBar); UIKit.Stretch(ftrack, 2, 2, 2, 2);
         feverGhost = UIKit.Panel(ftrack, new Color(1f, 1f, 1f, 0.4f), "Ghost").rectTransform;
         var ff = UIKit.Panel(ftrack, new Color(1f, 0.42f, 0.68f), "Fill"); feverFill = ff.rectTransform;
@@ -3234,26 +3239,29 @@ public class GameController : MonoBehaviour
         bigTxt = UIKit.Outlined(UIKit.Label(hud, "", 84, Color.white), Ink, 5); UIKit.Place(bigTxt.rectTransform, 0.5f, 0.5f, 0, 120, 1000, 200);
         bigTxt.color = new Color(1, 1, 1, 0);
         // hint
-        hintPanel = UIKit.Panel(hud, new Color(1, 1, 1, 0.92f), "Hint").rectTransform; UIKit.Place(hintPanel, 0.5f, 0, 0, 150, 960, 46);
+        hintPanel = UIKit.SkinPanel(hud, "pill_cream", "Hint", 1.6f).rectTransform; UIKit.Place(hintPanel, 0.5f, 0, 0, 176, 940, 66);
         hintTxt = UIKit.Label(hintPanel, "", 30, Ink); hintTxt.fontStyle = FontStyle.Bold; hintTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
         BuildTray();
         // booster bar
-        var bar = UIKit.Rect("Boosters", hud); UIKit.Place(bar, 0.5f, 0, 0, 66, 1060, 112);
-        var mapBtn = UIKit.Btn(bar, "BẢN\nĐỒ", Purple, Color.white, 24, App.ShowMap, "Map");
-        UIKit.Place((RectTransform)mapBtn.transform, 0, 0.5f, 68, 0, 120, 100);
+        var bar = UIKit.Rect("Boosters", hud); UIKit.Place(bar, 0.5f, 0, 0, 80, 1060, 136);
+        var mapBtn = UIKit.Btn(bar, "BẢN\nĐỒ", Purple, Color.white, 26, App.ShowMap, "Map");
+        UIKit.Place((RectTransform)mapBtn.transform, 0, 0.5f, 92, 0, 150, 116); UIKit.BtnText(mapBtn).lineSpacing = 0.9f;
         string[] keys = { "hammer", "bomb", "moves" };
         for (int i = 0; i < 3; i++)
         {
             string k = keys[i];
-            var b = UIKit.Btn(bar, "", Color.white, Ink, 36, () => UseBooster(k), "Boost_" + k);
-            UIKit.Place((RectTransform)b.transform, 0, 0.5f, 290 + i * 296, 0, 276, 92);
-            var lbl = UIKit.BtnText(b); lbl.lineSpacing = 1f; lbl.fontSize = 28;
-            lbl.rectTransform.offsetMin = new Vector2(84, lbl.rectTransform.offsetMin.y);   // room for the icon
-            var badge = UIKit.Panel(b.transform, new Color(0.95f, 0.42f, 0.36f), "Badge"); UIKit.Place(badge.rectTransform, 1, 1, -36, -4, 92, 40); badge.raycastTarget = false;
-            var bt = UIKit.Label(badge.transform, "", 24, Color.white); boostBadge[k] = bt; boostBadgeImg[k] = badge;
+            var b = UIKit.Btn(bar, "", Color.white, Color.white, 24, () => UseBooster(k), "Boost_" + k);
+            UIKit.Place((RectTransform)b.transform, 0, 0.5f, 430 + i * 200, 4, 160, 128);
+            var bimg = b.GetComponent<Image>();
+            if (UIKit.Skin("booster") != null) { bimg.sprite = UIKit.Skin("booster"); bimg.type = Image.Type.Sliced; bimg.color = Color.white; bimg.pixelsPerUnitMultiplier = 1.8f; }
+            var lbl = UIKit.BtnText(b); lbl.fontSize = 24; lbl.rectTransform.offsetMin = new Vector2(0, 10); lbl.rectTransform.offsetMax = new Vector2(0, -88);   // name along the bottom
+            lbl.alignment = TextAnchor.LowerCenter;
             var bIcon = UIKit.Rect("Icon", b.transform).gameObject.AddComponent<RawImage>(); bIcon.raycastTarget = false;
-            UIKit.Place(bIcon.rectTransform, 0, 0.5f, 48, 2, 62, 62); bIcon.texture = BoosterIcon(k);
-            boostTxt[k] = lbl; boostImg[k] = b.GetComponent<Image>();
+            UIKit.Place(bIcon.rectTransform, 0.5f, 0.5f, 0, 14, 68, 68); bIcon.texture = BoosterIcon(k);
+            var badge = UIKit.Dot(b.transform, Color.white, "Badge"); UIKit.Place(badge.rectTransform, 1, 1, -8, -8, 54, 54); badge.raycastTarget = false;
+            if (UIKit.Skin("badge_yellow") != null) badge.sprite = UIKit.Skin("badge_yellow"); else badge.color = Yellow;
+            var bt = UIKit.Label(badge.transform, "", 26, Ink); boostBadge[k] = bt; boostBadgeImg[k] = badge;
+            boostTxt[k] = lbl; boostImg[k] = bimg;
         }
         // result popup: coloured ribbon header, stars / sad duck, one stat row, a big primary button and
         // a row of two secondary buttons (retry + map) so the map is always one tap away
@@ -3290,11 +3298,12 @@ public class GameController : MonoBehaviour
         popB = UIKit.Btn(card, "", Yellow, Ink, 38, OnPopB, "B"); UIKit.Place((RectTransform)popB.transform, 0.5f, 0, -178, 95, 324, 112);
         popC = UIKit.Btn(card, "Bản đồ", Purple, Color.white, 38, () => App.ShowMap(), "C"); UIKit.Place((RectTransform)popC.transform, 0.5f, 0, 178, 95, 324, 112);
         // level intro card
-        introRoot = UIKit.Rect("Intro", hud); UIKit.Place(introRoot, 0.5f, 0, 0, 240, 1020, 230);
-        var ic = UIKit.Panel(introRoot, new Color(1f, 1f, 1f, 0.95f), "IntroCard"); UIKit.Stretch(ic.rectTransform);
+        introRoot = UIKit.Rect("Intro", hud); UIKit.Place(introRoot, 0.5f, 0, 0, 290, 1000, 240);
+        var ic = UIKit.SkinPanel(introRoot, "board", "IntroCard", 1.8f); UIKit.Stretch(ic.rectTransform);
         var ish = ic.gameObject.AddComponent<Shadow>(); ish.effectColor = new Color(0.3f, 0.2f, 0.5f, 0.3f); ish.effectDistance = new Vector2(0, -12);
-        introTitle = UIKit.Label(introRoot, "", 46, Purple); UIKit.Place(introTitle.rectTransform, 0.5f, 1, 0, -40, 980, 64);
-        introBody = UIKit.Label(introRoot, "", 34, Ink); UIKit.Place(introBody.rectTransform, 0.5f, 0.5f, 0, -30, 980, 150);
+        introPlate = UIKit.SkinPanel(introRoot, "bar_blue", "IntroPlate", 0.8f); UIKit.Place(introPlate.rectTransform, 0.5f, 1, 0, -8, 520, 88);
+        introTitle = UIKit.Outlined(UIKit.Label(introPlate.transform, "", 40, Color.white), new Color(0.1f, 0.1f, 0.3f, 0.6f), 2); introTitle.rectTransform.offsetMin = new Vector2(0, 4);
+        introBody = UIKit.Label(introRoot, "", 34, Ink); UIKit.Place(introBody.rectTransform, 0.5f, 0.5f, 0, -36, 940, 150);
         introRoot.gameObject.SetActive(false);
         // tutorial hand (white fingertip)
         var hand = UIKit.Dot(hud, Color.white, "Hand"); hand.raycastTarget = false; handRt = hand.rectTransform;
@@ -3311,6 +3320,11 @@ public class GameController : MonoBehaviour
             new Dictionary<char, Color> { { 'o', new Color(0.23f, 0.18f, 0.42f) }, { 'w', new Color(1f, 0.93f, 0.85f) } });
         hpx.rectTransform.anchorMin = hpx.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
         hpx.rectTransform.sizeDelta = new Vector2(91, 112); hpx.rectTransform.anchoredPosition = new Vector2(14, -50);
+        if (UIKit.Skin("hand") != null)
+        {   // glove art: fingertip sits at ~(20%, 85%) of the picture -> put that point on the touch dot
+            hpx.texture = UIKit.Skin("hand").texture; hpx.rectTransform.sizeDelta = new Vector2(140, 140);
+            hpx.rectTransform.anchoredPosition = new Vector2(70 - 0.2f * 140, -(0.85f * 140 - 70));
+        }
         var hl = UIKit.Label(hand.transform, "KÉO", 26, Ink); hl.name = "HandLabel"; hl.rectTransform.offsetMin = new Vector2(0, -150); hl.rectTransform.offsetMax = new Vector2(0, -120);
         handRt.gameObject.SetActive(false);
         // animated UI lives in a nested canvas: moving labels no longer force a rebuild of the whole HUD
@@ -3364,6 +3378,14 @@ public class GameController : MonoBehaviour
     // ===================== combo bar: how many smashes this shot, and which duck each milestone gives =====================
     RectTransform comboBar, comboFill, comboGhost; Text comboCount; readonly List<(int need, string kind, Image dot, Text label, RectTransform rt)> comboMarks = new List<(int, string, Image, Text, RectTransform)>();
     RectTransform guideRoot; Text guideBody; const float COMBO_MAX = 25f; float comboShownFill = -1, comboShownGhost = -1;
+
+    // kit plate per tier: blue bar = easy/medium, red cat plate = hard, purple cat plate = extreme, green = tutorial
+    static string PlateFor(int lvl)
+    {
+        if (lvl < 1 || lvl > LevelLibrary.Count) return "bar_blue";
+        if (lvl <= LevelLibrary.Onboarding) return "bar_green";
+        int t = LevelLibrary.Tier(lvl); return t == 3 ? "plate_purple" : t == 2 ? "plate_red" : "bar_blue";
+    }
 
     void BuildComboBar()
     {
@@ -3500,7 +3522,7 @@ public class GameController : MonoBehaviour
         {
             shownLeft = left;
             int done = goalTotal - left, pctDone = goalTotal > 0 ? Mathf.RoundToInt(100f * done / goalTotal) : 100;
-            goalsTxt.text = "<size=40><b>" + (left == 0 ? "XONG!" : "Còn " + left + " món") + "</b></size>";
+            goalsTxt.text = left == 0 ? "XONG!" : "Còn " + left + " món";
             objFill.anchorMax = new Vector2(goalTotal > 0 ? 1f - left / (float)goalTotal : 1f, 1);
             goalPulse = 0.25f;
             if (!halfShown && goalTotal >= 10 && left > 0 && left <= goalTotal / 2)
@@ -3510,12 +3532,16 @@ public class GameController : MonoBehaviour
             }
         }
         levelTxt.text = LevelLibrary.Title(level);
+        if (levelPlate != null) { var ps = UIKit.Skin(PlateFor(level)); if (ps != null && levelPlate.sprite != ps) levelPlate.sprite = ps; }
         foreach (var k in PRICE.Keys)
         {
             int n = SaveData.GetBoost(k);
-            boostTxt[k].text = BNAME[k];
-            boostBadge[k].text = n > 0 ? n.ToString() : PRICE[k] + " xu"; boostBadgeImg[k].color = n > 0 ? new Color(0.95f, 0.42f, 0.36f) : new Color(0.98f, 0.72f, 0.12f);
-            if (boostSkin[k] != (target == k)) { boostSkin[k] = target == k; UIKit.SkinButton(boostImg[k], target == k ? new Color(0.37f, 0.83f, 0.37f) : Color.white); }
+            boostTxt[k].text = n > 0 ? BNAME[k] : PRICE[k] + " xu";
+            // stock -> yellow count badge; none left -> the kit's green "+" (tap to buy)
+            var wantB = UIKit.Skin(n > 0 ? "badge_yellow" : "plus");
+            if (wantB != null && boostBadgeImg[k].sprite != wantB) boostBadgeImg[k].sprite = wantB;
+            boostBadge[k].text = n > 0 ? n.ToString() : "";
+            boostImg[k].color = target == k ? new Color(0.7f, 1f, 0.7f) : Color.white;   // armed booster glows green
         }
         }
         Sfx.MusicMood(state != "play" ? 1f : frenzyReady || frenzyShot ? 1.07f : moves <= 1 && shownLeft > 0 ? 1.05f : 1f);
